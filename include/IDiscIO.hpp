@@ -17,14 +17,14 @@ public:
     public:
         virtual size_t read(void* buf, size_t length)=0;
     };
-    virtual std::unique_ptr<IReadStream> beginReadStream(size_t offset);
+    virtual std::unique_ptr<IReadStream> beginReadStream(size_t offset)=0;
 
     class IWriteStream
     {
     public:
         virtual size_t write(void* buf, size_t length)=0;
     };
-    virtual std::unique_ptr<IWriteStream> beginWriteStream(size_t offset);
+    virtual std::unique_ptr<IWriteStream> beginWriteStream(size_t offset)=0;
 };
 
 }

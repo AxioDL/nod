@@ -1,5 +1,5 @@
-TEMPLATE = lib
-CONFIG += staticlib c++11
+TEMPLATE = app
+CONFIG += console c++11
 CONFIG -= app_bundle
 CONFIG -= qt
 QT =
@@ -15,10 +15,12 @@ HEADERS += \
     include/DiscWii.hpp
 
 SOURCES += \
+    lib/NODLib.cpp \
     lib/DiscIOFILE.cpp \
     lib/DiscIOWBFS.cpp \
     lib/FileIOFILE.cpp \
     lib/FileIOMEM.cpp \
     lib/DiscBase.cpp \
     lib/DiscGCN.cpp \
-    lib/DiscWii.cpp
+    lib/DiscWii.cpp \
+    main.cpp

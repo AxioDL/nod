@@ -9,8 +9,7 @@
 namespace NOD
 {
 
-std::unique_ptr<IDiscIO> NewDiscIOFILE(const char* path);
-std::unique_ptr<IDiscIO> NewDiscIOWBFS(const char* path);
+std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path);
 
 }
 
