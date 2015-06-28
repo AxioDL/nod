@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <stdlib.h>
+#include <stdio.h>
 
 namespace NOD
 {
@@ -12,19 +13,18 @@ class IDiscIO
 public:
     virtual ~IDiscIO() {}
 
-    class IReadStream
+    struct IReadStream
     {
-    public:
         virtual size_t read(void* buf, size_t length)=0;
+        virtual void seek(size_t offset, int whence=SEEK_SET)=0;
     };
-    virtual std::unique_ptr<IReadStream> beginReadStream(size_t offset)=0;
+    virtual std::unique_ptr<IReadStream> beginReadStream(size_t offset=0) const=0;
 
-    class IWriteStream
+    struct IWriteStream
     {
-    public:
         virtual size_t write(void* buf, size_t length)=0;
     };
-    virtual std::unique_ptr<IWriteStream> beginWriteStream(size_t offset)=0;
+    virtual std::unique_ptr<IWriteStream> beginWriteStream(size_t offset=0) const=0;
 };
 
 }

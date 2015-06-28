@@ -7,6 +7,7 @@ QT =
 INCLUDEPATH += include
 
 HEADERS += \
+    include/Util.hpp \
     include/NODLib.hpp \
     include/IDiscIO.hpp \
     include/IFileIO.hpp \
@@ -16,11 +17,11 @@ HEADERS += \
 
 SOURCES += \
     lib/NODLib.cpp \
-    lib/DiscIOFILE.cpp \
-    lib/DiscIOWBFS.cpp \
     lib/FileIOFILE.cpp \
     lib/FileIOMEM.cpp \
     lib/DiscBase.cpp \
     lib/DiscGCN.cpp \
     lib/DiscWii.cpp \
-    main.cpp
+    main.cpp \
+    lib/DiscIOWBFS.cpp \
+    lib/DiscIOISO.cpp

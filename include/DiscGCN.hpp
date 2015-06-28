@@ -9,7 +9,8 @@ namespace NOD
 class DiscGCN : public DiscBase
 {
 public:
-    DiscGCN(IDiscIO& discio);
+    DiscGCN(std::unique_ptr<IDiscIO>&& dio);
+    bool commit();
 };
 
 }

@@ -2,15 +2,19 @@
 #define __NOD_LIB__
 
 #include <memory>
-#include "DiscGCN.hpp"
-#include "DiscWii.hpp"
-#include "IDiscIO.hpp"
 
 namespace NOD
 {
 
-std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path);
+class DiscBase;
+
+std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path, bool& isWii);
 
 }
+
+#include "DiscGCN.hpp"
+#include "DiscWii.hpp"
+#include "IDiscIO.hpp"
+#include "Util.hpp"
 
 #endif // __NOD_LIB__

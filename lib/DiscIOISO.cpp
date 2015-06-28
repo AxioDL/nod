@@ -5,25 +5,27 @@
 namespace NOD
 {
 
-class DiscIOFILE : public IDiscIO
+class DiscIOISO : public IDiscIO
 {
     std::string filepath;
 public:
-    DiscIOFILE(const std::string& fpin)
+    DiscIOISO(const std::string& fpin)
     : filepath(fpin) {}
 
-    class FILEReadStream : public IReadStream
+    class ReadStream : public IReadStream
     {
-        friend class DiscIOFILE;
+        friend class DiscIOISO;
         FILE* fp;
-        FILEReadStream(FILE* fpin)
+        ReadStream(FILE* fpin)
         : fp(fpin) {}
-        ~FILEReadStream() {fclose(fp);}
+        ~ReadStream() {fclose(fp);}
     public:
         size_t read(void* buf, size_t length)
         {return fread(buf, 1, length, fp);}
+        void seek(size_t offset, int whence)
+        {fseek(fp, offset, whence);}
     };
-    std::unique_ptr<IReadStream> beginReadStream(size_t offset)
+    std::unique_ptr<IReadStream> beginReadStream(size_t offset) const
     {
         FILE* fp = fopen(filepath.c_str(), "rb");
         if (!fp)
@@ -32,21 +34,21 @@ public:
             return std::unique_ptr<IReadStream>();
         }
         fseek(fp, offset, SEEK_SET);
-        return std::unique_ptr<IReadStream>(new FILEReadStream(fp));
+        return std::unique_ptr<IReadStream>(new ReadStream(fp));
     }
 
-    class FILEWriteStream : public IWriteStream
+    class WriteStream : public IWriteStream
     {
-        friend class DiscIOFILE;
+        friend class DiscIOISO;
         FILE* fp;
-        FILEWriteStream(FILE* fpin)
+        WriteStream(FILE* fpin)
         : fp(fpin) {}
-        ~FILEWriteStream() {fclose(fp);}
+        ~WriteStream() {fclose(fp);}
     public:
         size_t write(void* buf, size_t length)
         {return fwrite(buf, 1, length, fp);}
     };
-    std::unique_ptr<IWriteStream> beginWriteStream(size_t offset)
+    std::unique_ptr<IWriteStream> beginWriteStream(size_t offset) const
     {
         FILE* fp = fopen(filepath.c_str(), "wb");
         if (!fp)
@@ -55,13 +57,13 @@ public:
             return std::unique_ptr<IWriteStream>();
         }
         fseek(fp, offset, SEEK_SET);
-        return std::unique_ptr<IWriteStream>(new FILEWriteStream(fp));
+        return std::unique_ptr<IWriteStream>(new WriteStream(fp));
     }
 };
 
-std::unique_ptr<IDiscIO> NewDiscIOFILE(const char* path)
+std::unique_ptr<IDiscIO> NewDiscIOISO(const char* path)
 {
-    return std::unique_ptr<IDiscIO>(new DiscIOFILE(path));
+    return std::unique_ptr<IDiscIO>(new DiscIOISO(path));
 }
 
 }

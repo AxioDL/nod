@@ -9,7 +9,8 @@ namespace NOD
 class DiscWii : public DiscBase
 {
 public:
-    DiscWii(IDiscIO& discio);
+    DiscWii(std::unique_ptr<IDiscIO>&& dio);
+    bool commit();
 };
 
 }

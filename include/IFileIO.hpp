@@ -14,17 +14,15 @@ public:
     virtual ~IFileIO() {}
     virtual size_t size()=0;
 
-    class IWriteStream
+    struct IWriteStream
     {
-    public:
         virtual ~IWriteStream() {}
         virtual size_t copyFromDisc(IDiscIO::IReadStream& discio, size_t length)=0;
     };
     virtual std::unique_ptr<IWriteStream> beginWriteStream();
 
-    class IReadStream
+    struct IReadStream
     {
-    public:
         virtual ~IReadStream() {}
         virtual size_t copyToDisc(IDiscIO::IWriteStream& discio, size_t length)=0;
     };
