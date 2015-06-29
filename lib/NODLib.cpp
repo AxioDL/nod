@@ -63,5 +63,11 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path, bool& isWii)
 
 }
 
+std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path)
+{
+    bool isWii;
+    return OpenDiscFromImage(path, isWii);
+}
+
 }
 

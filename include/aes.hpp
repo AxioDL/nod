@@ -67,8 +67,9 @@ public:
         size_t i,j;
         if (len%16)
             len = len/16+1;
-        else len /= 16;
-            feedback = _mm_loadu_si128((__m128i*)iv);
+        else
+            len /= 16;
+        feedback = _mm_loadu_si128((__m128i*)iv);
         for (i=0 ; i<len ; i++)
         {
             data = _mm_loadu_si128(&((__m128i*)inbuf)[i]);

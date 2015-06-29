@@ -10,8 +10,7 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    bool isWii;
-    std::unique_ptr<NOD::DiscBase> disc = NOD::OpenDiscFromImage(argv[1], isWii);
+    std::unique_ptr<NOD::DiscBase> disc = NOD::OpenDiscFromImage(argv[1]);
     if (!disc)
         return -1;
 

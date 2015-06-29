@@ -8,6 +8,7 @@ namespace NOD
 
 class DiscBase;
 
+std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path);
 std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path, bool& isWii);
 
 }
