@@ -2,7 +2,6 @@
 #define __NOD_DISC_BASE__
 
 #include <vector>
-#include <list>
 #include <memory>
 #include <string>
 #include "Util.hpp"
@@ -90,10 +89,20 @@ public:
             Node(const IPartition& parent, bool isDir, const char* name)
             : m_parent(parent), m_kind(isDir ? NODE_DIRECTORY : NODE_FILE), m_name(name) {}
             inline Kind getKind() const {return m_kind;}
-            std::unique_ptr<IPartReadStream> beginReadStream();
+            std::unique_ptr<IPartReadStream> beginReadStream() const
+            {
+                if (m_kind != NODE_FILE)
+                {
+                    throw std::runtime_error("unable to stream a non-file");
+                    return std::unique_ptr<IPartReadStream>();
+                }
+                return m_parent.beginReadStream(m_discOffset);
+            }
         };
     protected:
-        std::list<Node> files;
+        std::vector<Node> m_files;
+        void parseFST();
+
         const DiscBase& m_parent;
         Kind m_kind;
         size_t m_offset;
@@ -101,7 +110,7 @@ public:
         IPartition(const DiscBase& parent, Kind kind, size_t offset)
         : m_parent(parent), m_kind(kind), m_offset(offset) {}
         inline Kind getKind() const {return m_kind;}
-        std::unique_ptr<IPartReadStream> beginReadStream(size_t offset);
+        virtual std::unique_ptr<IPartReadStream> beginReadStream(size_t offset=0) const=0;
     };
 
 protected:

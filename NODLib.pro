@@ -4,6 +4,9 @@ CONFIG -= app_bundle
 CONFIG -= qt
 QT =
 
+QMAKE_CXXFLAGS += -maes
+QMAKE_LFLAGS += -maes
+
 INCLUDEPATH += include
 
 HEADERS += \
@@ -13,7 +16,8 @@ HEADERS += \
     include/IFileIO.hpp \
     include/DiscBase.hpp \
     include/DiscGCN.hpp \
-    include/DiscWii.hpp
+    include/DiscWii.hpp \
+    include/aes.hpp
 
 SOURCES += \
     lib/NODLib.cpp \
@@ -22,6 +26,7 @@ SOURCES += \
     lib/DiscBase.cpp \
     lib/DiscGCN.cpp \
     lib/DiscWii.cpp \
-    main.cpp \
     lib/DiscIOWBFS.cpp \
-    lib/DiscIOISO.cpp
+    lib/DiscIOISO.cpp \
+    main.cpp \
+    lib/aes.cpp

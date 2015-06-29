@@ -1,8 +1,14 @@
 #include <stdio.h>
 #include "DiscWii.hpp"
+#include "aes.hpp"
 
 namespace NOD
 {
+
+static const uint8_t COMMON_KEY[] = {0xeb, 0xe4, 0x2a, 0x22,
+                                     0x5e, 0x85, 0x93, 0xe4,
+                                     0x48, 0xd9, 0xc5, 0x45,
+                                     0x73, 0x81, 0xaa, 0xf7};
 
 class PartitionWii : public DiscBase::IPartition
 {
@@ -156,6 +162,9 @@ class PartitionWii : public DiscBase::IPartition
     Certificate m_tmdCert;
     Certificate m_ticketCert;
 
+    size_t m_dataOff;
+    uint8_t m_decKey[16];
+
 public:
     PartitionWii(const DiscWii& parent, Kind kind, size_t offset)
     : IPartition(parent, kind, offset)
@@ -184,6 +193,7 @@ public:
         uint32_t dataOff;
         s->read(&dataOff, 4);
         dataOff = SBig(dataOff) << 2;
+        m_dataOff = offset + dataOff;
         uint32_t dataSize;
         s->read(&dataSize, 4);
         dataSize = SBig(dataSize) << 2;
@@ -196,6 +206,68 @@ public:
         m_tmdCert.read(*s.get());
         m_ticketCert.read(*s.get());
 
+        /* Decrypt title key */
+        std::unique_ptr<IAES> aes = NewAES();
+        uint8_t iv[16] = {};
+        memcpy(iv, m_ticket.titleId, 8);
+        aes->setKey(COMMON_KEY);
+        aes->decrypt(iv, m_ticket.encKey, m_decKey, 16);
+
+        parseFST();
+    }
+
+    class PartReadStream : public DiscBase::IPartReadStream
+    {
+        std::unique_ptr<IAES> m_aes;
+        const PartitionWii& m_parent;
+        size_t m_baseOffset;
+        size_t m_offset;
+        std::unique_ptr<IDiscIO::IReadStream> m_dio;
+
+        uint8_t m_encBuf[0x8000];
+        uint8_t m_decBuf[0x7c00];
+
+        void decryptBlock()
+        {
+            m_dio->read(m_encBuf, 0x8000);
+            m_aes->decrypt(&m_encBuf[0x3d0], &m_encBuf[0x400], m_decBuf, 0x7c00);
+        }
+    public:
+        PartReadStream(const PartitionWii& parent, size_t baseOffset, size_t offset)
+        : m_aes(NewAES()), m_parent(parent), m_baseOffset(baseOffset), m_offset(offset)
+        {
+            m_aes->setKey(parent.m_decKey);
+            size_t block = m_offset / 0x7c00;
+            m_dio = m_parent.m_parent.getDiscIO().beginReadStream(m_baseOffset + block * 0x8000);
+        }
+        size_t read(void* buf, size_t length)
+        {
+            size_t cacheOffset = m_offset % 0x7c00;
+            size_t cacheSize;
+            uint8_t* dst = (uint8_t*)buf;
+
+            while (length)
+            {
+                decryptBlock();
+
+                cacheSize = length;
+                if (cacheSize + cacheOffset > 0x7c00)
+                    cacheSize = 0x7c00 - cacheOffset;
+
+                memcpy(dst, m_decBuf + cacheOffset, cacheSize);
+                dst += cacheSize;
+                length -= cacheSize;
+                cacheOffset = 0;
+            }
+
+            m_offset += length;
+            return dst - (uint8_t*)buf;
+        }
+    };
+
+    std::unique_ptr<DiscBase::IPartReadStream> beginReadStream(size_t offset) const
+    {
+        return std::unique_ptr<DiscBase::IPartReadStream>(new PartReadStream(*this, m_dataOff, offset));
     }
 };
 

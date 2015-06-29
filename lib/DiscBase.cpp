@@ -8,4 +8,12 @@ DiscBase::DiscBase(std::unique_ptr<IDiscIO>&& dio)
 {
 }
 
+void DiscBase::IPartition::parseFST()
+{
+    char buf[1024];
+    std::unique_ptr<IPartReadStream> s = beginReadStream();
+    s->read(buf, 1024);
+    printf("");
+}
+
 }
