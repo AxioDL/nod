@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <stdio.h>
+#include <stdint.h>
 #include "Util.hpp"
 #include "IDiscIO.hpp"
 #include "IFileIO.hpp"
@@ -71,8 +72,8 @@ public:
             Kind m_kind;
 
             std::unique_ptr<IFileIO> m_hddFile;
-            size_t m_discOffset;
-            size_t m_discLength;
+            uint64_t m_discOffset;
+            uint64_t m_discLength;
             std::string m_name;
 
             std::vector<Node>::iterator m_childrenBegin;
@@ -82,7 +83,7 @@ public:
             Node(const IPartition& parent, const FSTNode& node, const char* name)
             : m_parent(parent),
               m_kind(node.isDir() ? NODE_DIRECTORY : NODE_FILE),
-              m_discOffset(node.getOffset()),
+              m_discOffset(parent.normalizeOffset(node.getOffset())),
               m_discLength(node.getLength()),
               m_name(name) {}
             inline Kind getKind() const {return m_kind;}
@@ -123,25 +124,31 @@ public:
             void extractToDirectory(const std::string& basePath, bool force=false);
         };
     protected:
-        uint32_t m_dolOff;
-        uint32_t m_fstOff;
-        uint32_t m_fstSz;
-        uint32_t m_apploaderOff;
+        uint64_t m_dolOff;
+        uint64_t m_fstOff;
+        uint64_t m_fstSz;
+        uint64_t m_apploaderSz;
         std::vector<Node> m_nodes;
         void parseFST(IPartReadStream& s);
 
         const DiscBase& m_parent;
         Kind m_kind;
-        size_t m_offset;
+        uint64_t m_offset;
     public:
-        IPartition(const DiscBase& parent, Kind kind, size_t offset)
+        IPartition(const DiscBase& parent, Kind kind, uint64_t offset)
         : m_parent(parent), m_kind(kind), m_offset(offset) {}
+        virtual uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset;}
         inline Kind getKind() const {return m_kind;}
-        virtual std::unique_ptr<IPartReadStream> beginReadStream(size_t offset=0) const=0;
+        virtual std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const=0;
         inline const Node& getFSTRoot() const {return m_nodes[0];}
         inline Node& getFSTRoot() {return m_nodes[0];}
-        inline void extractToDirectory(const std::string& path, bool force=false)
-        {m_nodes[0].extractToDirectory(path, force);}
+        std::string pathOfNode(const Node& node);
+        void extractToDirectory(const std::string& path, bool force=false);
+    private:
+        bool _recursivePathOfNode(const std::string& basePath,
+                                  const Node& refNode,
+                                  const Node& curNode,
+                                  std::string& result);
     };
 
 protected:
@@ -153,14 +160,14 @@ public:
     virtual bool commit()=0;
     inline const Header& getHeader() const {return m_header;}
     inline const IDiscIO& getDiscIO() const {return *m_discIO.get();}
-    inline const IPartition* getDataPartition() const
+    inline IPartition* getDataPartition()
     {
         for (const std::unique_ptr<IPartition>& part : m_partitions)
             if (part->getKind() == IPartition::PART_DATA)
                 return part.get();
         return nullptr;
     }
-    inline const IPartition* getUpdatePartition() const
+    inline IPartition* getUpdatePartition()
     {
         for (const std::unique_ptr<IPartition>& part : m_partitions)
             if (part->getKind() == IPartition::PART_UPDATE)

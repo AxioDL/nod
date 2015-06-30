@@ -2,6 +2,10 @@
 #include "DiscBase.hpp"
 #include "IFileIO.hpp"
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 namespace NOD
 {
 
@@ -52,8 +56,8 @@ void DiscBase::IPartition::Node::extractToDirectory(const std::string& basePath,
     {
         if (mkdir(path.c_str(), 0755) && errno != EEXIST)
             throw std::runtime_error("unable to mkdir '" + path + "'");
-        for (DiscBase::IPartition::Node& subnode : *this)
-            subnode.extractToDirectory(path);
+        for (Node& subnode : *this)
+            subnode.extractToDirectory(path, force);
     }
     else if (m_kind == NODE_FILE)
     {
@@ -66,6 +70,54 @@ void DiscBase::IPartition::Node::extractToDirectory(const std::string& basePath,
             ws->copyFromDisc(*rs.get(), m_discLength);
         }
     }
+}
+
+bool DiscBase::IPartition::_recursivePathOfNode(const std::string& basePath,
+                                                const Node& refNode,
+                                                const Node& curNode,
+                                                std::string& result)
+{
+    std::string path = basePath + "/" + curNode.getName();
+    if (&refNode == &curNode)
+    {
+        result = path;
+        return true;
+    }
+    else if (curNode.m_kind == Node::NODE_DIRECTORY)
+    {
+        for (const Node& subnode : curNode)
+            if (_recursivePathOfNode(path, refNode, subnode, result))
+                break;
+    }
+    return false;
+}
+
+std::string DiscBase::IPartition::pathOfNode(const Node& node)
+{
+    std::string result;
+    _recursivePathOfNode("", node, m_nodes[0], result);
+    return result;
+}
+
+void DiscBase::IPartition::extractToDirectory(const std::string& path, bool force)
+{
+    struct stat theStat;
+    if (mkdir(path.c_str(), 0755) && errno != EEXIST)
+        throw std::runtime_error("unable to mkdir '" + path + "'");
+
+    /* Extract Apploader */
+    std::string apploaderPath = path + "/apploader.bin";
+    if (force || stat(apploaderPath.c_str(), &theStat))
+    {
+        std::unique_ptr<uint8_t[]> buf(new uint8_t[m_apploaderSz]);
+        std::unique_ptr<IPartReadStream> rs = beginReadStream(0x2440);
+        rs->read(buf.get(), m_apploaderSz);
+        std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path + "/apploader.bin")->beginWriteStream();
+        ws->write(buf.get(), m_apploaderSz);
+    }
+
+    /* Extract Filesystem */
+    m_nodes[0].extractToDirectory(path, force);
 }
 
 }

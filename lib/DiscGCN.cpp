@@ -6,7 +6,7 @@ namespace NOD
 class PartitionGCN : public DiscBase::IPartition
 {
 public:
-    PartitionGCN(const DiscGCN& parent, Kind kind, size_t offset)
+    PartitionGCN(const DiscGCN& parent, Kind kind, uint64_t offset)
     : IPartition(parent, kind, offset)
     {
         /* GCN-specific header reads */
@@ -16,6 +16,9 @@ public:
         m_dolOff = SBig(vals[0]);
         m_fstOff = SBig(vals[1]);
         m_fstSz = SBig(vals[2]);
+        s->seek(0x2440 + 0x14);
+        s->read(vals, 8);
+        m_apploaderSz = SBig(vals[0]) + SBig(vals[1]);
 
         /* Yay files!! */
         parseFST(*s.get());
@@ -27,16 +30,16 @@ public:
         std::unique_ptr<IDiscIO::IReadStream> m_dio;
 
     public:
-        PartReadStream(const PartitionGCN& parent, size_t offset)
+        PartReadStream(const PartitionGCN& parent, uint64_t offset)
         : m_parent(parent)
         {m_dio = m_parent.m_parent.getDiscIO().beginReadStream(offset);}
-        void seek(size_t offset, int whence)
+        void seek(int64_t offset, int whence)
         {m_dio->seek(offset, whence);}
-        size_t read(void* buf, size_t length)
+        uint64_t read(void* buf, uint64_t length)
         {return m_dio->read(buf, length);}
     };
 
-    std::unique_ptr<IPartReadStream> beginReadStream(size_t offset) const
+    std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const
     {
         return std::unique_ptr<IPartReadStream>(new PartReadStream(*this, offset));
     }

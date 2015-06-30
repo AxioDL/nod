@@ -6,6 +6,7 @@
 namespace NOD
 {
 
+/* Not much of a secret anymore I suppose */
 static const uint8_t COMMON_KEY[] = {0xeb, 0xe4, 0x2a, 0x22,
                                      0x5e, 0x85, 0x93, 0xe4,
                                      0x48, 0xd9, 0xc5, 0x45,
@@ -124,7 +125,7 @@ class PartitionWii : public DiscBase::IPartition
             titleVersion = SBig(titleVersion);
             numContents = SBig(numContents);
             bootIdx = SBig(bootIdx);
-            for (size_t c=0 ; c<numContents ; ++c)
+            for (uint16_t c=0 ; c<numContents ; ++c)
             {
                 contents.emplace_back();
                 contents.back().read(s);
@@ -175,11 +176,11 @@ class PartitionWii : public DiscBase::IPartition
     Certificate m_tmdCert;
     Certificate m_ticketCert;
 
-    size_t m_dataOff;
+    uint64_t m_dataOff;
     uint8_t m_decKey[16];
 
 public:
-    PartitionWii(const DiscWii& parent, Kind kind, size_t offset)
+    PartitionWii(const DiscWii& parent, Kind kind, uint64_t offset)
     : IPartition(parent, kind, offset)
     {
         std::unique_ptr<IDiscIO::IReadStream> s = parent.getDiscIO().beginReadStream(offset);
@@ -233,6 +234,9 @@ public:
         m_dolOff = SBig(vals[0]) << 2;
         m_fstOff = SBig(vals[1]) << 2;
         m_fstSz = SBig(vals[2]) << 2;
+        ds->seek(0x2440 + 0x14);
+        ds->read(vals, 8);
+        m_apploaderSz = SBig(vals[0]) + SBig(vals[1]);
 
         /* Yay files!! */
         parseFST(*ds.get());
@@ -242,8 +246,8 @@ public:
     {
         std::unique_ptr<IAES> m_aes;
         const PartitionWii& m_parent;
-        size_t m_baseOffset;
-        size_t m_offset;
+        uint64_t m_baseOffset;
+        uint64_t m_offset;
         std::unique_ptr<IDiscIO::IReadStream> m_dio;
 
         size_t m_curBlock = SIZE_MAX;
@@ -256,7 +260,7 @@ public:
             m_aes->decrypt(&m_encBuf[0x3d0], &m_encBuf[0x400], m_decBuf, 0x7c00);
         }
     public:
-        PartReadStream(const PartitionWii& parent, size_t baseOffset, size_t offset)
+        PartReadStream(const PartitionWii& parent, uint64_t baseOffset, uint64_t offset)
         : m_aes(NewAES()), m_parent(parent), m_baseOffset(baseOffset), m_offset(offset)
         {
             m_aes->setKey(parent.m_decKey);
@@ -265,7 +269,7 @@ public:
             decryptBlock();
             m_curBlock = block;
         }
-        void seek(size_t offset, int whence)
+        void seek(int64_t offset, int whence)
         {
             if (whence == SEEK_SET)
                 m_offset = offset;
@@ -281,11 +285,11 @@ public:
                 m_curBlock = block;
             }
         }
-        size_t read(void* buf, size_t length)
+        uint64_t read(void* buf, uint64_t length)
         {
             size_t block = m_offset / 0x7c00;
             size_t cacheOffset = m_offset % 0x7c00;
-            size_t cacheSize;
+            uint64_t cacheSize;
             uint8_t* dst = (uint8_t*)buf;
 
             while (length)
@@ -312,10 +316,12 @@ public:
         }
     };
 
-    std::unique_ptr<IPartReadStream> beginReadStream(size_t offset) const
+    std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const
     {
         return std::unique_ptr<IPartReadStream>(new PartReadStream(*this, m_dataOff, offset));
     }
+
+    uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset << 2;}
 };
 
 DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)

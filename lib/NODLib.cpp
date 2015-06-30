@@ -29,7 +29,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path, bool& isWii)
     }
     else
     {
-        fseek(fp, 0x18, SEEK_SET);
+        fseeko(fp, 0x18, SEEK_SET);
         fread(&magic, 1, 4, fp);
         magic = NOD::SBig(magic);
         if (magic == 0x5D1C9EA3)

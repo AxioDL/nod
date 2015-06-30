@@ -18,13 +18,13 @@ public:
     FileIOFILE(const std::string& path)
     : m_path(path) {}
 
-    size_t size()
+    uint64_t size()
     {
         FILE* fp = fopen(m_path.c_str(), "rb");
         if (!fp)
             return 0;
-        fseek(fp, 0, SEEK_END);
-        size_t result = ftell(fp);
+        fseeko(fp, 0, SEEK_END);
+        uint64_t result = ftello(fp);
         fclose(fp);
         return result;
     }
@@ -40,13 +40,15 @@ public:
                 throw std::runtime_error("unable to open '" + path + "' for writing");
         }
         ~WriteStream() {fclose(fp);}
-        size_t copyFromDisc(IPartReadStream& discio, size_t length)
+        uint64_t write(void* buf, uint64_t length)
+        {return fwrite(buf, 1, length, fp);}
+        uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
         {
-            size_t read = 0;
+            uint64_t read = 0;
             while (length)
             {
-                size_t thisSz = MIN(0x7c00, length);
-                size_t readSz = discio.read(buf, thisSz);
+                uint64_t thisSz = MIN(0x7c00, length);
+                uint64_t readSz = discio.read(buf, thisSz);
                 if (thisSz != readSz)
                     throw std::runtime_error("unable to read enough from disc");
                 if (fwrite(buf, 1, readSz, fp) != readSz)
@@ -71,12 +73,14 @@ public:
                 throw std::runtime_error("unable to open '" + path + "' for reading");
         }
         ~ReadStream() {fclose(fp);}
-        size_t copyToDisc(IPartWriteStream& discio, size_t length)
+        uint64_t read(void* buf, uint64_t length)
+        {return fread(buf, 1, length, fp);}
+        uint64_t copyToDisc(IPartWriteStream& discio, uint64_t length)
         {
-            size_t written = 0;
+            uint64_t written = 0;
             while (length)
             {
-                size_t thisSz = MIN(0x7c00, length);
+                uint64_t thisSz = MIN(0x7c00, length);
                 if (fread(buf, 1, thisSz, fp) != thisSz)
                     throw std::runtime_error("unable to read enough from file");
                 if (discio.write(buf, thisSz) != thisSz)

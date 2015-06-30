@@ -20,12 +20,12 @@ public:
         : fp(fpin) {}
         ~ReadStream() {fclose(fp);}
     public:
-        size_t read(void* buf, size_t length)
+        uint64_t read(void* buf, uint64_t length)
         {return fread(buf, 1, length, fp);}
-        void seek(size_t offset, int whence)
-        {fseek(fp, offset, whence);}
+        void seek(int64_t offset, int whence)
+        {fseeko(fp, offset, whence);}
     };
-    std::unique_ptr<IReadStream> beginReadStream(size_t offset) const
+    std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
         FILE* fp = fopen(filepath.c_str(), "rb");
         if (!fp)
@@ -33,7 +33,7 @@ public:
             throw std::runtime_error("Unable to open '" + filepath + "' for reading");
             return std::unique_ptr<IReadStream>();
         }
-        fseek(fp, offset, SEEK_SET);
+        fseeko(fp, offset, SEEK_SET);
         return std::unique_ptr<IReadStream>(new ReadStream(fp));
     }
 
@@ -45,10 +45,10 @@ public:
         : fp(fpin) {}
         ~WriteStream() {fclose(fp);}
     public:
-        size_t write(void* buf, size_t length)
+        uint64_t write(void* buf, uint64_t length)
         {return fwrite(buf, 1, length, fp);}
     };
-    std::unique_ptr<IWriteStream> beginWriteStream(size_t offset) const
+    std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
         FILE* fp = fopen(filepath.c_str(), "wb");
         if (!fp)
@@ -56,7 +56,7 @@ public:
             throw std::runtime_error("Unable to open '" + filepath + "' for writing");
             return std::unique_ptr<IWriteStream>();
         }
-        fseek(fp, offset, SEEK_SET);
+        fseeko(fp, offset, SEEK_SET);
         return std::unique_ptr<IWriteStream>(new WriteStream(fp));
     }
 };
