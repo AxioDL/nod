@@ -10,7 +10,7 @@ public:
     : IPartition(parent, kind, offset)
     {
         /* GCN-specific header reads */
-        std::unique_ptr<DiscBase::IPartReadStream> s = beginReadStream(0x420);
+        std::unique_ptr<IPartReadStream> s = beginReadStream(0x420);
         uint32_t vals[3];
         s->read(vals, 12);
         m_dolOff = SBig(vals[0]);
@@ -21,7 +21,7 @@ public:
         parseFST(*s.get());
     }
 
-    class PartReadStream : public DiscBase::IPartReadStream
+    class PartReadStream : public IPartReadStream
     {
         const PartitionGCN& m_parent;
         std::unique_ptr<IDiscIO::IReadStream> m_dio;
@@ -36,9 +36,9 @@ public:
         {return m_dio->read(buf, length);}
     };
 
-    std::unique_ptr<DiscBase::IPartReadStream> beginReadStream(size_t offset) const
+    std::unique_ptr<IPartReadStream> beginReadStream(size_t offset) const
     {
-        return std::unique_ptr<DiscBase::IPartReadStream>(new PartReadStream(*this, offset));
+        return std::unique_ptr<IPartReadStream>(new PartReadStream(*this, offset));
     }
 };
 

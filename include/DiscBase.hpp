@@ -36,17 +36,6 @@ public:
         }
     };
 
-    struct IPartReadStream
-    {
-        virtual void seek(size_t offset, int whence=SEEK_SET)=0;
-        virtual size_t read(void* buf, size_t length)=0;
-    };
-
-    struct IPartWriteStream
-    {
-        virtual size_t write(void* buf, size_t length)=0;
-    };
-
     class FSTNode
     {
         uint32_t typeAndNameOffset;
@@ -86,8 +75,8 @@ public:
             size_t m_discLength;
             std::string m_name;
 
-            std::vector<Node>::const_iterator m_childrenBegin;
-            std::vector<Node>::const_iterator m_childrenEnd;
+            std::vector<Node>::iterator m_childrenBegin;
+            std::vector<Node>::iterator m_childrenEnd;
 
         public:
             Node(const IPartition& parent, const FSTNode& node, const char* name)
@@ -107,15 +96,15 @@ public:
                 }
                 return m_parent.beginReadStream(m_discOffset);
             }
-            inline std::vector<Node>::const_iterator rawBegin() const {return m_childrenBegin;}
-            inline std::vector<Node>::const_iterator rawEnd() const {return m_childrenEnd;}
+            inline std::vector<Node>::iterator rawBegin() const {return m_childrenBegin;}
+            inline std::vector<Node>::iterator rawEnd() const {return m_childrenEnd;}
 
-            class DirectoryIterator : std::iterator<std::forward_iterator_tag, const Node>
+            class DirectoryIterator : std::iterator<std::forward_iterator_tag, Node>
             {
                 friend class Node;
-                std::vector<Node>::const_iterator m_it;
-                DirectoryIterator(std::vector<Node>::const_iterator&& it)
-                : m_it(std::move(it)) {}
+                std::vector<Node>::iterator m_it;
+                DirectoryIterator(const std::vector<Node>::iterator& it)
+                : m_it(it) {}
             public:
                 inline bool operator!=(const DirectoryIterator& other) {return m_it != other.m_it;}
                 inline DirectoryIterator& operator++()
@@ -126,10 +115,12 @@ public:
                         ++m_it;
                     return *this;
                 }
-                inline const Node& operator*() {return *m_it;}
+                inline Node& operator*() {return *m_it;}
             };
-            inline DirectoryIterator begin() const {return DirectoryIterator(rawBegin());}
-            inline DirectoryIterator end() const {return DirectoryIterator(rawEnd());}
+            inline DirectoryIterator begin() const {return DirectoryIterator(m_childrenBegin);}
+            inline DirectoryIterator end() const {return DirectoryIterator(m_childrenEnd);}
+
+            void extractToDirectory(const std::string& basePath, bool force=false);
         };
     protected:
         uint32_t m_dolOff;
@@ -148,6 +139,9 @@ public:
         inline Kind getKind() const {return m_kind;}
         virtual std::unique_ptr<IPartReadStream> beginReadStream(size_t offset=0) const=0;
         inline const Node& getFSTRoot() const {return m_nodes[0];}
+        inline Node& getFSTRoot() {return m_nodes[0];}
+        inline void extractToDirectory(const std::string& path, bool force=false)
+        {m_nodes[0].extractToDirectory(path, force);}
     };
 
 protected:
@@ -172,6 +166,11 @@ public:
             if (part->getKind() == IPartition::PART_UPDATE)
                 return part.get();
         return nullptr;
+    }
+    inline void extractToDirectory(const std::string& path, bool force=false)
+    {
+        for (std::unique_ptr<IPartition>& part : m_partitions)
+            part->extractToDirectory(path, force);
     }
 };
 

@@ -1,4 +1,6 @@
+#include <sys/stat.h>
 #include "DiscBase.hpp"
+#include "IFileIO.hpp"
 
 namespace NOD
 {
@@ -26,7 +28,7 @@ void DiscBase::IPartition::parseFST(IPartReadStream& s)
     for (uint32_t n=0 ; n<nodeCount ; ++n)
     {
         const FSTNode& node = nodes[n];
-        m_nodes.emplace_back(*this, node, n ? names + node.getNameOffset() : "<root>");
+        m_nodes.emplace_back(*this, node, n ? names + node.getNameOffset() : "");
     }
 
     /* Setup dir-child iterators */
@@ -39,6 +41,29 @@ void DiscBase::IPartition::parseFST(IPartReadStream& s)
         {
             node.m_childrenBegin = it + 1;
             node.m_childrenEnd = m_nodes.begin() + node.m_discLength;
+        }
+    }
+}
+
+void DiscBase::IPartition::Node::extractToDirectory(const std::string& basePath, bool force)
+{
+    std::string path = basePath + "/" + getName();
+    if (m_kind == NODE_DIRECTORY)
+    {
+        if (mkdir(path.c_str(), 0755) && errno != EEXIST)
+            throw std::runtime_error("unable to mkdir '" + path + "'");
+        for (DiscBase::IPartition::Node& subnode : *this)
+            subnode.extractToDirectory(path);
+    }
+    else if (m_kind == NODE_FILE)
+    {
+        struct stat theStat;
+        if (force || stat(path.c_str(), &theStat))
+        {
+            m_hddFile = NewFileIO(path);
+            std::unique_ptr<IPartReadStream> rs = beginReadStream();
+            std::unique_ptr<IFileIO::IWriteStream> ws = m_hddFile->beginWriteStream();
+            ws->copyFromDisc(*rs.get(), m_discLength);
         }
     }
 }

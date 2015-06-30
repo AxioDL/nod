@@ -17,17 +17,20 @@ public:
     struct IWriteStream
     {
         virtual ~IWriteStream() {}
-        virtual size_t copyFromDisc(IDiscIO::IReadStream& discio, size_t length)=0;
+        virtual size_t copyFromDisc(struct IPartReadStream& discio, size_t length)=0;
     };
-    virtual std::unique_ptr<IWriteStream> beginWriteStream();
+    virtual std::unique_ptr<IWriteStream> beginWriteStream() const=0;
 
     struct IReadStream
     {
         virtual ~IReadStream() {}
-        virtual size_t copyToDisc(IDiscIO::IWriteStream& discio, size_t length)=0;
+        virtual size_t copyToDisc(struct IPartWriteStream& discio, size_t length)=0;
     };
-    virtual std::unique_ptr<IReadStream> beginReadStream();
+    virtual std::unique_ptr<IReadStream> beginReadStream() const=0;
 };
+
+std::unique_ptr<IFileIO> NewFileIO(const std::string& path);
+std::unique_ptr<IFileIO> NewMemIO(void* buf, size_t size);
 
 }
 

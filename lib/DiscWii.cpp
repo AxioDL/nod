@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "DiscWii.hpp"
 #include "aes.hpp"
 
@@ -12,6 +13,19 @@ static const uint8_t COMMON_KEY[] = {0xeb, 0xe4, 0x2a, 0x22,
 
 class PartitionWii : public DiscBase::IPartition
 {
+    enum SigType : uint32_t
+    {
+        SRSA_4096 = 0x00010000,
+        SRSA_2048 = 0x00010001,
+        SELIPTICAL_CURVE = 0x00010002
+    };
+
+    enum KeyType : uint32_t
+    {
+        KRSA_4096 = 0x00000000,
+        KRSA_2048 = 0x00000001
+    };
+
     struct Ticket
     {
         uint32_t sigType;
@@ -57,7 +71,7 @@ class PartitionWii : public DiscBase::IPartition
 
     struct TMD
     {
-        uint32_t sigType;
+        SigType sigType;
         char sig[256];
         char padding[60];
         char sigIssuer[64];
@@ -68,7 +82,7 @@ class PartitionWii : public DiscBase::IPartition
         uint32_t iosIdMajor;
         uint32_t iosIdMinor;
         uint32_t titleIdMajor;
-        uint32_t titleIdMinor;
+        char titleIdMinor[4];
         uint32_t titleType;
         uint16_t groupId;
         char padding2[62];
@@ -100,11 +114,10 @@ class PartitionWii : public DiscBase::IPartition
         void read(IDiscIO::IReadStream& s)
         {
             s.read(this, 484);
-            sigType = SBig(sigType);
+            sigType = (SigType)SBig(sigType);
             iosIdMajor = SBig(iosIdMajor);
             iosIdMinor = SBig(iosIdMinor);
             titleIdMajor = SBig(titleIdMajor);
-            titleIdMinor = SBig(titleIdMinor);
             titleType = SBig(titleType);
             groupId = SBig(groupId);
             accessFlags = SBig(accessFlags);
@@ -121,10 +134,10 @@ class PartitionWii : public DiscBase::IPartition
 
     struct Certificate
     {
-        uint32_t sigType;
+        SigType sigType;
         char sig[512];
         char issuer[64];
-        uint32_t keyType;
+        KeyType keyType;
         char subject[64];
         char key[512];
         uint32_t modulus;
@@ -133,22 +146,22 @@ class PartitionWii : public DiscBase::IPartition
         void read(IDiscIO::IReadStream& s)
         {
             s.read(&sigType, 4);
-            sigType = SBig(sigType);
-            if (sigType == 0x00010000)
+            sigType = (SigType)SBig(sigType);
+            if (sigType == SRSA_4096)
                 s.read(sig, 512);
-            else if (sigType == 0x00010001)
+            else if (sigType == SRSA_2048)
                 s.read(sig, 256);
-            else if (sigType == 0x00010002)
+            else if (sigType == SELIPTICAL_CURVE)
                 s.read(sig, 64);
             s.seek(60, SEEK_CUR);
 
             s.read(issuer, 64);
             s.read(&keyType, 4);
             s.read(subject, 64);
-            keyType = SBig(keyType);
-            if (keyType == 0x00000000)
+            keyType = (KeyType)SBig(keyType);
+            if (keyType == KRSA_4096)
                 s.read(key, 512);
-            else if (keyType == 0x00000001)
+            else if (keyType == KRSA_2048)
                 s.read(key, 256);
 
             s.read(&modulus, 8);
@@ -214,7 +227,7 @@ public:
         aes->decrypt(iv, m_ticket.encKey, m_decKey, 16);
 
         /* Wii-specific header reads (now using title key to decrypt) */
-        std::unique_ptr<DiscBase::IPartReadStream> ds = beginReadStream(0x420);
+        std::unique_ptr<IPartReadStream> ds = beginReadStream(0x420);
         uint32_t vals[3];
         ds->read(vals, 12);
         m_dolOff = SBig(vals[0]) << 2;
@@ -225,7 +238,7 @@ public:
         parseFST(*ds.get());
     }
 
-    class PartReadStream : public DiscBase::IPartReadStream
+    class PartReadStream : public IPartReadStream
     {
         std::unique_ptr<IAES> m_aes;
         const PartitionWii& m_parent;
@@ -233,6 +246,7 @@ public:
         size_t m_offset;
         std::unique_ptr<IDiscIO::IReadStream> m_dio;
 
+        size_t m_curBlock = SIZE_MAX;
         uint8_t m_encBuf[0x8000];
         uint8_t m_decBuf[0x7c00];
 
@@ -248,6 +262,8 @@ public:
             m_aes->setKey(parent.m_decKey);
             size_t block = m_offset / 0x7c00;
             m_dio = m_parent.m_parent.getDiscIO().beginReadStream(m_baseOffset + block * 0x8000);
+            decryptBlock();
+            m_curBlock = block;
         }
         void seek(size_t offset, int whence)
         {
@@ -259,16 +275,26 @@ public:
                 return;
             size_t block = m_offset / 0x7c00;
             m_dio->seek(m_baseOffset + block * 0x8000);
+            if (block != m_curBlock)
+            {
+                decryptBlock();
+                m_curBlock = block;
+            }
         }
         size_t read(void* buf, size_t length)
         {
+            size_t block = m_offset / 0x7c00;
             size_t cacheOffset = m_offset % 0x7c00;
             size_t cacheSize;
             uint8_t* dst = (uint8_t*)buf;
 
             while (length)
             {
-                decryptBlock();
+                if (block != m_curBlock)
+                {
+                    decryptBlock();
+                    m_curBlock = block;
+                }
 
                 cacheSize = length;
                 if (cacheSize + cacheOffset > 0x7c00)
@@ -278,6 +304,7 @@ public:
                 dst += cacheSize;
                 length -= cacheSize;
                 cacheOffset = 0;
+                ++block;
             }
 
             m_offset += length;
@@ -285,9 +312,9 @@ public:
         }
     };
 
-    std::unique_ptr<DiscBase::IPartReadStream> beginReadStream(size_t offset) const
+    std::unique_ptr<IPartReadStream> beginReadStream(size_t offset) const
     {
-        return std::unique_ptr<DiscBase::IPartReadStream>(new PartReadStream(*this, m_dataOff, offset));
+        return std::unique_ptr<IPartReadStream>(new PartReadStream(*this, m_dataOff, offset));
     }
 };
 

@@ -27,6 +27,17 @@ public:
     virtual std::unique_ptr<IWriteStream> beginWriteStream(size_t offset=0) const=0;
 };
 
+struct IPartReadStream
+{
+    virtual void seek(size_t offset, int whence=SEEK_SET)=0;
+    virtual size_t read(void* buf, size_t length)=0;
+};
+
+struct IPartWriteStream
+{
+    virtual size_t write(void* buf, size_t length)=0;
+};
+
 }
 
 #endif // __NOD_IDISC_IO__

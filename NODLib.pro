@@ -1,13 +1,10 @@
-TEMPLATE = app
-CONFIG += console c++11
+TEMPLATE = subdirs
 CONFIG -= app_bundle
 CONFIG -= qt
 QT =
 
-QMAKE_CXXFLAGS += -maes
-QMAKE_LFLAGS += -maes
-
-INCLUDEPATH += include
+SUBDIRS += lib driver
+driver.depends += lib
 
 HEADERS += \
     include/Util.hpp \
@@ -19,14 +16,3 @@ HEADERS += \
     include/DiscWii.hpp \
     include/aes.hpp
 
-SOURCES += \
-    lib/NODLib.cpp \
-    lib/FileIOFILE.cpp \
-    lib/FileIOMEM.cpp \
-    lib/DiscBase.cpp \
-    lib/DiscGCN.cpp \
-    lib/DiscWii.cpp \
-    lib/DiscIOWBFS.cpp \
-    lib/DiscIOISO.cpp \
-    main.cpp \
-    lib/aes.cpp

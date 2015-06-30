@@ -1,16 +1,5 @@
-/* Rijndael Block Cipher - aes.c
-
-   Written by Mike Scott 21st April 1999
-   mike@compapp.dcu.ie
-
-   Permission for free direct or derivative use is granted subject
-   to compliance with any conditions that the originators of the
-   algorithm place on its exploitation.
-
-*/
 #include "aes.hpp"
 #include <stdio.h>
-//#include <stdlib.h>
 #include <string.h>
 #include <cpuid.h>
 
@@ -605,8 +594,6 @@ public:
 #endif
 
 static int HAS_AES_NI = -1;
-
-
 std::unique_ptr<IAES> NewAES()
 {
 #if __AES__
@@ -614,10 +601,7 @@ std::unique_ptr<IAES> NewAES()
     {
         unsigned int a,b,c,d;
         __cpuid(1, a,b,c,d);
-        if (c & 0x2000000)
-            HAS_AES_NI = 1;
-        else
-            HAS_AES_NI = 0;
+        HAS_AES_NI = ((c & 0x2000000) != 0);
     }
     if (HAS_AES_NI)
         return std::unique_ptr<IAES>(new NiAES);
