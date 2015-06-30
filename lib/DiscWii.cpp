@@ -213,7 +213,16 @@ public:
         aes->setKey(COMMON_KEY);
         aes->decrypt(iv, m_ticket.encKey, m_decKey, 16);
 
-        parseFST();
+        /* Wii-specific header reads (now using title key to decrypt) */
+        std::unique_ptr<DiscBase::IPartReadStream> ds = beginReadStream(0x420);
+        uint32_t vals[3];
+        ds->read(vals, 12);
+        m_dolOff = SBig(vals[0]) << 2;
+        m_fstOff = SBig(vals[1]) << 2;
+        m_fstSz = SBig(vals[2]) << 2;
+
+        /* Yay files!! */
+        parseFST(*ds.get());
     }
 
     class PartReadStream : public DiscBase::IPartReadStream
@@ -239,6 +248,17 @@ public:
             m_aes->setKey(parent.m_decKey);
             size_t block = m_offset / 0x7c00;
             m_dio = m_parent.m_parent.getDiscIO().beginReadStream(m_baseOffset + block * 0x8000);
+        }
+        void seek(size_t offset, int whence)
+        {
+            if (whence == SEEK_SET)
+                m_offset = offset;
+            else if (whence == SEEK_CUR)
+                m_offset += offset;
+            else
+                return;
+            size_t block = m_offset / 0x7c00;
+            m_dio->seek(m_baseOffset + block * 0x8000);
         }
         size_t read(void* buf, size_t length)
         {

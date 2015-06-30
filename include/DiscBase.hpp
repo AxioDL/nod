@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <stdio.h>
 #include "Util.hpp"
 #include "IDiscIO.hpp"
 #include "IFileIO.hpp"
@@ -35,28 +36,27 @@ public:
         }
     };
 
-    struct FSTNode
-    {
-        uint32_t typeAndNameOff;
-        uint32_t offset;
-        uint32_t length;
-        FSTNode(IDiscIO::IReadStream& s)
-        {
-            s.read(this, 12);
-            typeAndNameOff = SBig(typeAndNameOff);
-            offset = SBig(offset);
-            length = SBig(length);
-        }
-    };
-
     struct IPartReadStream
     {
+        virtual void seek(size_t offset, int whence=SEEK_SET)=0;
         virtual size_t read(void* buf, size_t length)=0;
     };
 
     struct IPartWriteStream
     {
         virtual size_t write(void* buf, size_t length)=0;
+    };
+
+    class FSTNode
+    {
+        uint32_t typeAndNameOffset;
+        uint32_t offset;
+        uint32_t length;
+    public:
+        inline bool isDir() const {return SBig(typeAndNameOffset) >> 24;}
+        inline uint32_t getNameOffset() const {return SBig(typeAndNameOffset) & 0xffffff;}
+        inline uint32_t getOffset() const {return SBig(offset);}
+        inline uint32_t getLength() const {return SBig(length);}
     };
 
     class IPartition
@@ -77,18 +77,27 @@ public:
                 NODE_DIRECTORY
             };
         private:
+            friend class IPartition;
             const IPartition& m_parent;
             Kind m_kind;
-            std::string m_name;
 
             std::unique_ptr<IFileIO> m_hddFile;
             size_t m_discOffset;
             size_t m_discLength;
+            std::string m_name;
+
+            std::vector<Node>::const_iterator m_childrenBegin;
+            std::vector<Node>::const_iterator m_childrenEnd;
 
         public:
-            Node(const IPartition& parent, bool isDir, const char* name)
-            : m_parent(parent), m_kind(isDir ? NODE_DIRECTORY : NODE_FILE), m_name(name) {}
+            Node(const IPartition& parent, const FSTNode& node, const char* name)
+            : m_parent(parent),
+              m_kind(node.isDir() ? NODE_DIRECTORY : NODE_FILE),
+              m_discOffset(node.getOffset()),
+              m_discLength(node.getLength()),
+              m_name(name) {}
             inline Kind getKind() const {return m_kind;}
+            inline const std::string& getName() const {return m_name;}
             std::unique_ptr<IPartReadStream> beginReadStream() const
             {
                 if (m_kind != NODE_FILE)
@@ -98,10 +107,37 @@ public:
                 }
                 return m_parent.beginReadStream(m_discOffset);
             }
+            inline std::vector<Node>::const_iterator rawBegin() const {return m_childrenBegin;}
+            inline std::vector<Node>::const_iterator rawEnd() const {return m_childrenEnd;}
+
+            class DirectoryIterator : std::iterator<std::forward_iterator_tag, const Node>
+            {
+                friend class Node;
+                std::vector<Node>::const_iterator m_it;
+                DirectoryIterator(std::vector<Node>::const_iterator&& it)
+                : m_it(std::move(it)) {}
+            public:
+                inline bool operator!=(const DirectoryIterator& other) {return m_it != other.m_it;}
+                inline DirectoryIterator& operator++()
+                {
+                    if (m_it->m_kind == NODE_DIRECTORY)
+                        m_it = m_it->rawEnd();
+                    else
+                        ++m_it;
+                    return *this;
+                }
+                inline const Node& operator*() {return *m_it;}
+            };
+            inline DirectoryIterator begin() const {return DirectoryIterator(rawBegin());}
+            inline DirectoryIterator end() const {return DirectoryIterator(rawEnd());}
         };
     protected:
-        std::vector<Node> m_files;
-        void parseFST();
+        uint32_t m_dolOff;
+        uint32_t m_fstOff;
+        uint32_t m_fstSz;
+        uint32_t m_apploaderOff;
+        std::vector<Node> m_nodes;
+        void parseFST(IPartReadStream& s);
 
         const DiscBase& m_parent;
         Kind m_kind;
@@ -111,6 +147,7 @@ public:
         : m_parent(parent), m_kind(kind), m_offset(offset) {}
         inline Kind getKind() const {return m_kind;}
         virtual std::unique_ptr<IPartReadStream> beginReadStream(size_t offset=0) const=0;
+        inline const Node& getFSTRoot() const {return m_nodes[0];}
     };
 
 protected:
@@ -120,8 +157,22 @@ protected:
 public:
     DiscBase(std::unique_ptr<IDiscIO>&& dio);
     virtual bool commit()=0;
-    inline Header getHeader() const {return m_header;}
+    inline const Header& getHeader() const {return m_header;}
     inline const IDiscIO& getDiscIO() const {return *m_discIO.get();}
+    inline const IPartition* getDataPartition() const
+    {
+        for (const std::unique_ptr<IPartition>& part : m_partitions)
+            if (part->getKind() == IPartition::PART_DATA)
+                return part.get();
+        return nullptr;
+    }
+    inline const IPartition* getUpdatePartition() const
+    {
+        for (const std::unique_ptr<IPartition>& part : m_partitions)
+            if (part->getKind() == IPartition::PART_UPDATE)
+                return part.get();
+        return nullptr;
+    }
 };
 
 }

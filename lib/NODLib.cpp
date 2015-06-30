@@ -52,6 +52,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path, bool& isWii)
 
     if (!discIO)
     {
+        fclose(fp);
         throw std::runtime_error("'" + std::string(path) + "' is not a valid image");
         return std::unique_ptr<DiscBase>();
     }

@@ -12,6 +12,7 @@
 #include <stdio.h>
 //#include <stdlib.h>
 #include <string.h>
+#include <cpuid.h>
 
 namespace NOD
 {
@@ -30,13 +31,13 @@ namespace NOD
 
 static const uint8_t InCo[4] = {0xB, 0xD, 0x9, 0xE}; /* Inverse Coefficients */
 
-static uint32_t pack(const uint8_t* b)
+static inline uint32_t pack(const uint8_t* b)
 {
     /* pack bytes into a 32-bit Word */
     return ((uint32_t)b[3] << 24) | ((uint32_t)b[2] << 16) | ((uint32_t)b[1] << 8) | (uint32_t)b[0];
 }
 
-static void unpack(uint32_t a, uint8_t* b)
+static inline void unpack(uint32_t a, uint8_t* b)
 {
     /* unpack bytes from a word */
     b[0] = (uint8_t)a;
@@ -45,7 +46,7 @@ static void unpack(uint32_t a, uint8_t* b)
     b[3] = (uint8_t)(a >> 24);
 }
 
-static uint8_t xtime(uint8_t a)
+static inline uint8_t xtime(uint8_t a)
 {
     uint8_t b;
 
@@ -56,6 +57,40 @@ static uint8_t xtime(uint8_t a)
     a ^= b;
     return a;
 }
+
+class SoftwareAES : public IAES
+{
+protected:
+    uint8_t fbsub[256];
+    uint8_t rbsub[256];
+    uint8_t ptab[256], ltab[256];
+    uint32_t ftable[256];
+    uint32_t rtable[256];
+    uint32_t rco[30];
+
+    /* Parameter-dependent data */
+
+    int Nk, Nb, Nr;
+    uint8_t fi[24], ri[24];
+    uint32_t fkey[120];
+    uint32_t rkey[120];
+
+
+    uint8_t bmul(uint8_t x, uint8_t y);
+    uint32_t SubByte(uint32_t a);
+    uint8_t product(uint32_t x, uint32_t y);
+    uint32_t InvMixCol(uint32_t x);
+    uint8_t ByteSub(uint8_t x);
+    void gentables(void);
+    void gkey(int nb, int nk, const uint8_t* key);
+    void _encrypt(uint8_t* buff);
+    void _decrypt(uint8_t* buff);
+
+public:
+    void encrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len);
+    void decrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len);
+    void setKey(const uint8_t* key);
+};
 
 uint8_t SoftwareAES::bmul(uint8_t x, uint8_t y)
 {
@@ -454,76 +489,127 @@ void SoftwareAES::encrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, si
 
 #if __AES__
 
-static inline __m128i AES_128_ASSIST (__m128i temp1, __m128i temp2)
+#include <wmmintrin.h>
+
+class NiAES : public IAES
 {
-    __m128i temp3;
-    temp2 = _mm_shuffle_epi32 (temp2 ,0xff);
-    temp3 = _mm_slli_si128 (temp1, 0x4);
-    temp1 = _mm_xor_si128 (temp1, temp3);
-    temp3 = _mm_slli_si128 (temp3, 0x4);
-    temp1 = _mm_xor_si128 (temp1, temp3);
-    temp3 = _mm_slli_si128 (temp3, 0x4);
-    temp1 = _mm_xor_si128 (temp1, temp3);
-    temp1 = _mm_xor_si128 (temp1, temp2);
-    return temp1;
-}
+    __m128i m_ekey[11];
+    __m128i m_dkey[11];
+public:
+    void encrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)
+    {
+        __m128i feedback,data;
+        size_t i,j;
+        if (len%16)
+            len = len/16+1;
+        else
+            len /= 16;
+        feedback = _mm_loadu_si128((__m128i*)iv);
+        for (i=0 ; i<len ; i++)
+        {
+            data = _mm_loadu_si128(&((__m128i*)inbuf)[i]);
+            feedback = _mm_xor_si128(data, feedback);
+            feedback = _mm_xor_si128(feedback, m_ekey[0]);
+            for (j=1 ; j<10 ; j++)
+                feedback = _mm_aesenc_si128(feedback, m_ekey[j]);
+            feedback = _mm_aesenclast_si128(feedback, m_ekey[j]);
+            _mm_storeu_si128(&((__m128i*)outbuf)[i], feedback);
+        }
+    }
+    void decrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)
+    {
+        __m128i data,feedback,last_in;
+        size_t i,j;
+        if (len%16)
+            len = len/16+1;
+        else
+            len /= 16;
+        feedback = _mm_loadu_si128((__m128i*)iv);
+        for (i=0 ; i<len ; i++)
+        {
+            last_in=_mm_loadu_si128(&((__m128i*)inbuf)[i]);
+            data = _mm_xor_si128(last_in, m_dkey[0]);
+            for (j=1 ; j<10 ; j++)
+                data = _mm_aesdec_si128(data, m_dkey[j]);
+            data = _mm_aesdeclast_si128(data, m_dkey[j]);
+            data = _mm_xor_si128(data, feedback);
+            _mm_storeu_si128(&((__m128i*)outbuf)[i], data);
+            feedback = last_in;
+        }
+    }
 
-void NiAES::setKey(const uint8_t* key)
-{
-    __m128i temp1, temp2;
+    static inline __m128i AES_128_ASSIST (__m128i temp1, __m128i temp2)
+    {
+        __m128i temp3;
+        temp2 = _mm_shuffle_epi32 (temp2 ,0xff);
+        temp3 = _mm_slli_si128 (temp1, 0x4);
+        temp1 = _mm_xor_si128 (temp1, temp3);
+        temp3 = _mm_slli_si128 (temp3, 0x4);
+        temp1 = _mm_xor_si128 (temp1, temp3);
+        temp3 = _mm_slli_si128 (temp3, 0x4);
+        temp1 = _mm_xor_si128 (temp1, temp3);
+        temp1 = _mm_xor_si128 (temp1, temp2);
+        return temp1;
+    }
 
-    temp1 = _mm_loadu_si128((__m128i*)key);
-    m_ekey[0] = temp1;
-    m_dkey[10] = temp1;
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x1);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[1] = temp1;
-    m_dkey[9] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x2);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[2] = temp1;
-    m_dkey[8] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x4);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[3] = temp1;
-    m_dkey[7] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x8);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[4] = temp1;
-    m_dkey[6] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x10);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[5] = temp1;
-    m_dkey[5] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x20);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[6] = temp1;
-    m_dkey[4] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x40);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[7] = temp1;
-    m_dkey[3] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x80);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[8] = temp1;
-    m_dkey[2] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x1b);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[9] = temp1;
-    m_dkey[1] = _mm_aesimc_si128(temp1);
-    temp2 = _mm_aeskeygenassist_si128 (temp1,0x36);
-    temp1 = AES_128_ASSIST(temp1, temp2);
-    m_ekey[10] = temp1;
-    m_dkey[0] = temp1;
+    void setKey(const uint8_t* key)
+    {
+        __m128i temp1, temp2;
 
-}
+        temp1 = _mm_loadu_si128((__m128i*)key);
+        m_ekey[0] = temp1;
+        m_dkey[10] = temp1;
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x1);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[1] = temp1;
+        m_dkey[9] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x2);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[2] = temp1;
+        m_dkey[8] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x4);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[3] = temp1;
+        m_dkey[7] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x8);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[4] = temp1;
+        m_dkey[6] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x10);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[5] = temp1;
+        m_dkey[5] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x20);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[6] = temp1;
+        m_dkey[4] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x40);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[7] = temp1;
+        m_dkey[3] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x80);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[8] = temp1;
+        m_dkey[2] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x1b);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[9] = temp1;
+        m_dkey[1] = _mm_aesimc_si128(temp1);
+        temp2 = _mm_aeskeygenassist_si128(temp1, 0x36);
+        temp1 = AES_128_ASSIST(temp1, temp2);
+        m_ekey[10] = temp1;
+        m_dkey[0] = temp1;
+    }
+};
 
 #endif
 
 static int HAS_AES_NI = -1;
 
+
 std::unique_ptr<IAES> NewAES()
 {
+#if __AES__
     if (HAS_AES_NI == -1)
     {
         unsigned int a,b,c,d;
@@ -537,6 +623,9 @@ std::unique_ptr<IAES> NewAES()
         return std::unique_ptr<IAES>(new NiAES);
     else
         return std::unique_ptr<IAES>(new SoftwareAES);
+#else
+    return std::unique_ptr<IAES>(new SoftwareAES);
+#endif
 }
 
 }
