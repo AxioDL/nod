@@ -10,7 +10,11 @@ std::unique_ptr<IDiscIO> NewDiscIOWBFS(const SystemChar* path);
 std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path, bool& isWii)
 {
     /* Temporary file handle to determine image type */
+#if NOD_UCS2
+    FILE* fp = _wfopen(path, L"rb");
+#else
     FILE* fp = fopen(path, "rb");
+#endif
     if (!fp)
     {
 #if NOD_UCS2

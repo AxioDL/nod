@@ -1,3 +1,6 @@
+win32-g++ {
+QMAKE_LFLAGS += -municode
+}
 TEMPLATE = app
 CONFIG += console c++11
 CONFIG -= app_bundle

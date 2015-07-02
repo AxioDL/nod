@@ -29,7 +29,7 @@ public:
     std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
 #if NOD_UCS2
-        FILE* fp = wfopen(filepath.c_str(), L"rb");
+        FILE* fp = _wfopen(filepath.c_str(), L"rb");
 #else
         FILE* fp = fopen(filepath.c_str(), "rb");
 #endif
@@ -60,7 +60,7 @@ public:
     std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
 #if NOD_UCS2
-        FILE* fp = wfopen(filepath.c_str(), L"wb");
+        FILE* fp = _wfopen(filepath.c_str(), L"wb");
 #else
         FILE* fp = fopen(filepath.c_str(), "wb");
 #endif

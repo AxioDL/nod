@@ -1,6 +1,6 @@
-#include "NOD/NOD.hpp"
 #include <locale>
 #include <codecvt>
+#include "NOD/NOD.hpp"
 
 namespace NOD
 {

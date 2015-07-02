@@ -9,7 +9,15 @@ static void printHelp()
                     "  nodlib make <dir-in> [<image-out>]\n");
 }
 
+#if NOD_UCS2
+#ifdef strcasecmp
+#undef strcasecmp
+#endif
+#define strcasecmp _wcsicmp
+int wmain(int argc, wchar_t* argv[])
+#else
 int main(int argc, char* argv[])
+#endif
 {
     if (argc < 3)
     {
@@ -17,8 +25,8 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    const char* inDir = nullptr;
-    const char* outDir = ".";
+    const NOD::SystemChar* inDir = nullptr;
+    const NOD::SystemChar* outDir = _S(".");
     bool force = false;
     for (int a=2 ; a<argc ; ++a)
     {
@@ -30,7 +38,7 @@ int main(int argc, char* argv[])
             outDir = argv[a];
     }
 
-    if (!strcasecmp(argv[1], "extract"))
+    if (!strcasecmp(argv[1], _S("extract")))
     {
         std::unique_ptr<NOD::DiscBase> disc = NOD::OpenDiscFromImage(inDir);
         if (!disc)
@@ -42,7 +50,7 @@ int main(int argc, char* argv[])
 
         dataPart->extractToDirectory(outDir, force);
     }
-    else if (!strcasecmp(argv[1], "make"))
+    else if (!strcasecmp(argv[1], _S("make")))
     {
     }
     else

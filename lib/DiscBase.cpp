@@ -1,4 +1,3 @@
-#include <sys/stat.h>
 #include "NOD/DiscBase.hpp"
 #include "NOD/IFileIO.hpp"
 
@@ -55,15 +54,18 @@ void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     SystemString path = basePath + _S("/") + nameView.sys_str();
     if (m_kind == NODE_DIRECTORY)
     {
-        if (mkdir(path.c_str(), 0755) && errno != EEXIST)
-            throw std::runtime_error("unable to mkdir '" + path + "'");
+        if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
+        {
+            SystemUTF8View pathView(path);
+            throw std::runtime_error("unable to mkdir '" + pathView.utf8_str() + "'");
+        }
         for (Node& subnode : *this)
             subnode.extractToDirectory(path, force);
     }
     else if (m_kind == NODE_FILE)
     {
-        struct stat theStat;
-        if (force || stat(path.c_str(), &theStat))
+        Sstat theStat;
+        if (force || Stat(path.c_str(), &theStat))
         {
             m_hddFile = NewFileIO(path);
             std::unique_ptr<IPartReadStream> rs = beginReadStream();
@@ -75,18 +77,21 @@ void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
 
 void DiscBase::IPartition::extractToDirectory(const SystemString& path, bool force)
 {
-    struct stat theStat;
-    if (mkdir(path.c_str(), 0755) && errno != EEXIST)
-        throw std::runtime_error("unable to mkdir '" + path + "'");
+    Sstat theStat;
+    if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
+    {
+        SystemUTF8View pathView(path);
+        throw std::runtime_error("unable to mkdir '" + pathView.utf8_str() + "'");
+    }
 
     /* Extract Apploader */
-    std::string apploaderPath = path + "/apploader.bin";
-    if (force || stat(apploaderPath.c_str(), &theStat))
+    SystemString apploaderPath = path + _S("/apploader.bin");
+    if (force || Stat(apploaderPath.c_str(), &theStat))
     {
         std::unique_ptr<uint8_t[]> buf(new uint8_t[m_apploaderSz]);
         std::unique_ptr<IPartReadStream> rs = beginReadStream(0x2440);
         rs->read(buf.get(), m_apploaderSz);
-        std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path + "/apploader.bin")->beginWriteStream();
+        std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path + _S("/apploader.bin"))->beginWriteStream();
         ws->write(buf.get(), m_apploaderSz);
     }
 

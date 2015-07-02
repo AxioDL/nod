@@ -1,3 +1,6 @@
+win32-g++ {
+CROSS_COMPILE = x86_64-w64-mingw32-
+}
 TEMPLATE = subdirs
 CONFIG -= app_bundle
 CONFIG -= qt

@@ -1,4 +1,3 @@
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdexcept>
@@ -22,7 +21,7 @@ public:
     uint64_t size()
     {
 #if NOD_UCS2
-        FILE* fp = wfopen(m_path.c_str(), L"rb");
+        FILE* fp = _wfopen(m_path.c_str(), L"rb");
 #else
         FILE* fp = fopen(m_path.c_str(), "rb");
 #endif
@@ -41,7 +40,7 @@ public:
         WriteStream(const SystemString& path)
         {
 #if NOD_UCS2
-            fp = wfopen(path.c_str(), L"wb");
+            fp = _wfopen(path.c_str(), L"wb");
 #else
             fp = fopen(path.c_str(), "wb");
 #endif
@@ -84,7 +83,7 @@ public:
         ReadStream(const SystemString& path)
         {
 #if NOD_UCS2
-            fp = wfopen(path.c_str(), L"rb");
+            fp = _wfopen(path.c_str(), L"rb");
 #else
             fp = fopen(path.c_str(), "rb");
 #endif
