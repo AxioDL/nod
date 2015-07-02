@@ -1,6 +1,6 @@
 #include <sys/stat.h>
-#include "DiscBase.hpp"
-#include "IFileIO.hpp"
+#include "NOD/DiscBase.hpp"
+#include "NOD/IFileIO.hpp"
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -49,9 +49,10 @@ void DiscBase::IPartition::parseFST(IPartReadStream& s)
     }
 }
 
-void DiscBase::IPartition::Node::extractToDirectory(const std::string& basePath, bool force)
+void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, bool force)
 {
-    std::string path = basePath + "/" + getName();
+    SystemStringView nameView(getName());
+    SystemString path = basePath + _S("/") + nameView.sys_str();
     if (m_kind == NODE_DIRECTORY)
     {
         if (mkdir(path.c_str(), 0755) && errno != EEXIST)
@@ -72,34 +73,7 @@ void DiscBase::IPartition::Node::extractToDirectory(const std::string& basePath,
     }
 }
 
-bool DiscBase::IPartition::_recursivePathOfNode(const std::string& basePath,
-                                                const Node& refNode,
-                                                const Node& curNode,
-                                                std::string& result)
-{
-    std::string path = basePath + "/" + curNode.getName();
-    if (&refNode == &curNode)
-    {
-        result = path;
-        return true;
-    }
-    else if (curNode.m_kind == Node::NODE_DIRECTORY)
-    {
-        for (const Node& subnode : curNode)
-            if (_recursivePathOfNode(path, refNode, subnode, result))
-                break;
-    }
-    return false;
-}
-
-std::string DiscBase::IPartition::pathOfNode(const Node& node)
-{
-    std::string result;
-    _recursivePathOfNode("", node, m_nodes[0], result);
-    return result;
-}
-
-void DiscBase::IPartition::extractToDirectory(const std::string& path, bool force)
+void DiscBase::IPartition::extractToDirectory(const SystemString& path, bool force)
 {
     struct stat theStat;
     if (mkdir(path.c_str(), 0755) && errno != EEXIST)

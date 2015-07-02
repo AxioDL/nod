@@ -1,8 +1,77 @@
 #ifndef __NOD_UTIL_HPP__
 #define __NOD_UTIL_HPP__
 
+#include <string>
+#include <algorithm>
+
 namespace NOD
 {
+
+/* System char type */
+#if _WIN32 && UNICODE
+#include <wctype.h>
+#define NOD_UCS2 1
+#include <ctype.h>
+#endif
+
+/* String Converters */
+std::string WideToUTF8(const std::wstring& src);
+std::wstring UTF8ToWide(const std::string& src);
+
+/* String-converting views */
+#if NOD_UCS2
+typedef wchar_t SystemChar;
+typedef std::wstring SystemString;
+static inline void ToLower(SystemString& str)
+{std::transform(str.begin(), str.end(), str.begin(), towlower);}
+static inline void ToUpper(SystemString& str)
+{std::transform(str.begin(), str.end(), str.begin(), towupper);}
+class SystemUTF8View
+{
+    std::string m_utf8;
+public:
+    SystemUTF8View(const SystemString& str)
+    : m_utf8(WideToUTF8(str)) {}
+    inline const std::string& utf8_str() {return m_utf8;}
+};
+class SystemStringView
+{
+    std::wstring m_sys;
+public:
+    SystemStringView(const std::string& str)
+    : m_sys(UTF8ToWide(str)) {}
+    inline const std::wstring& sys_str() {return m_sys;}
+};
+#ifndef _S
+#define _S(val) L ## val
+#endif
+#else
+typedef char SystemChar;
+typedef std::string SystemString;
+static inline void ToLower(SystemString& str)
+{std::transform(str.begin(), str.end(), str.begin(), tolower);}
+static inline void ToUpper(SystemString& str)
+{std::transform(str.begin(), str.end(), str.begin(), toupper);}
+class SystemUTF8View
+{
+    const std::string& m_utf8;
+public:
+    SystemUTF8View(const SystemString& str)
+    : m_utf8(str) {}
+    inline const std::string& utf8_str() {return m_utf8;}
+};
+class SystemStringView
+{
+    const std::string& m_sys;
+public:
+    SystemStringView(const std::string& str)
+    : m_sys(str) {}
+    inline const std::string& sys_str() {return m_sys;}
+};
+#ifndef _S
+#define _S(val) val
+#endif
+#endif
 
 /* Type-sensitive byte swappers */
 template <typename T>

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include "NODLib.hpp"
+#include "NOD/NOD.hpp"
 
 static void printHelp()
 {

@@ -1,15 +1,16 @@
 #include <stdio.h>
 #include <stdexcept>
-#include "IDiscIO.hpp"
+#include "NOD/Util.hpp"
+#include "NOD/IDiscIO.hpp"
 
 namespace NOD
 {
 
 class DiscIOISO : public IDiscIO
 {
-    std::string filepath;
+    SystemString filepath;
 public:
-    DiscIOISO(const std::string& fpin)
+    DiscIOISO(const SystemString& fpin)
     : filepath(fpin) {}
 
     class ReadStream : public IReadStream
@@ -27,10 +28,18 @@ public:
     };
     std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
+#if NOD_UCS2
+        FILE* fp = wfopen(filepath.c_str(), L"rb");
+#else
         FILE* fp = fopen(filepath.c_str(), "rb");
+#endif
         if (!fp)
         {
-            throw std::runtime_error("Unable to open '" + filepath + "' for reading");
+#if NOD_UCS2
+            fwprintf(stderr, L"Unable to open '%s' for reading\n", filepath.c_str());
+#else
+            fprintf(stderr, "Unable to open '%s' for reading\n", filepath.c_str());
+#endif
             return std::unique_ptr<IReadStream>();
         }
         fseeko(fp, offset, SEEK_SET);
@@ -50,10 +59,18 @@ public:
     };
     std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
+#if NOD_UCS2
+        FILE* fp = wfopen(filepath.c_str(), L"wb");
+#else
         FILE* fp = fopen(filepath.c_str(), "wb");
+#endif
         if (!fp)
         {
-            throw std::runtime_error("Unable to open '" + filepath + "' for writing");
+#if NOD_UCS2
+            fwprintf(stderr, L"Unable to open '%s' for writing\n", filepath.c_str());
+#else
+            fprintf(stderr, "Unable to open '%s' for writing\n", filepath.c_str());
+#endif
             return std::unique_ptr<IWriteStream>();
         }
         fseeko(fp, offset, SEEK_SET);
@@ -61,7 +78,7 @@ public:
     }
 };
 
-std::unique_ptr<IDiscIO> NewDiscIOISO(const char* path)
+std::unique_ptr<IDiscIO> NewDiscIOISO(const SystemChar* path)
 {
     return std::unique_ptr<IDiscIO>(new DiscIOISO(path));
 }

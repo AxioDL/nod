@@ -4,6 +4,7 @@
 #include <memory>
 #include <stdlib.h>
 #include "IDiscIO.hpp"
+#include "Util.hpp"
 
 namespace NOD
 {
@@ -31,7 +32,7 @@ public:
     virtual std::unique_ptr<IReadStream> beginReadStream() const=0;
 };
 
-std::unique_ptr<IFileIO> NewFileIO(const std::string& path);
+std::unique_ptr<IFileIO> NewFileIO(const SystemString& path);
 std::unique_ptr<IFileIO> NewMemIO(void* buf, uint64_t size);
 
 }

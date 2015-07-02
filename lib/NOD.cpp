@@ -1,19 +1,23 @@
 #include <stdio.h>
-#include "NODLib.hpp"
-#include "DiscBase.hpp"
+#include "NOD/NOD.hpp"
+#include "NOD/DiscBase.hpp"
 
 namespace NOD
 {
-std::unique_ptr<IDiscIO> NewDiscIOISO(const char* path);
-std::unique_ptr<IDiscIO> NewDiscIOWBFS(const char* path);
+std::unique_ptr<IDiscIO> NewDiscIOISO(const SystemChar* path);
+std::unique_ptr<IDiscIO> NewDiscIOWBFS(const SystemChar* path);
 
-std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path, bool& isWii)
+std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path, bool& isWii)
 {
     /* Temporary file handle to determine image type */
     FILE* fp = fopen(path, "rb");
     if (!fp)
     {
-        throw std::runtime_error("Unable to open '" + std::string(path) + "'");
+#if NOD_UCS2
+        fwprintf(stderr, L"Unable to open '%s'\n", path);
+#else
+        fprintf(stderr, "Unable to open '%s'\n", path);
+#endif
         return std::unique_ptr<DiscBase>();
     }
 
@@ -47,13 +51,18 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path, bool& isWii)
                 fclose(fp);
                 discIO = NewDiscIOISO(path);
             }
+            else
+                fclose(fp);
         }
     }
 
     if (!discIO)
     {
-        fclose(fp);
-        throw std::runtime_error("'" + std::string(path) + "' is not a valid image");
+#if NOD_UCS2
+        fwprintf(stderr, L"'%s' is not a valid image\n", path);
+#else
+        fprintf(stderr, "'%s' is not a valid image\n", path);
+#endif
         return std::unique_ptr<DiscBase>();
     }
 
@@ -64,7 +73,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path, bool& isWii)
 
 }
 
-std::unique_ptr<DiscBase> OpenDiscFromImage(const char* path)
+std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path)
 {
     bool isWii;
     return OpenDiscFromImage(path, isWii);

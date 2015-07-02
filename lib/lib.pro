@@ -9,7 +9,6 @@ QMAKE_CXXFLAGS += -maes
 INCLUDEPATH += ../include
 
 SOURCES += \
-    NODLib.cpp \
     FileIOFILE.cpp \
     FileIOMEM.cpp \
     DiscBase.cpp \
@@ -17,5 +16,7 @@ SOURCES += \
     DiscWii.cpp \
     DiscIOWBFS.cpp \
     DiscIOISO.cpp \
-    aes.cpp
+    aes.cpp \
+    WideStringConvert.cpp \
+    NOD.cpp
 

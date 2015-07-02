@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include "DiscWii.hpp"
-#include "aes.hpp"
+#include "NOD/DiscWii.hpp"
+#include "NOD/aes.hpp"
 
 namespace NOD
 {

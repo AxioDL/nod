@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdexcept>
-#include "IFileIO.hpp"
+#include "NOD/Util.hpp"
+#include "NOD/IFileIO.hpp"
 
 /* Macros for min/max */
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -13,14 +14,18 @@ namespace NOD
 
 class FileIOFILE : public IFileIO
 {
-    std::string m_path;
+    SystemString m_path;
 public:
-    FileIOFILE(const std::string& path)
+    FileIOFILE(const SystemString& path)
     : m_path(path) {}
 
     uint64_t size()
     {
+#if NOD_UCS2
+        FILE* fp = wfopen(m_path.c_str(), L"rb");
+#else
         FILE* fp = fopen(m_path.c_str(), "rb");
+#endif
         if (!fp)
             return 0;
         fseeko(fp, 0, SEEK_END);
@@ -33,11 +38,21 @@ public:
     {
         FILE* fp;
         uint8_t buf[0x7c00];
-        WriteStream(const std::string& path)
+        WriteStream(const SystemString& path)
         {
+#if NOD_UCS2
+            fp = wfopen(path.c_str(), L"wb");
+#else
             fp = fopen(path.c_str(), "wb");
+#endif
             if (!fp)
-                throw std::runtime_error("unable to open '" + path + "' for writing");
+            {
+#if NOD_UCS2
+                throw std::runtime_error("Unable to open '" + WideToUTF8(path) + "' for writing");
+#else
+                throw std::runtime_error("Unable to open '" + path + "' for writing");
+#endif
+            }
         }
         ~WriteStream() {fclose(fp);}
         uint64_t write(void* buf, uint64_t length)
@@ -66,11 +81,21 @@ public:
     {
         FILE* fp;
         uint8_t buf[0x7c00];
-        ReadStream(const std::string& path)
+        ReadStream(const SystemString& path)
         {
+#if NOD_UCS2
+            fp = wfopen(path.c_str(), L"rb");
+#else
             fp = fopen(path.c_str(), "rb");
+#endif
             if (!fp)
-                throw std::runtime_error("unable to open '" + path + "' for reading");
+            {
+#if NOD_UCS2
+                throw std::runtime_error("Unable to open '" + WideToUTF8(path) + "' for reading");
+#else
+                throw std::runtime_error("Unable to open '" + path + "' for reading");
+#endif
+            }
         }
         ~ReadStream() {fclose(fp);}
         uint64_t read(void* buf, uint64_t length)
@@ -95,7 +120,7 @@ public:
     {return std::unique_ptr<IReadStream>(new ReadStream(m_path));}
 };
 
-std::unique_ptr<IFileIO> NewFileIO(const std::string& path)
+std::unique_ptr<IFileIO> NewFileIO(const SystemString& path)
 {
     return std::unique_ptr<IFileIO>(new FileIOFILE(path));
 }

@@ -121,7 +121,7 @@ public:
             inline DirectoryIterator begin() const {return DirectoryIterator(m_childrenBegin);}
             inline DirectoryIterator end() const {return DirectoryIterator(m_childrenEnd);}
 
-            void extractToDirectory(const std::string& basePath, bool force=false);
+            void extractToDirectory(const SystemString& basePath, bool force=false);
         };
     protected:
         uint64_t m_dolOff;
@@ -142,13 +142,7 @@ public:
         virtual std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const=0;
         inline const Node& getFSTRoot() const {return m_nodes[0];}
         inline Node& getFSTRoot() {return m_nodes[0];}
-        std::string pathOfNode(const Node& node);
-        void extractToDirectory(const std::string& path, bool force=false);
-    private:
-        bool _recursivePathOfNode(const std::string& basePath,
-                                  const Node& refNode,
-                                  const Node& curNode,
-                                  std::string& result);
+        void extractToDirectory(const SystemString& path, bool force=false);
     };
 
 protected:
@@ -174,7 +168,7 @@ public:
                 return part.get();
         return nullptr;
     }
-    inline void extractToDirectory(const std::string& path, bool force=false)
+    inline void extractToDirectory(const SystemString& path, bool force=false)
     {
         for (std::unique_ptr<IPartition>& part : m_partitions)
             part->extractToDirectory(path, force);

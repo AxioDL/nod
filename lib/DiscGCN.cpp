@@ -1,4 +1,4 @@
-#include "DiscGCN.hpp"
+#include "NOD/DiscGCN.hpp"
 
 namespace NOD
 {
