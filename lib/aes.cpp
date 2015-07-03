@@ -76,8 +76,8 @@ protected:
     void _decrypt(uint8_t* buff);
 
 public:
-    void encrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len);
-    void decrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len);
+    void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len);
+    void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len);
     void setKey(const uint8_t* key);
 };
 
@@ -400,10 +400,10 @@ void SoftwareAES::setKey(const uint8_t* key)
 }
 
 // CBC mode decryption
-void SoftwareAES::decrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)
+void SoftwareAES::decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)
 {
     uint8_t block[16];
-    uint8_t* ctext_ptr;
+    const uint8_t* ctext_ptr;
     unsigned int blockno = 0, i;
 
     //fprintf( stderr,"aes_decrypt(%p, %p, %p, %lld)\n", iv, inbuf, outbuf, len  );
@@ -440,9 +440,11 @@ void SoftwareAES::decrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, si
 }
 
 // CBC mode encryption
-void SoftwareAES::encrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
+void SoftwareAES::encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
 {
     uint8_t block[16];
+    uint8_t feedback[16];
+    memcpy(feedback, iv, 16);
     unsigned int blockno = 0, i;
 
     //printf("aes_decrypt(%p, %p, %p, %lld)\n", iv, inbuf, outbuf, len);
@@ -466,10 +468,10 @@ void SoftwareAES::encrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, ui
         memcpy(block, inbuf + blockno * sizeof(block), fraction);
 
         for (i = 0; i < fraction; i++)
-            block[i] = inbuf[blockno * sizeof(block) + i] ^ iv[i];
+            block[i] = inbuf[blockno * sizeof(block) + i] ^ feedback[i];
 
         _encrypt(block);
-        memcpy(iv, block, sizeof(block));
+        memcpy(feedback, block, sizeof(block));
         memcpy(outbuf + blockno * sizeof(block), block, sizeof(block));
         //    debug_printf("Block %d output: ", blockno);
         //    hexdump(outbuf + blockno*sizeof(block), 16);
@@ -485,7 +487,7 @@ class NiAES : public IAES
     __m128i m_ekey[11];
     __m128i m_dkey[11];
 public:
-    void encrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
+    void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
     {
         __m128i feedback,data;
         uint64_t i,j;
@@ -505,7 +507,7 @@ public:
             _mm_storeu_si128(&((__m128i*)outbuf)[i], feedback);
         }
     }
-    void decrypt(uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
+    void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
     {
         __m128i data,feedback,last_in;
         uint64_t i,j;

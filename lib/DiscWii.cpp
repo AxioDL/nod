@@ -290,9 +290,10 @@ public:
             size_t block = m_offset / 0x7c00;
             size_t cacheOffset = m_offset % 0x7c00;
             uint64_t cacheSize;
+            uint64_t rem = length;
             uint8_t* dst = (uint8_t*)buf;
 
-            while (length)
+            while (rem)
             {
                 if (block != m_curBlock)
                 {
@@ -300,13 +301,13 @@ public:
                     m_curBlock = block;
                 }
 
-                cacheSize = length;
+                cacheSize = rem;
                 if (cacheSize + cacheOffset > 0x7c00)
                     cacheSize = 0x7c00 - cacheOffset;
 
                 memcpy(dst, m_decBuf + cacheOffset, cacheSize);
                 dst += cacheSize;
-                length -= cacheSize;
+                rem -= cacheSize;
                 cacheOffset = 0;
                 ++block;
             }
