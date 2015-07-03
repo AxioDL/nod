@@ -91,7 +91,7 @@ void DiscBase::IPartition::extractToDirectory(const SystemString& path, bool for
         std::unique_ptr<uint8_t[]> buf(new uint8_t[m_apploaderSz]);
         std::unique_ptr<IPartReadStream> rs = beginReadStream(0x2440);
         rs->read(buf.get(), m_apploaderSz);
-        std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path + _S("/apploader.bin"))->beginWriteStream();
+        std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(apploaderPath)->beginWriteStream();
         ws->write(buf.get(), m_apploaderSz);
     }
 
