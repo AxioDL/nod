@@ -2,6 +2,7 @@
 #define __NOD_LIB__
 
 #include <memory>
+#include <LogVisor/LogVisor.hpp>
 #include "Util.hpp"
 
 namespace NOD

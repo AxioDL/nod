@@ -8,11 +8,6 @@
 namespace NOD
 {
 
-DiscBase::DiscBase(std::unique_ptr<IDiscIO>&& dio)
-: m_discIO(std::move(dio)), m_header(*m_discIO.get())
-{
-}
-
 void DiscBase::IPartition::parseFST(IPartReadStream& s)
 {
     std::unique_ptr<uint8_t[]> fst(new uint8_t[m_fstSz]);
