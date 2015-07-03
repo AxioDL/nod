@@ -58,6 +58,19 @@ public:
             PART_UPDATE,
             PART_CHANNEL
         };
+        struct DOLHeader
+        {
+            uint32_t textOff[7];
+            uint32_t dataOff[11];
+            uint32_t textStarts[7];
+            uint32_t dataStarts[11];
+            uint32_t textSizes[7];
+            uint32_t dataSizes[11];
+            uint32_t bssStart;
+            uint32_t bssSize;
+            uint32_t entryPoint;
+        };
+
         class Node
         {
         public:
