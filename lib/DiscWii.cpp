@@ -236,7 +236,7 @@ public:
         m_fstSz = SBig(vals[2]) << 2;
         ds->seek(0x2440 + 0x14);
         ds->read(vals, 8);
-        m_apploaderSz = SBig(vals[0]) + SBig(vals[1]);
+        m_apploaderSz = 32 + SBig(vals[0]) + SBig(vals[1]);
 
         /* Yay files!! */
         parseFST(*ds.get());
