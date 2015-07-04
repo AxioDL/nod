@@ -35,11 +35,7 @@ public:
 #endif
         if (!fp)
         {
-#if NOD_UCS2
-            LogModule.report(LogVisor::Error, L"Unable to open '%s' for reading", filepath.c_str());
-#else
-            LogModule.report(LogVisor::Error, "Unable to open '%s' for reading", filepath.c_str());
-#endif
+            LogModule.report(LogVisor::Error, _S("Unable to open '%s' for reading"), filepath.c_str());
             return std::unique_ptr<IReadStream>();
         }
         fseeko(fp, offset, SEEK_SET);
@@ -66,11 +62,7 @@ public:
 #endif
         if (!fp)
         {
-#if NOD_UCS2
-            LogModule.report(LogVisor::Error, L"Unable to open '%s' for writing", filepath.c_str());
-#else
-            LogModule.report(LogVisor::Error, "Unable to open '%s' for writing", filepath.c_str());
-#endif
+            LogModule.report(LogVisor::Error, _S("Unable to open '%s' for writing"), filepath.c_str());
             return std::unique_ptr<IWriteStream>();
         }
         fseeko(fp, offset, SEEK_SET);
