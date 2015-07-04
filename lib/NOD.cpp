@@ -21,9 +21,9 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path, bool& isWii)
     if (!fp)
     {
 #if NOD_UCS2
-        LogModule.report(LogVisor::Error, L"Unable to open '%s'\n", path);
+        LogModule.report(LogVisor::Error, L"Unable to open '%s'", path);
 #else
-        LogModule.report(LogVisor::Error, "Unable to open '%s'\n", path);
+        LogModule.report(LogVisor::Error, "Unable to open '%s'", path);
 #endif
         return std::unique_ptr<DiscBase>();
     }
@@ -66,9 +66,9 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path, bool& isWii)
     if (!discIO)
     {
 #if NOD_UCS2
-        LogModule.report(LogVisor::Error, L"'%s' is not a valid image\n", path);
+        LogModule.report(LogVisor::Error, L"'%s' is not a valid image", path);
 #else
-        LogModule.report(LogVisor::Error, "'%s' is not a valid image\n", path);
+        LogModule.report(LogVisor::Error, "'%s' is not a valid image", path);
 #endif
         return std::unique_ptr<DiscBase>();
     }
