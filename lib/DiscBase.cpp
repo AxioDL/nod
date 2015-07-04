@@ -101,7 +101,7 @@ void DiscBase::IPartition::extractToDirectory(const SystemString& path, bool for
         std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(dolPath)->beginWriteStream();
         ws->write(&hdr, sizeof(DOLHeader));
         /* Calculate Dol size */
-        uint32_t dolSize = SBig(hdr.textOff[0]);
+        uint32_t dolSize = SBig(hdr.textOff[0]) - sizeof(DOLHeader);
         for (uint32_t i = 0 ; i < 7 ; i++)
             dolSize += SBig(hdr.textSizes[i]);
         for (uint32_t i = 0 ; i < 11 ; i++)
