@@ -7,10 +7,19 @@ namespace NOD
 {
 
 /* Not much of a secret anymore I suppose */
-static const uint8_t COMMON_KEY[] = {0xeb, 0xe4, 0x2a, 0x22,
-                                     0x5e, 0x85, 0x93, 0xe4,
-                                     0x48, 0xd9, 0xc5, 0x45,
-                                     0x73, 0x81, 0xaa, 0xf7};
+static const uint8_t COMMON_KEYS[2][16] =
+{
+    /* Normal */
+    {0xeb, 0xe4, 0x2a, 0x22,
+     0x5e, 0x85, 0x93, 0xe4,
+     0x48, 0xd9, 0xc5, 0x45,
+     0x73, 0x81, 0xaa, 0xf7},
+    /* Korean */
+    {0x63, 0xb8, 0x2b, 0xb4,
+     0xf4, 0x61, 0x4e, 0x2e,
+     0x13, 0xf2, 0xfe, 0xfb,
+     0xba, 0x4c, 0x9b, 0x7e}
+};
 
 class PartitionWii : public DiscBase::IPartition
 {
@@ -224,7 +233,7 @@ public:
         std::unique_ptr<IAES> aes = NewAES();
         uint8_t iv[16] = {};
         memcpy(iv, m_ticket.titleId, 8);
-        aes->setKey(COMMON_KEY);
+        aes->setKey(COMMON_KEYS[(int)m_ticket.commonKeyIdx]);
         aes->decrypt(iv, m_ticket.encKey, m_decKey, 16);
 
         /* Wii-specific header reads (now using title key to decrypt) */
