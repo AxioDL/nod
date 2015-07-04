@@ -6,13 +6,6 @@
 namespace NOD
 {
 
-#ifndef WIN32
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
-#else
-#define likely(x)		(x)
-#define unlikely(x)		(x)
-#endif
 #define ALIGN_LBA(x) (((x)+p->hd_sec_sz-1)&(~(p->hd_sec_sz-1)))
 
 static uint8_t size_to_shift(uint32_t size)
@@ -197,34 +190,34 @@ public:
             uint64_t len_copied;
             int err = 0;
             uint8_t  *ptr = data;
-            if (unlikely(iwlba==0))
+            if (!iwlba)
                 return 1;
-            if (unlikely(off))
+            if (off)
             {
                 off*=4;
                 err = wbfsReadSector(p->part_lba + (iwlba<<iwlba_shift) + lba, 1, m_tmpBuffer.get());
                 if (err)
                     return err;
                 len_copied = p->hd_sec_sz - off;
-                if (likely(len < len_copied))
+                if (len < len_copied)
                     len_copied = len;
                 memcpy(ptr, m_tmpBuffer.get() + off, len_copied);
                 len -= len_copied;
                 ptr += len_copied;
                 lba++;
-                if (unlikely(lba>lba_mask && len))
+                if (lba>lba_mask && len)
                 {
                     lba=0;
                     iwlba = SBig(d->wlba_table[++wlba]);
-                    if (unlikely(iwlba==0))
+                    if (!iwlba)
                         return 1;
                 }
             }
-            while (likely(len>=p->hd_sec_sz))
+            while (len>=p->hd_sec_sz)
             {
                 uint32_t nlb = len>>(p->hd_sec_sz_s);
 
-                if (unlikely(lba + nlb > p->wbfs_sec_sz)) // dont cross wbfs sectors..
+                if (lba + nlb > p->wbfs_sec_sz) // dont cross wbfs sectors..
                     nlb = p->wbfs_sec_sz-lba;
                 err = wbfsReadSector(p->part_lba + (iwlba<<iwlba_shift) + lba, nlb, ptr);
                 if (err)
@@ -232,15 +225,15 @@ public:
                 len -= nlb<<p->hd_sec_sz_s;
                 ptr += nlb<<p->hd_sec_sz_s;
                 lba += nlb;
-                if (unlikely(lba>lba_mask && len))
+                if (lba>lba_mask && len)
                 {
                     lba = 0;
                     iwlba = SBig(d->wlba_table[++wlba]);
-                    if (unlikely(iwlba==0))
+                    if (!iwlba)
                         return 1;
                 }
             }
-            if (unlikely(len))
+            if (len)
             {
                 err = wbfsReadSector(p->part_lba + (iwlba<<iwlba_shift) + lba, 1, m_tmpBuffer.get());
                 if (err)
