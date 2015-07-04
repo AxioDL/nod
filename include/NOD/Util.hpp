@@ -3,9 +3,13 @@
 
 #include <string>
 #include <algorithm>
+#include <LogVisor/LogVisor.hpp>
 
 namespace NOD
 {
+
+/* Log Module */
+extern LogVisor::LogModule LogModule;
 
 /* filesystem char type */
 #if _WIN32 && UNICODE

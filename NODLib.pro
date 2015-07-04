@@ -6,8 +6,8 @@ CONFIG -= app_bundle
 CONFIG -= qt
 QT =
 
-SUBDIRS += lib driver
-driver.depends += lib
+SUBDIRS += LogVisor lib driver
+driver.depends += LogVisor lib
 
 HEADERS += \
     include/NOD/Util.hpp \

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <LogVisor/LogVisor.hpp>
 #include "NOD/NOD.hpp"
 
 static void printHelp()
@@ -24,6 +25,9 @@ int main(int argc, char* argv[])
         printHelp();
         return -1;
     }
+
+    /* Enable logging to console */
+    LogVisor::RegisterConsoleLogger();
 
     const NOD::SystemChar* inDir = nullptr;
     const NOD::SystemChar* outDir = _S(".");

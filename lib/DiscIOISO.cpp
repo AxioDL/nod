@@ -36,9 +36,9 @@ public:
         if (!fp)
         {
 #if NOD_UCS2
-            fwprintf(stderr, L"Unable to open '%s' for reading\n", filepath.c_str());
+            LogModule.report(LogVisor::Error, L"Unable to open '%s' for reading\n", filepath.c_str());
 #else
-            fprintf(stderr, "Unable to open '%s' for reading\n", filepath.c_str());
+            LogModule.report(LogVisor::Error, "Unable to open '%s' for reading\n", filepath.c_str());
 #endif
             return std::unique_ptr<IReadStream>();
         }
@@ -67,9 +67,9 @@ public:
         if (!fp)
         {
 #if NOD_UCS2
-            fwprintf(stderr, L"Unable to open '%s' for writing\n", filepath.c_str());
+            LogModule.report(LogVisor::Error, L"Unable to open '%s' for writing\n", filepath.c_str());
 #else
-            fprintf(stderr, "Unable to open '%s' for writing\n", filepath.c_str());
+            LogModule.report(LogVisor::Error, "Unable to open '%s' for writing\n", filepath.c_str());
 #endif
             return std::unique_ptr<IWriteStream>();
         }

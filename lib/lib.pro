@@ -6,7 +6,11 @@ QT =
 TARGET = NOD
 
 QMAKE_CXXFLAGS += -maes
-INCLUDEPATH += ../include ../../../LogVisor/include
+
+isEmpty(LOGVISOR_INCLUDE) {
+    LOGVISOR_INCLUDE = ../LogVisor/include
+}
+INCLUDEPATH += ../include $$LOGVISOR_INCLUDE
 
 SOURCES += \
     FileIOFILE.cpp \
