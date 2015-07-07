@@ -1,0 +1,12 @@
+add_library(NOD
+            aes.cpp
+            DiscBase.cpp
+            DiscGCN.cpp
+            DiscIOISO.cpp
+            DiscIOWBFS.cpp
+            DiscWii.cpp
+            FileIOFILE.cpp
+            FileIOMEM.cpp
+            NOD.cpp
+            WideStringConvert.cpp
+            ${NOD_HEADERS})

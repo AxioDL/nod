@@ -294,6 +294,7 @@ public:
                 m_curBlock = block;
             }
         }
+        uint64_t position() const {return m_offset;}
         uint64_t read(void* buf, uint64_t length)
         {
             size_t block = m_offset / 0x7c00;

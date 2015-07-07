@@ -35,6 +35,7 @@ public:
         {m_dio = m_parent.m_parent.getDiscIO().beginReadStream(offset);}
         void seek(int64_t offset, int whence)
         {m_dio->seek(offset, whence);}
+        uint64_t position() const {return m_dio->position();}
         uint64_t read(void* buf, uint64_t length)
         {return m_dio->read(buf, length);}
     };

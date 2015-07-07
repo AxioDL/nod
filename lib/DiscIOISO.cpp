@@ -23,6 +23,8 @@ public:
     public:
         uint64_t read(void* buf, uint64_t length)
         {return fread(buf, 1, length, fp);}
+        uint64_t position() const
+        {return ftello(fp);}
         void seek(int64_t offset, int whence)
         {fseeko(fp, offset, whence);}
     };

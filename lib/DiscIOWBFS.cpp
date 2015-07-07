@@ -265,6 +265,7 @@ public:
             m_offset += length;
             return length;
         }
+        uint64_t position() const {return m_offset;}
         void seek(int64_t offset, int whence)
         {
             if (whence == SEEK_SET)
