@@ -10,3 +10,4 @@ add_library(NOD
             NOD.cpp
             WideStringConvert.cpp
             ${NOD_HEADERS})
+set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)
