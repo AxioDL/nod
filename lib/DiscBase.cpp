@@ -43,6 +43,20 @@ void DiscBase::IPartition::parseFST(IPartReadStream& s)
     }
 }
 
+void DiscBase::IPartition::parseDOL(IPartReadStream& s)
+{
+    /* Read Dol header */
+    s.read(&m_dolHead, sizeof(DOLHeader));
+
+    /* Calculate Dol size */
+    uint32_t dolSize = SBig(m_dolHead.textOff[0]) - sizeof(DOLHeader);
+    for (uint32_t i = 0 ; i < 7 ; i++)
+        dolSize += SBig(m_dolHead.textSizes[i]);
+    for (uint32_t i = 0 ; i < 11 ; i++)
+        dolSize += SBig(m_dolHead.dataSizes[i]);
+    m_dolSz = dolSize;
+}
+
 void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, bool force)
 {
     SystemStringView nameView(getName());
@@ -83,32 +97,16 @@ void DiscBase::IPartition::extractToDirectory(const SystemString& path, bool for
     SystemString apploaderPath = path + _S("/apploader.bin");
     if (force || Stat(apploaderPath.c_str(), &theStat))
     {
-        std::unique_ptr<uint8_t[]> buf(new uint8_t[m_apploaderSz]);
-        std::unique_ptr<IPartReadStream> rs = beginReadStream(0x2440);
-        rs->read(buf.get(), m_apploaderSz);
-        std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(apploaderPath)->beginWriteStream();
-        ws->write(buf.get(), m_apploaderSz);
+        std::unique_ptr<uint8_t[]> buf = getApploaderBuf();
+        NewFileIO(apploaderPath)->beginWriteStream()->write(buf.get(), m_apploaderSz);
     }
 
     /* Extract Dol */
     SystemString dolPath = path + _S("/main.dol");
     if (force || Stat(dolPath.c_str(), &theStat))
     {
-        std::unique_ptr<IPartReadStream> rs = beginReadStream(m_dolOff);
-        /* Read Dol header */
-        DOLHeader hdr;
-        rs->read(&hdr, sizeof(DOLHeader));
-        std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(dolPath)->beginWriteStream();
-        ws->write(&hdr, sizeof(DOLHeader));
-        /* Calculate Dol size */
-        uint32_t dolSize = SBig(hdr.textOff[0]) - sizeof(DOLHeader);
-        for (uint32_t i = 0 ; i < 7 ; i++)
-            dolSize += SBig(hdr.textSizes[i]);
-        for (uint32_t i = 0 ; i < 11 ; i++)
-            dolSize += SBig(hdr.dataSizes[i]);
-        std::unique_ptr<uint8_t[]> buf(new uint8_t[dolSize]);
-        rs->read(buf.get(), dolSize);
-        ws->write(buf.get(), dolSize);
+        std::unique_ptr<uint8_t[]> buf = getDOLBuf();
+        NewFileIO(dolPath)->beginWriteStream()->write(buf.get(), m_dolSz);
     }
 
     /* Extract Filesystem */

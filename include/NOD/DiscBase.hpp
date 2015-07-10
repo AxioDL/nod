@@ -101,14 +101,14 @@ public:
               m_name(name) {}
             inline Kind getKind() const {return m_kind;}
             inline const std::string& getName() const {return m_name;}
-            std::unique_ptr<IPartReadStream> beginReadStream() const
+            std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const
             {
                 if (m_kind != NODE_FILE)
                 {
                     throw std::runtime_error("unable to stream a non-file");
                     return std::unique_ptr<IPartReadStream>();
                 }
-                return m_parent.beginReadStream(m_discOffset);
+                return m_parent.beginReadStream(m_discOffset + offset);
             }
             inline std::vector<Node>::iterator rawBegin() const {return m_childrenBegin;}
             inline std::vector<Node>::iterator rawEnd() const {return m_childrenEnd;}
@@ -144,6 +144,10 @@ public:
         std::vector<Node> m_nodes;
         void parseFST(IPartReadStream& s);
 
+        DOLHeader m_dolHead;
+        uint64_t m_dolSz;
+        void parseDOL(IPartReadStream& s);
+
         const DiscBase& m_parent;
         Kind m_kind;
         uint64_t m_offset;
@@ -153,9 +157,39 @@ public:
         virtual uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset;}
         inline Kind getKind() const {return m_kind;}
         virtual std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const=0;
+        inline std::unique_ptr<IPartReadStream> beginDOLReadStream(uint64_t offset=0) const
+        {return beginReadStream(m_dolOff + offset);}
+        inline std::unique_ptr<IPartReadStream> beginFSTReadStream(uint64_t offset=0) const
+        {return beginReadStream(m_fstOff + offset);}
+        inline std::unique_ptr<IPartReadStream> beginApploaderReadStream(uint64_t offset=0) const
+        {return beginReadStream(0x2440 + offset);}
         inline const Node& getFSTRoot() const {return m_nodes[0];}
         inline Node& getFSTRoot() {return m_nodes[0];}
         void extractToDirectory(const SystemString& path, bool force=false);
+
+        inline uint64_t getDOLSize() const {return m_dolSz;}
+        inline std::unique_ptr<uint8_t[]> getDOLBuf() const
+        {
+            std::unique_ptr<uint8_t[]> buf(new uint8_t[m_dolSz]);
+            beginDOLReadStream()->read(buf.get(), m_dolSz);
+            return buf;
+        }
+
+        inline uint64_t getFSTSize() const {return m_fstSz;}
+        inline std::unique_ptr<uint8_t[]> getFSTBuf() const
+        {
+            std::unique_ptr<uint8_t[]> buf(new uint8_t[m_fstSz]);
+            beginFSTReadStream()->read(buf.get(), m_fstSz);
+            return buf;
+        }
+
+        inline uint64_t getApploaderSize() const {return m_apploaderSz;}
+        inline std::unique_ptr<uint8_t[]> getApploaderBuf() const
+        {
+            std::unique_ptr<uint8_t[]> buf(new uint8_t[m_apploaderSz]);
+            beginApploaderReadStream()->read(buf.get(), m_apploaderSz);
+            return buf;
+        }
     };
 
 protected:

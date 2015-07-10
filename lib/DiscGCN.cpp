@@ -22,6 +22,10 @@ public:
 
         /* Yay files!! */
         parseFST(*s.get());
+
+        /* Also make DOL header and size handy */
+        s->seek(m_dolOff);
+        parseDOL(*s.get());
     }
 
     class PartReadStream : public IPartReadStream
