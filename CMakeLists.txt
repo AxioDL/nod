@@ -6,7 +6,7 @@ if (NOT TARGET LogVisor)
 endif()
 
 include_directories(include ${LOG_VISOR_INCLUDE_DIR})
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -D_GLIBCXX_USE_CXX11_ABI=1")
 file(GLOB NOD_HEADERS include/NOD/*.hpp)
 
 add_subdirectory(lib)
