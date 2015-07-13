@@ -291,9 +291,9 @@ public:
             else
                 return;
             size_t block = m_offset / 0x7c00;
-            m_dio->seek(m_baseOffset + block * 0x8000);
             if (block != m_curBlock)
             {
+                m_dio->seek(m_baseOffset + block * 0x8000);
                 decryptBlock();
                 m_curBlock = block;
             }

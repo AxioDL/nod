@@ -101,6 +101,7 @@ public:
               m_name(name) {}
             inline Kind getKind() const {return m_kind;}
             inline const std::string& getName() const {return m_name;}
+            inline uint64_t size() const {return m_discLength;}
             std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const
             {
                 if (m_kind != NODE_FILE)
@@ -109,6 +110,17 @@ public:
                     return std::unique_ptr<IPartReadStream>();
                 }
                 return m_parent.beginReadStream(m_discOffset + offset);
+            }
+            std::unique_ptr<uint8_t[]> getBuf() const
+            {
+                if (m_kind != NODE_FILE)
+                {
+                    throw std::runtime_error("unable to buffer a non-file");
+                    return std::unique_ptr<uint8_t[]>();
+                }
+                uint8_t* buf = new uint8_t[m_discLength];
+                beginReadStream()->read(buf, m_discLength);
+                return std::unique_ptr<uint8_t[]>(buf);
             }
             inline std::vector<Node>::iterator rawBegin() const {return m_childrenBegin;}
             inline std::vector<Node>::iterator rawEnd() const {return m_childrenEnd;}
@@ -121,6 +133,7 @@ public:
                 : m_it(it) {}
             public:
                 inline bool operator!=(const DirectoryIterator& other) {return m_it != other.m_it;}
+                inline bool operator==(const DirectoryIterator& other) {return m_it == other.m_it;}
                 inline DirectoryIterator& operator++()
                 {
                     if (m_it->m_kind == NODE_DIRECTORY)
@@ -130,9 +143,24 @@ public:
                     return *this;
                 }
                 inline Node& operator*() {return *m_it;}
+                inline Node* operator->() {return &*m_it;}
             };
             inline DirectoryIterator begin() const {return DirectoryIterator(m_childrenBegin);}
             inline DirectoryIterator end() const {return DirectoryIterator(m_childrenEnd);}
+            inline DirectoryIterator find(const std::string& name) const
+            {
+                if (m_kind == NODE_DIRECTORY)
+                {
+                    DirectoryIterator it=begin();
+                    for (; it != end() ; ++it)
+                    {
+                        if (!it->getName().compare(name))
+                            return it;
+                    }
+                    return it;
+                }
+                return end();
+            }
 
             void extractToDirectory(const SystemString& basePath, bool force=false);
         };
