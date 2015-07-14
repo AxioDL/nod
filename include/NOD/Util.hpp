@@ -1,6 +1,14 @@
 #ifndef __NOD_UTIL_HPP__
 #define __NOD_UTIL_HPP__
 
+#if _WIN32 && UNICODE
+#include <wctype.h>
+#include <direct.h>
+#else
+#include <ctype.h>
+#endif
+#include <sys/stat.h>
+
 #include <string>
 #include <algorithm>
 #include <LogVisor/LogVisor.hpp>
@@ -13,16 +21,11 @@ extern LogVisor::LogModule LogModule;
 
 /* filesystem char type */
 #if _WIN32 && UNICODE
-#include <wctype.h>
-#include <direct.h>
-#include <sys/stat.h>
 #define NOD_UCS2 1
 typedef struct _stat Sstat;
 static inline int Mkdir(const wchar_t* path, int) {return _wmkdir(path);}
 static inline int Stat(const wchar_t* path, Sstat* statout) {return _wstat(path, statout);}
 #else
-#include <ctype.h>
-#include <sys/stat.h>
 typedef struct stat Sstat;
 static inline int Mkdir(const char* path, mode_t mode) {return mkdir(path, mode);}
 static inline int Stat(const char* path, Sstat* statout) {return stat(path, statout);}

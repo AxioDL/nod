@@ -478,7 +478,7 @@ void SoftwareAES::encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outb
     }
 }
 
-#if __AES__
+#if __AES__ || _MSC_VER >= 1800
 
 #include <wmmintrin.h>
 
@@ -598,12 +598,18 @@ public:
 static int HAS_AES_NI = -1;
 std::unique_ptr<IAES> NewAES()
 {
-#if __AES__
+#if __AES__ || _MSC_VER >= 1800
     if (HAS_AES_NI == -1)
     {
+#if _MSC_VER
+        int info[4];
+        __cpuid(info, 1);
+        HAS_AES_NI = ((info[2] & 0x2000000) != 0);
+#else
         unsigned int a,b,c,d;
         __cpuid(1, a,b,c,d);
         HAS_AES_NI = ((c & 0x2000000) != 0);
+#endif
     }
     if (HAS_AES_NI)
         return std::unique_ptr<IAES>(new NiAES);
