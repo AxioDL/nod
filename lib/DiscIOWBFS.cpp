@@ -251,15 +251,15 @@ public:
             if (rem_offset)
             {
                 uint64_t rem_rem = 4 - rem_offset;
-                if (wbfsDiscRead((unsigned int)m_offset / 4, extra, 4))
+                if (wbfsDiscRead((uint32_t)(m_offset / 4), extra, 4))
                     return 0;
                 memcpy(buf, extra + rem_offset, rem_rem);
-                if (wbfsDiscRead((unsigned int)m_offset / 4 + 1, (uint8_t*)buf + rem_rem, length - rem_rem))
+                if (wbfsDiscRead((uint32_t)(m_offset / 4 + 1), (uint8_t*)buf + rem_rem, length - rem_rem))
                     return 0;
             }
             else
             {
-                if (wbfsDiscRead((unsigned int)m_offset / 4, (uint8_t*)buf, length))
+                if (wbfsDiscRead((uint32_t)(m_offset / 4), (uint8_t*)buf, length))
                     return 0;
             }
             m_offset += length;

@@ -16,8 +16,6 @@ namespace NOD
 #define ROTL16(x) (((x)<<16)|((x)>>16))
 #define ROTL24(x) (((x)<<24)|((x)>>8))
 
-/* Fixed Data */
-
 static const uint8_t InCo[4] = {0xB, 0xD, 0x9, 0xE}; /* Inverse Coefficients */
 
 static inline uint32_t pack(const uint8_t* b)
@@ -47,9 +45,8 @@ static inline uint8_t xtime(uint8_t a)
     return a;
 }
 
-class SoftwareAES : public IAES
+static const struct SoftwareAESTables
 {
-protected:
     uint8_t fbsub[256];
     uint8_t rbsub[256];
     uint8_t ptab[256], ltab[256];
@@ -57,20 +54,134 @@ protected:
     uint32_t rtable[256];
     uint32_t rco[30];
 
-    /* Parameter-dependent data */
+    uint8_t bmul(uint8_t x, uint8_t y) const
+    {
+        /* x.y= AntiLog(Log(x) + Log(y)) */
+        if (x && y) return ptab[(ltab[x] + ltab[y]) % 255];
+        else return 0;
+    }
 
+    uint32_t SubByte(uint32_t a) const
+    {
+        uint8_t b[4];
+        unpack(a, b);
+        b[0] = fbsub[b[0]];
+        b[1] = fbsub[b[1]];
+        b[2] = fbsub[b[2]];
+        b[3] = fbsub[b[3]];
+        return pack(b);
+    }
+
+    uint8_t product(uint32_t x, uint32_t y) const
+    {
+        /* dot product of two 4-byte arrays */
+        uint8_t xb[4], yb[4];
+        unpack(x, xb);
+        unpack(y, yb);
+        return bmul(xb[0], yb[0])^bmul(xb[1], yb[1])^bmul(xb[2], yb[2])^bmul(xb[3], yb[3]);
+    }
+
+    uint32_t InvMixCol(uint32_t x) const
+    {
+        /* matrix Multiplication */
+        uint32_t y, m;
+        uint8_t b[4];
+
+        m = pack(InCo);
+        b[3] = product(m, x);
+        m = ROTL24(m);
+        b[2] = product(m, x);
+        m = ROTL24(m);
+        b[1] = product(m, x);
+        m = ROTL24(m);
+        b[0] = product(m, x);
+        y = pack(b);
+        return y;
+    }
+
+    uint8_t ByteSub(uint8_t x) const
+    {
+        uint8_t y = ptab[255 - ltab[x]]; /* multiplicative inverse */
+        x = y;
+        x = ROTL(x);
+        y ^= x;
+        x = ROTL(x);
+        y ^= x;
+        x = ROTL(x);
+        y ^= x;
+        x = ROTL(x);
+        y ^= x;
+        y ^= 0x63;
+        return y;
+    }
+
+    SoftwareAESTables()
+    {
+        /* generate tables */
+        int i;
+        uint8_t y, b[4];
+
+        /* use 3 as primitive root to generate power and log tables */
+
+        ltab[0] = 0;
+        ptab[0] = 1;
+        ltab[1] = 0;
+        ptab[1] = 3;
+        ltab[3] = 1;
+
+        for (i = 2; i < 256; i++)
+        {
+            ptab[i] = ptab[i - 1] ^ xtime(ptab[i - 1]);
+            ltab[ptab[i]] = i;
+        }
+
+        /* affine transformation:- each bit is xored with itself shifted one bit */
+
+        fbsub[0] = 0x63;
+        rbsub[0x63] = 0;
+
+        for (i = 1; i < 256; i++)
+        {
+            y = ByteSub((uint8_t)i);
+            fbsub[i] = y;
+            rbsub[y] = i;
+        }
+
+        for (i = 0, y = 1; i < 30; i++)
+        {
+            rco[i] = y;
+            y = xtime(y);
+        }
+
+        /* calculate forward and reverse tables */
+        for (i = 0; i < 256; i++)
+        {
+            y = fbsub[i];
+            b[3] = y ^ xtime(y);
+            b[2] = y;
+            b[1] = y;
+            b[0] = xtime(y);
+            ftable[i] = pack(b);
+
+            y = rbsub[i];
+            b[3] = bmul(InCo[0], y);
+            b[2] = bmul(InCo[1], y);
+            b[1] = bmul(InCo[2], y);
+            b[0] = bmul(InCo[3], y);
+            rtable[i] = pack(b);
+        }
+    }
+} AEStb;
+
+class SoftwareAES : public IAES
+{
+protected:
+    /* Parameter-dependent data */
     int Nk, Nb, Nr;
     uint8_t fi[24], ri[24];
     uint32_t fkey[120];
     uint32_t rkey[120];
 
-
-    uint8_t bmul(uint8_t x, uint8_t y);
-    uint32_t SubByte(uint32_t a);
-    uint8_t product(uint32_t x, uint32_t y);
-    uint32_t InvMixCol(uint32_t x);
-    uint8_t ByteSub(uint8_t x);
-    void gentables(void);
     void gkey(int nb, int nk, const uint8_t* key);
     void _encrypt(uint8_t* buff);
     void _decrypt(uint8_t* buff);
@@ -80,124 +191,6 @@ public:
     void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len);
     void setKey(const uint8_t* key);
 };
-
-uint8_t SoftwareAES::bmul(uint8_t x, uint8_t y)
-{
-    /* x.y= AntiLog(Log(x) + Log(y)) */
-    if (x && y) return ptab[(ltab[x] + ltab[y]) % 255];
-    else return 0;
-}
-
-uint32_t SoftwareAES::SubByte(uint32_t a)
-{
-    uint8_t b[4];
-    unpack(a, b);
-    b[0] = fbsub[b[0]];
-    b[1] = fbsub[b[1]];
-    b[2] = fbsub[b[2]];
-    b[3] = fbsub[b[3]];
-    return pack(b);
-}
-
-uint8_t SoftwareAES::product(uint32_t x, uint32_t y)
-{
-    /* dot product of two 4-byte arrays */
-    uint8_t xb[4], yb[4];
-    unpack(x, xb);
-    unpack(y, yb);
-    return bmul(xb[0], yb[0])^bmul(xb[1], yb[1])^bmul(xb[2], yb[2])^bmul(xb[3], yb[3]);
-}
-
-uint32_t SoftwareAES::InvMixCol(uint32_t x)
-{
-    /* matrix Multiplication */
-    uint32_t y, m;
-    uint8_t b[4];
-
-    m = pack(InCo);
-    b[3] = product(m, x);
-    m = ROTL24(m);
-    b[2] = product(m, x);
-    m = ROTL24(m);
-    b[1] = product(m, x);
-    m = ROTL24(m);
-    b[0] = product(m, x);
-    y = pack(b);
-    return y;
-}
-
-uint8_t SoftwareAES::ByteSub(uint8_t x)
-{
-    uint8_t y = ptab[255 - ltab[x]]; /* multiplicative inverse */
-    x = y;
-    x = ROTL(x);
-    y ^= x;
-    x = ROTL(x);
-    y ^= x;
-    x = ROTL(x);
-    y ^= x;
-    x = ROTL(x);
-    y ^= x;
-    y ^= 0x63;
-    return y;
-}
-
-void SoftwareAES::gentables(void)
-{
-    /* generate tables */
-    int i;
-    uint8_t y, b[4];
-
-    /* use 3 as primitive root to generate power and log tables */
-
-    ltab[0] = 0;
-    ptab[0] = 1;
-    ltab[1] = 0;
-    ptab[1] = 3;
-    ltab[3] = 1;
-
-    for (i = 2; i < 256; i++)
-    {
-        ptab[i] = ptab[i - 1] ^ xtime(ptab[i - 1]);
-        ltab[ptab[i]] = i;
-    }
-
-    /* affine transformation:- each bit is xored with itself shifted one bit */
-
-    fbsub[0] = 0x63;
-    rbsub[0x63] = 0;
-
-    for (i = 1; i < 256; i++)
-    {
-        y = ByteSub((uint8_t)i);
-        fbsub[i] = y;
-        rbsub[y] = i;
-    }
-
-    for (i = 0, y = 1; i < 30; i++)
-    {
-        rco[i] = y;
-        y = xtime(y);
-    }
-
-    /* calculate forward and reverse tables */
-    for (i = 0; i < 256; i++)
-    {
-        y = fbsub[i];
-        b[3] = y ^ xtime(y);
-        b[2] = y;
-        b[1] = y;
-        b[0] = xtime(y);
-        ftable[i] = pack(b);
-
-        y = rbsub[i];
-        b[3] = bmul(InCo[0], y);
-        b[2] = bmul(InCo[1], y);
-        b[1] = bmul(InCo[2], y);
-        b[0] = bmul(InCo[3], y);
-        rtable[i] = pack(b);
-    }
-}
 
 void SoftwareAES::gkey(int nb, int nk, const uint8_t* key)
 {
@@ -243,7 +236,7 @@ void SoftwareAES::gkey(int nb, int nk, const uint8_t* key)
 
     for (j = Nk, k = 0; j < N; j += Nk, k++)
     {
-        fkey[j] = fkey[j - Nk] ^ SubByte(ROTL24(fkey[j - 1]))^rco[k];
+        fkey[j] = fkey[j - Nk] ^ AEStb.SubByte(ROTL24(fkey[j - 1]))^AEStb.rco[k];
 
         if (Nk <= 6)
         {
@@ -255,7 +248,7 @@ void SoftwareAES::gkey(int nb, int nk, const uint8_t* key)
             for (i = 1; i < 4 && (i + j) < N; i++)
                 fkey[i + j] = fkey[i + j - Nk] ^ fkey[i + j - 1];
 
-            if ((j + 4) < N) fkey[j + 4] = fkey[j + 4 - Nk] ^ SubByte(fkey[j + 3]);
+            if ((j + 4) < N) fkey[j + 4] = fkey[j + 4 - Nk] ^ AEStb.SubByte(fkey[j + 3]);
 
             for (i = 5; i < Nk && (i + j) < N; i++)
                 fkey[i + j] = fkey[i + j - Nk] ^ fkey[i + j - 1];
@@ -271,7 +264,7 @@ void SoftwareAES::gkey(int nb, int nk, const uint8_t* key)
     {
         k = N - Nb - i;
 
-        for (j = 0; j < Nb; j++) rkey[k + j] = InvMixCol(fkey[i + j]);
+        for (j = 0; j < Nb; j++) rkey[k + j] = AEStb.InvMixCol(fkey[i + j]);
     }
 
     for (j = N - Nb; j < N; j++) rkey[j - N + Nb] = fkey[j];
@@ -309,10 +302,10 @@ void SoftwareAES::_encrypt(uint8_t* buff)
         {
             /* deal with each 32-bit element of the State */
             /* This is the time-critical bit */
-            y[j] = fkey[k++] ^ ftable[(uint8_t)x[j]] ^
-                   ROTL8(ftable[(uint8_t)(x[fi[m]] >> 8)])^
-                   ROTL16(ftable[(uint8_t)(x[fi[m + 1]] >> 16)])^
-                   ROTL24(ftable[(uint8_t)(x[fi[m + 2]] >> 24)]);
+            y[j] = fkey[k++] ^ AEStb.ftable[(uint8_t)x[j]] ^
+                   ROTL8(AEStb.ftable[(uint8_t)(x[fi[m]] >> 8)])^
+                   ROTL16(AEStb.ftable[(uint8_t)(x[fi[m + 1]] >> 16)])^
+                   ROTL24(AEStb.ftable[(uint8_t)(x[fi[m + 2]] >> 24)]);
         }
 
         t = x;
@@ -323,10 +316,10 @@ void SoftwareAES::_encrypt(uint8_t* buff)
     /* Last Round - unroll if possible */
     for (m = j = 0; j < Nb; j++, m += 3)
     {
-        y[j] = fkey[k++] ^ (uint32_t)fbsub[(uint8_t)x[j]] ^
-               ROTL8((uint32_t)fbsub[(uint8_t)(x[fi[m]] >> 8)])^
-               ROTL16((uint32_t)fbsub[(uint8_t)(x[fi[m + 1]] >> 16)])^
-               ROTL24((uint32_t)fbsub[(uint8_t)(x[fi[m + 2]] >> 24)]);
+        y[j] = fkey[k++] ^ (uint32_t)AEStb.fbsub[(uint8_t)x[j]] ^
+               ROTL8((uint32_t)AEStb.fbsub[(uint8_t)(x[fi[m]] >> 8)])^
+               ROTL16((uint32_t)AEStb.fbsub[(uint8_t)(x[fi[m + 1]] >> 16)])^
+               ROTL24((uint32_t)AEStb.fbsub[(uint8_t)(x[fi[m + 2]] >> 24)]);
     }
 
     for (i = j = 0; i < Nb; i++, j += 4)
@@ -364,10 +357,10 @@ void SoftwareAES::_decrypt(uint8_t* buff)
         for (m = j = 0; j < Nb; j++, m += 3)
         {
             /* This is the time-critical bit */
-            y[j] = rkey[k++] ^ rtable[(uint8_t)x[j]] ^
-                   ROTL8(rtable[(uint8_t)(x[ri[m]] >> 8)])^
-                   ROTL16(rtable[(uint8_t)(x[ri[m + 1]] >> 16)])^
-                   ROTL24(rtable[(uint8_t)(x[ri[m + 2]] >> 24)]);
+            y[j] = rkey[k++] ^ AEStb.rtable[(uint8_t)x[j]] ^
+                   ROTL8(AEStb.rtable[(uint8_t)(x[ri[m]] >> 8)])^
+                   ROTL16(AEStb.rtable[(uint8_t)(x[ri[m + 1]] >> 16)])^
+                   ROTL24(AEStb.rtable[(uint8_t)(x[ri[m + 2]] >> 24)]);
         }
 
         t = x;
@@ -378,10 +371,10 @@ void SoftwareAES::_decrypt(uint8_t* buff)
     /* Last Round - unroll if possible */
     for (m = j = 0; j < Nb; j++, m += 3)
     {
-        y[j] = rkey[k++] ^ (uint32_t)rbsub[(uint8_t)x[j]] ^
-               ROTL8((uint32_t)rbsub[(uint8_t)(x[ri[m]] >> 8)])^
-               ROTL16((uint32_t)rbsub[(uint8_t)(x[ri[m + 1]] >> 16)])^
-               ROTL24((uint32_t)rbsub[(uint8_t)(x[ri[m + 2]] >> 24)]);
+        y[j] = rkey[k++] ^ (uint32_t)AEStb.rbsub[(uint8_t)x[j]] ^
+               ROTL8((uint32_t)AEStb.rbsub[(uint8_t)(x[ri[m]] >> 8)])^
+               ROTL16((uint32_t)AEStb.rbsub[(uint8_t)(x[ri[m + 1]] >> 16)])^
+               ROTL24((uint32_t)AEStb.rbsub[(uint8_t)(x[ri[m + 2]] >> 24)]);
     }
 
     for (i = j = 0; i < Nb; i++, j += 4)
@@ -395,7 +388,6 @@ void SoftwareAES::_decrypt(uint8_t* buff)
 
 void SoftwareAES::setKey(const uint8_t* key)
 {
-    gentables();
     gkey(4, 4, key);
 }
 
