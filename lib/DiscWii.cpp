@@ -134,6 +134,8 @@ class PartitionWii : public DiscBase::IPartition
             titleVersion = SBig(titleVersion);
             numContents = SBig(numContents);
             bootIdx = SBig(bootIdx);
+            contents.clear();
+            contents.reserve(numContents);
             for (uint16_t c=0 ; c<numContents ; ++c)
             {
                 contents.emplace_back();
