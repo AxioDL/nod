@@ -16,6 +16,7 @@ namespace NOD
 class DiscBase
 {
 public:
+    virtual ~DiscBase() {}
     struct Header
     {
         char gameID[6];
@@ -52,6 +53,7 @@ public:
     class IPartition
     {
     public:
+        virtual ~IPartition() {}
         enum Kind
         {
             PART_DATA,

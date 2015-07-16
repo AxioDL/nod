@@ -21,6 +21,7 @@ public:
 
     struct IReadStream
     {
+        virtual ~IReadStream() {}
         virtual uint64_t read(void* buf, uint64_t length)=0;
         virtual void seek(int64_t offset, int whence=SEEK_SET)=0;
         virtual uint64_t position() const=0;
@@ -29,6 +30,7 @@ public:
 
     struct IWriteStream
     {
+        virtual ~IWriteStream() {}
         virtual uint64_t write(void* buf, uint64_t length)=0;
     };
     virtual std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset=0) const=0;
@@ -36,6 +38,7 @@ public:
 
 struct IPartReadStream
 {
+    virtual ~IPartReadStream() {}
     virtual void seek(int64_t offset, int whence=SEEK_SET)=0;
     virtual uint64_t position() const=0;
     virtual uint64_t read(void* buf, uint64_t length)=0;
@@ -43,6 +46,7 @@ struct IPartReadStream
 
 struct IPartWriteStream
 {
+    virtual ~IPartWriteStream() {}
     virtual void seek(int64_t offset, int whence=SEEK_SET)=0;
     virtual uint64_t position() const=0;
     virtual uint64_t write(void* buf, uint64_t length)=0;
