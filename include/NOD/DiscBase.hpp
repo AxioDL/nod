@@ -86,7 +86,6 @@ public:
             const IPartition& m_parent;
             Kind m_kind;
 
-            std::unique_ptr<IFileIO> m_hddFile;
             uint64_t m_discOffset;
             uint64_t m_discLength;
             std::string m_name;
@@ -164,7 +163,7 @@ public:
                 return end();
             }
 
-            void extractToDirectory(const SystemString& basePath, bool force=false);
+            void extractToDirectory(const SystemString& basePath, bool force=false) const;
         };
     protected:
         uint64_t m_dolOff;

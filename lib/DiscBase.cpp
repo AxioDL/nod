@@ -57,7 +57,7 @@ void DiscBase::IPartition::parseDOL(IPartReadStream& s)
     m_dolSz = dolSize;
 }
 
-void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, bool force)
+void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, bool force) const
 {
     SystemStringView nameView(getName());
     SystemString path = basePath + _S("/") + nameView.sys_str();
@@ -76,9 +76,8 @@ void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
         Sstat theStat;
         if (force || Stat(path.c_str(), &theStat))
         {
-            m_hddFile = NewFileIO(path);
             std::unique_ptr<IPartReadStream> rs = beginReadStream();
-            std::unique_ptr<IFileIO::IWriteStream> ws = m_hddFile->beginWriteStream();
+            std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path)->beginWriteStream();
             ws->copyFromDisc(*rs.get(), m_discLength);
         }
     }
