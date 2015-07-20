@@ -3,6 +3,7 @@ project(NODLib)
 
 if (NOT TARGET LogVisor)
     add_subdirectory(LogVisor)
+    set(LOG_VISOR_INCLUDE_DIR LogVisor/include)
 endif()
 
 include_directories(include ${LOG_VISOR_INCLUDE_DIR})
