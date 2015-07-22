@@ -2,6 +2,10 @@
 #include "NOD/NOD.hpp"
 #include "NOD/DiscBase.hpp"
 
+#if _WIN32
+#define fseeko _fseeki64
+#endif
+
 namespace NOD
 {
 

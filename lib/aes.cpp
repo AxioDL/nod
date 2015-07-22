@@ -1,7 +1,12 @@
 #include "NOD/aes.hpp"
 #include <stdio.h>
 #include <string.h>
+
+#if _WIN32
+#include <intrin.h>
+#else
 #include <cpuid.h>
+#endif
 
 namespace NOD
 {

@@ -4,6 +4,11 @@
 #include "NOD/Util.hpp"
 #include "NOD/IFileIO.hpp"
 
+#if _WIN32
+#define ftello _ftelli64
+#define fseeko _fseeki64
+#endif
+
 /* Macros for min/max */
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))

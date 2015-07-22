@@ -44,7 +44,7 @@ public:
         uint32_t offset;
         uint32_t length;
     public:
-        inline bool isDir() const {return SBig(typeAndNameOffset) >> 24;}
+        inline bool isDir() const {return ((SBig(typeAndNameOffset) >> 24) != 0);}
         inline uint32_t getNameOffset() const {return SBig(typeAndNameOffset) & 0xffffff;}
         inline uint32_t getOffset() const {return SBig(offset);}
         inline uint32_t getLength() const {return SBig(length);}

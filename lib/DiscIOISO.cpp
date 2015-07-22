@@ -3,6 +3,11 @@
 #include "NOD/Util.hpp"
 #include "NOD/IDiscIO.hpp"
 
+#if _WIN32
+#define ftello _ftelli64
+#define fseeko _fseeki64
+#endif
+
 namespace NOD
 {
 
