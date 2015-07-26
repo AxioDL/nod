@@ -107,7 +107,7 @@ public:
             {
                 if (m_kind != NODE_FILE)
                 {
-                    throw std::runtime_error("unable to stream a non-file");
+                    LogModule.report(LogVisor::Error, "unable to stream a non-file %s", m_name.c_str());
                     return std::unique_ptr<IPartReadStream>();
                 }
                 return m_parent.beginReadStream(m_discOffset + offset);
@@ -116,7 +116,7 @@ public:
             {
                 if (m_kind != NODE_FILE)
                 {
-                    throw std::runtime_error("unable to buffer a non-file");
+                    LogModule.report(LogVisor::Error, "unable to buffer a non-file %s", m_name.c_str());
                     return std::unique_ptr<uint8_t[]>();
                 }
                 uint8_t* buf = new uint8_t[m_discLength];
@@ -163,7 +163,7 @@ public:
                 return end();
             }
 
-            void extractToDirectory(const SystemString& basePath, bool force=false) const;
+            bool extractToDirectory(const SystemString& basePath, bool force=false) const;
         };
     protected:
         uint64_t m_dolOff;
@@ -194,7 +194,7 @@ public:
         {return beginReadStream(0x2440 + offset);}
         inline const Node& getFSTRoot() const {return m_nodes[0];}
         inline Node& getFSTRoot() {return m_nodes[0];}
-        void extractToDirectory(const SystemString& path, bool force=false);
+        bool extractToDirectory(const SystemString& path, bool force=false);
 
         inline uint64_t getDOLSize() const {return m_dolSz;}
         inline std::unique_ptr<uint8_t[]> getDOLBuf() const

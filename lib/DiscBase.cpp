@@ -57,7 +57,7 @@ void DiscBase::IPartition::parseDOL(IPartReadStream& s)
     m_dolSz = dolSize;
 }
 
-void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, bool force) const
+bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, bool force) const
 {
     SystemStringView nameView(getName());
     SystemString path = basePath + _S("/") + nameView.sys_str();
@@ -65,11 +65,12 @@ void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     {
         if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
         {
-            SystemUTF8View pathView(path);
-            throw std::runtime_error("unable to mkdir '" + pathView.utf8_str() + "'");
+            LogModule.report(LogVisor::Error, _S("unable to mkdir '%s'"), path.c_str());
+            return false;
         }
         for (Node& subnode : *this)
-            subnode.extractToDirectory(path, force);
+            if (!subnode.extractToDirectory(path, force))
+                return false;
     }
     else if (m_kind == NODE_FILE)
     {
@@ -81,15 +82,16 @@ void DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
             ws->copyFromDisc(*rs.get(), m_discLength);
         }
     }
+    return true;
 }
 
-void DiscBase::IPartition::extractToDirectory(const SystemString& path, bool force)
+bool DiscBase::IPartition::extractToDirectory(const SystemString& path, bool force)
 {
     Sstat theStat;
     if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
     {
-        SystemUTF8View pathView(path);
-        throw std::runtime_error("unable to mkdir '" + pathView.utf8_str() + "'");
+        LogModule.report(LogVisor::Error, _S("unable to mkdir '%s'"), path.c_str());
+        return false;
     }
 
     /* Extract Apploader */
@@ -109,7 +111,7 @@ void DiscBase::IPartition::extractToDirectory(const SystemString& path, bool for
     }
 
     /* Extract Filesystem */
-    m_nodes[0].extractToDirectory(path, force);
+    return m_nodes[0].extractToDirectory(path, force);
 }
 
 }

@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdexcept>
 #include "NOD/Util.hpp"
 #include "NOD/IDiscIO.hpp"
 

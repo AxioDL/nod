@@ -52,7 +52,8 @@ int main(int argc, char* argv[])
         if (!dataPart)
             return -1;
 
-        dataPart->extractToDirectory(outDir, force);
+        if (!dataPart->extractToDirectory(outDir, force))
+            return -1;
     }
     else if (!strcasecmp(argv[1], _S("make")))
     {

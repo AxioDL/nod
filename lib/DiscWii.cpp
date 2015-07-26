@@ -388,7 +388,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
         else if (part.partType == PartInfo::Part::PART_CHANNEL)
             kind = IPartition::PART_CHANNEL;
         else
-            throw std::runtime_error("Invalid partition type");
+            LogModule.report(LogVisor::FatalError, "invalid partition type %s", part.partType);
         m_partitions.emplace_back(new PartitionWii(*this, kind, part.partDataOff << 2));
     }
 }

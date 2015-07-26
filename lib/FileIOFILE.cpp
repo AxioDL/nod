@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdexcept>
 #include "NOD/Util.hpp"
 #include "NOD/IFileIO.hpp"
 
@@ -50,13 +49,7 @@ public:
             fp = fopen(path.c_str(), "wb");
 #endif
             if (!fp)
-            {
-#if NOD_UCS2
-                throw std::runtime_error("Unable to open '" + WideToUTF8(path) + "' for writing");
-#else
-                throw std::runtime_error("Unable to open '" + path + "' for writing");
-#endif
-            }
+                LogModule.report(LogVisor::Error, _S("unable to open '%s' for writing"), path.c_str());
         }
         ~WriteStream() {fclose(fp);}
         uint64_t write(void* buf, uint64_t length)
@@ -69,9 +62,15 @@ public:
                 uint64_t thisSz = MIN(0x7c00, length);
                 uint64_t readSz = discio.read(buf, thisSz);
                 if (thisSz != readSz)
-                    throw std::runtime_error("unable to read enough from disc");
+                {
+                    LogModule.report(LogVisor::Error, "unable to read enough from disc");
+                    return read;
+                }
                 if (fwrite(buf, 1, readSz, fp) != readSz)
-                    throw std::runtime_error("unable to write in file");
+                {
+                    LogModule.report(LogVisor::Error, "unable to write in file");
+                    return read;
+                }
                 length -= thisSz;
                 read += thisSz;
             }
@@ -93,13 +92,7 @@ public:
             fp = fopen(path.c_str(), "rb");
 #endif
             if (!fp)
-            {
-#if NOD_UCS2
-                throw std::runtime_error("Unable to open '" + WideToUTF8(path) + "' for reading");
-#else
-                throw std::runtime_error("Unable to open '" + path + "' for reading");
-#endif
-            }
+                LogModule.report(LogVisor::Error, _S("unable to open '%s' for reading"), path.c_str());
         }
         ~ReadStream() {fclose(fp);}
         uint64_t read(void* buf, uint64_t length)
@@ -111,9 +104,15 @@ public:
             {
                 uint64_t thisSz = MIN(0x7c00, length);
                 if (fread(buf, 1, thisSz, fp) != thisSz)
-                    throw std::runtime_error("unable to read enough from file");
+                {
+                    LogModule.report(LogVisor::Error, "unable to read enough from file");
+                    return written;
+                }
                 if (discio.write(buf, thisSz) != thisSz)
-                    throw std::runtime_error("unable to write enough to disc");
+                {
+                    LogModule.report(LogVisor::Error, "unable to write enough to disc");
+                    return written;
+                }
                 length -= thisSz;
                 written += thisSz;
             }
