@@ -40,14 +40,7 @@ static inline void unpack(uint32_t a, uint8_t* b)
 
 static inline uint8_t xtime(uint8_t a)
 {
-    uint8_t b;
-
-    if (a & 0x80) b = 0x1B;
-    else        b = 0;
-
-    a <<= 1;
-    a ^= b;
-    return a;
+    return ((a << 1) ^ (((a>>7) & 1) * 0x11B));
 }
 
 static const struct SoftwareAESTables
