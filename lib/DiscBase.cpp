@@ -79,7 +79,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
         {
             std::unique_ptr<IPartReadStream> rs = beginReadStream();
             std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path)->beginWriteStream();
-            ws->copyFromDisc(*rs.get(), m_discLength);
+            ws->copyFromDisc(*rs, m_discLength);
         }
     }
     return true;

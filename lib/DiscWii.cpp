@@ -195,7 +195,7 @@ public:
     : IPartition(parent, kind, offset)
     {
         std::unique_ptr<IDiscIO::IReadStream> s = parent.getDiscIO().beginReadStream(offset);
-        m_ticket.read(*s.get());
+        m_ticket.read(*s);
 
         uint32_t tmdSize;
         s->read(&tmdSize, 4);
@@ -224,12 +224,12 @@ public:
         dataSize = SBig(dataSize) << 2;
 
         s->seek(offset + tmdOff);
-        m_tmd.read(*s.get());
+        m_tmd.read(*s);
 
         s->seek(offset + certChainOff);
-        m_caCert.read(*s.get());
-        m_tmdCert.read(*s.get());
-        m_ticketCert.read(*s.get());
+        m_caCert.read(*s);
+        m_tmdCert.read(*s);
+        m_ticketCert.read(*s);
 
         /* Decrypt title key */
         std::unique_ptr<IAES> aes = NewAES();
@@ -250,11 +250,11 @@ public:
         m_apploaderSz = 32 + SBig(vals[0]) + SBig(vals[1]);
 
         /* Yay files!! */
-        parseFST(*ds.get());
+        parseFST(*ds);
 
         /* Also make DOL header and size handy */
         ds->seek(m_dolOff);
-        parseDOL(*ds.get());
+        parseDOL(*ds);
     }
 
     class PartReadStream : public IPartReadStream
@@ -373,7 +373,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
                 parts[p].partType = (Part::Type)SBig(parts[p].partType);
             }
         }
-    } partInfo(*m_discIO.get());
+    } partInfo(*m_discIO);
 
     /* Iterate for data partition */
     m_partitions.reserve(partInfo.partCount);

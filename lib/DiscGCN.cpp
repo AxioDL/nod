@@ -22,11 +22,11 @@ public:
         m_apploaderSz = 32 + SBig(vals[0]) + SBig(vals[1]);
 
         /* Yay files!! */
-        parseFST(*s.get());
+        parseFST(*s);
 
         /* Also make DOL header and size handy */
         s->seek(m_dolOff);
-        parseDOL(*s.get());
+        parseDOL(*s);
     }
 
     class PartReadStream : public IPartReadStream

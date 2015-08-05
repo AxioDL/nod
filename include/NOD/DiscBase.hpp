@@ -227,11 +227,11 @@ protected:
     std::vector<std::unique_ptr<IPartition>> m_partitions;
 public:
     DiscBase(std::unique_ptr<IDiscIO>&& dio)
-    : m_discIO(std::move(dio)), m_header(*m_discIO.get()) {}
+    : m_discIO(std::move(dio)), m_header(*m_discIO) {}
 
     virtual bool commit()=0;
     inline const Header& getHeader() const {return m_header;}
-    inline const IDiscIO& getDiscIO() const {return *m_discIO.get();}
+    inline const IDiscIO& getDiscIO() const {return *m_discIO;}
     inline IPartition* getDataPartition()
     {
         for (const std::unique_ptr<IPartition>& part : m_partitions)
