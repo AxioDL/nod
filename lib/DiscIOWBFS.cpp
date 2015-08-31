@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <inttypes.h>
 #include "NOD/Util.hpp"
 #include "NOD/IDiscIO.hpp"
 
@@ -82,7 +83,7 @@ class DiscIOWBFS : public IDiscIO
         off*=512ULL;
         if (fseeko(fp, off, SEEK_SET))
         {
-            LogModule.report(LogVisor::FatalError, "error seeking in disc partition: %lld %d", off, count);
+            LogModule.report(LogVisor::FatalError, "error seeking in disc partition: %" PRId64 " %d", off, count);
             return 1;
         }
         if (fread(buf, count*512ULL, 1, fp) != 1){

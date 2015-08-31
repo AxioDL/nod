@@ -4,6 +4,10 @@
 #if _WIN32 && UNICODE
 #include <wctype.h>
 #include <direct.h>
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 1
+#include <windows.h>
+#endif
 #else
 #include <ctype.h>
 #endif
@@ -31,10 +35,6 @@ static inline int Mkdir(const char* path, mode_t mode) {return mkdir(path, mode)
 static inline int Stat(const char* path, Sstat* statout) {return stat(path, statout);}
 #endif
 
-/* String Converters */
-std::string WideToUTF8(const std::wstring& src);
-std::wstring UTF8ToWide(const std::string& src);
-
 /* String-converting views */
 #if NOD_UCS2
 typedef wchar_t SystemChar;
@@ -48,7 +48,11 @@ class SystemUTF8View
     std::string m_utf8;
 public:
     SystemUTF8View(const SystemString& str)
-    : m_utf8(WideToUTF8(str)) {}
+    {
+        int len = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), str.size(), nullptr, 0, nullptr, nullptr);
+        m_utf8.assign('\0', len);
+        WideCharToMultiByte(CP_UTF8, 0, str.c_str(), str.size(), &m_utf8[0], len, nullptr, nullptr);
+    }
     inline const std::string& utf8_str() {return m_utf8;}
 };
 class SystemStringView
@@ -56,7 +60,11 @@ class SystemStringView
     std::wstring m_sys;
 public:
     SystemStringView(const std::string& str)
-    : m_sys(UTF8ToWide(str)) {}
+    {
+        int len = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), nullptr, 0);
+        m_sys.assign(L'\0', len);
+        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), &m_sys[0], len);
+    }
     inline const std::wstring& sys_str() {return m_sys;}
 };
 #ifndef _S
