@@ -139,7 +139,7 @@ public:
         p->wbfs_sec_sz = 1<<p->wbfs_sec_sz_s;
         p->n_wbfs_sec = p->n_wii_sec >> (p->wbfs_sec_sz_s - p->wii_sec_sz_s);
         p->n_wbfs_sec_per_disc = p->n_wii_sec_per_disc >> (p->wbfs_sec_sz_s - p->wii_sec_sz_s);
-        p->disc_info_sz = ALIGN_LBA(sizeof(WBFSDiscInfo) + p->n_wbfs_sec_per_disc*2);
+        p->disc_info_sz = ALIGN_LBA(uint16_t(sizeof(WBFSDiscInfo)) + p->n_wbfs_sec_per_disc*2);
 
         p->freeblks_lba = (p->wbfs_sec_sz - p->n_wbfs_sec/8)>>p->hd_sec_sz_s;
 
