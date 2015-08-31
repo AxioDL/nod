@@ -50,7 +50,7 @@ public:
     SystemUTF8View(const SystemString& str)
     {
         int len = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), str.size(), nullptr, 0, nullptr, nullptr);
-        m_utf8.assign('\0', len);
+        m_utf8.assign(len, '\0');
         WideCharToMultiByte(CP_UTF8, 0, str.c_str(), str.size(), &m_utf8[0], len, nullptr, nullptr);
     }
     inline const std::string& utf8_str() {return m_utf8;}
@@ -62,7 +62,7 @@ public:
     SystemStringView(const std::string& str)
     {
         int len = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), nullptr, 0);
-        m_sys.assign(L'\0', len);
+        m_sys.assign(len, L'\0');
         MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), &m_sys[0], len);
     }
     inline const std::wstring& sys_str() {return m_sys;}
