@@ -1,6 +1,7 @@
 #include "NOD/DiscBase.hpp"
 #include "NOD/IFileIO.hpp"
 
+#include <errno.h>
 #ifndef _WIN32
 #include <unistd.h>
 #endif

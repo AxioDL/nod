@@ -185,8 +185,8 @@ protected:
     void _decrypt(uint8_t* buff);
 
 public:
-    void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len);
-    void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len);
+    void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len);
+    void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len);
     void setKey(const uint8_t* key);
 };
 
@@ -430,7 +430,7 @@ void SoftwareAES::decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outb
 }
 
 // CBC mode encryption
-void SoftwareAES::encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
+void SoftwareAES::encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)
 {
     uint8_t block[16];
     uint8_t feedback[16];
@@ -477,7 +477,7 @@ class NiAES : public IAES
     __m128i m_ekey[11];
     __m128i m_dkey[11];
 public:
-    void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
+    void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)
     {
         __m128i feedback,data;
         uint64_t i,j;
@@ -497,7 +497,7 @@ public:
             _mm_storeu_si128(&((__m128i*)outbuf)[i], feedback);
         }
     }
-    void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, uint64_t len)
+    void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)
     {
         __m128i data,feedback,last_in;
         uint64_t i,j;
