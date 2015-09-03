@@ -380,7 +380,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
     for (uint32_t p=0 ; p<partInfo.partCount && p<4 ; ++p)
     {
         PartInfo::Part& part = partInfo.parts[p];
-        IPartition::Kind kind;
+        IPartition::Kind kind = IPartition::PART_DATA;
         if (part.partType == PartInfo::Part::PART_DATA)
             kind = IPartition::PART_DATA;
         else if (part.partType == PartInfo::Part::PART_UPDATE)
