@@ -98,6 +98,9 @@ public:
 #endif
 #endif
 
+#undef bswap16
+#undef bswap32
+#undef bswap64
 /* Type-sensitive byte swappers */
 template <typename T>
 static inline T bswap16(T val)
