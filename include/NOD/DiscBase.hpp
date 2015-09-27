@@ -173,7 +173,6 @@ public:
         std::vector<Node> m_nodes;
         void parseFST(IPartReadStream& s);
 
-        DOLHeader m_dolHead;
         uint64_t m_dolSz;
         void parseDOL(IPartReadStream& s);
 

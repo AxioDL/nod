@@ -47,14 +47,16 @@ void DiscBase::IPartition::parseFST(IPartReadStream& s)
 void DiscBase::IPartition::parseDOL(IPartReadStream& s)
 {
     /* Read Dol header */
-    s.read(&m_dolHead, sizeof(DOLHeader));
+    DOLHeader dolHeader;
+    s.read(&dolHeader, sizeof(DOLHeader));
 
     /* Calculate Dol size */
-    uint32_t dolSize = SBig(m_dolHead.textOff[0]) - sizeof(DOLHeader);
+    uint32_t dolSize = SBig(dolHeader.textOff[0]);
     for (uint32_t i = 0 ; i < 7 ; i++)
-        dolSize += SBig(m_dolHead.textSizes[i]);
+        dolSize += SBig(dolHeader.textSizes[i]);
     for (uint32_t i = 0 ; i < 11 ; i++)
-        dolSize += SBig(m_dolHead.dataSizes[i]);
+        dolSize += SBig(dolHeader.dataSizes[i]);
+
     m_dolSz = dolSize;
 }
 
