@@ -29,13 +29,19 @@ int main(int argc, char* argv[])
     /* Enable logging to console */
     LogVisor::RegisterConsoleLogger();
 
+    NOD::ExtractionContext ctx = { true, true, [&](const std::string& str){
+                                       fprintf(stderr, "%s\n", str.c_str());
+                                   }};
     const NOD::SystemChar* inDir = nullptr;
     const NOD::SystemChar* outDir = _S(".");
-    bool force = false;
+
     for (int a=2 ; a<argc ; ++a)
     {
         if (argv[a][0] == '-' && argv[a][1] == 'f')
-            force = true;
+            ctx.force = true;
+        else if (argv[a][0] == '-' && argv[a][1] == 'v')
+            ctx.verbose = true;
+
         else if (!inDir)
             inDir = argv[a];
         else
@@ -52,7 +58,7 @@ int main(int argc, char* argv[])
         if (!dataPart)
             return -1;
 
-        if (!dataPart->extractToDirectory(outDir, force))
+        if (!dataPart->extractToDirectory(outDir, ctx))
             return -1;
     }
     else if (!strcasecmp(argv[1], _S("make")))

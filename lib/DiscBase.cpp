@@ -1,5 +1,6 @@
 #include "NOD/DiscBase.hpp"
 #include "NOD/IFileIO.hpp"
+#include "NOD/NOD.hpp"
 
 #include <errno.h>
 #ifndef _WIN32
@@ -60,25 +61,33 @@ void DiscBase::IPartition::parseDOL(IPartReadStream& s)
     m_dolSz = dolSize;
 }
 
-bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, bool force) const
+bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, const ExtractionContext& ctx) const
 {
     SystemStringView nameView(getName());
     SystemString path = basePath + _S("/") + nameView.sys_str();
+
     if (m_kind == NODE_DIRECTORY)
     {
+        if (ctx.verbose && ctx.progressCB && !getName().empty())
+            ctx.progressCB(getName());
         if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
         {
             LogModule.report(LogVisor::Error, _S("unable to mkdir '%s'"), path.c_str());
             return false;
         }
         for (Node& subnode : *this)
-            if (!subnode.extractToDirectory(path, force))
+            if (!subnode.extractToDirectory(path, ctx))
                 return false;
+        if (ctx.verbose && ctx.progressCB)
+            ctx.progressCB(getName());
     }
     else if (m_kind == NODE_FILE)
     {
         Sstat theStat;
-        if (force || Stat(path.c_str(), &theStat))
+        if (ctx.verbose && ctx.progressCB)
+            ctx.progressCB(getName());
+
+        if (ctx.force || Stat(path.c_str(), &theStat))
         {
             std::unique_ptr<IPartReadStream> rs = beginReadStream();
             std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path)->beginWriteStream();
@@ -88,7 +97,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     return true;
 }
 
-bool DiscBase::IPartition::extractToDirectory(const SystemString& path, bool force)
+bool DiscBase::IPartition::extractToDirectory(const SystemString& path, const ExtractionContext& ctx)
 {
     Sstat theStat;
     if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
@@ -99,22 +108,26 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path, bool for
 
     /* Extract Apploader */
     SystemString apploaderPath = path + _S("/apploader.bin");
-    if (force || Stat(apploaderPath.c_str(), &theStat))
+    if (ctx.force || Stat(apploaderPath.c_str(), &theStat))
     {
+        if (ctx.verbose && ctx.progressCB)
+            ctx.progressCB("apploader.bin");
         std::unique_ptr<uint8_t[]> buf = getApploaderBuf();
         NewFileIO(apploaderPath)->beginWriteStream()->write(buf.get(), m_apploaderSz);
     }
 
     /* Extract Dol */
     SystemString dolPath = path + _S("/main.dol");
-    if (force || Stat(dolPath.c_str(), &theStat))
+    if (ctx.force || Stat(dolPath.c_str(), &theStat))
     {
+        if (ctx.verbose && ctx.progressCB)
+            ctx.progressCB("main.dol");
         std::unique_ptr<uint8_t[]> buf = getDOLBuf();
         NewFileIO(dolPath)->beginWriteStream()->write(buf.get(), m_dolSz);
     }
 
     /* Extract Filesystem */
-    return m_nodes[0].extractToDirectory(path, force);
+    return m_nodes[0].extractToDirectory(path, ctx);
 }
 
 }

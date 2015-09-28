@@ -13,6 +13,7 @@
 namespace NOD
 {
 
+class ExtractionContext;
 class DiscBase
 {
 public:
@@ -163,7 +164,7 @@ public:
                 return end();
             }
 
-            bool extractToDirectory(const SystemString& basePath, bool force=false) const;
+            bool extractToDirectory(const SystemString& basePath, const ExtractionContext& ctx) const;
         };
     protected:
         uint64_t m_dolOff;
@@ -193,7 +194,7 @@ public:
         {return beginReadStream(0x2440 + offset);}
         inline const Node& getFSTRoot() const {return m_nodes[0];}
         inline Node& getFSTRoot() {return m_nodes[0];}
-        bool extractToDirectory(const SystemString& path, bool force=false);
+        bool extractToDirectory(const SystemString& path, const ExtractionContext& ctx);
 
         inline uint64_t getDOLSize() const {return m_dolSz;}
         inline std::unique_ptr<uint8_t[]> getDOLBuf() const
@@ -245,10 +246,10 @@ public:
                 return part.get();
         return nullptr;
     }
-    inline void extractToDirectory(const SystemString& path, bool force=false)
+    inline void extractToDirectory(const SystemString& path, const ExtractionContext& ctx)
     {
         for (std::unique_ptr<IPartition>& part : m_partitions)
-            part->extractToDirectory(path, force);
+            part->extractToDirectory(path, ctx);
     }
 };
 
