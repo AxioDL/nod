@@ -78,8 +78,6 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
         for (Node& subnode : *this)
             if (!subnode.extractToDirectory(path, ctx))
                 return false;
-        if (ctx.verbose && ctx.progressCB)
-            ctx.progressCB(getName());
     }
     else if (m_kind == NODE_FILE)
     {
