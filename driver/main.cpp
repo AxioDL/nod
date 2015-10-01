@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
         if (!disc)
             return -1;
 
-        NOD::DiscBase::IPartition* dataPart = disc->getDataPartition();
+        NOD::Partition* dataPart = disc->getDataPartition();
         if (!dataPart)
             return -1;
 

@@ -253,6 +253,9 @@ public:
     }
 };
 
+using Partition = DiscBase::IPartition;
+using Node = Partition::Node;
+
 }
 
 #endif // __NOD_DISC_BASE__
