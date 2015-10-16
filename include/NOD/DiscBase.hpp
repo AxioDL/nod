@@ -13,7 +13,7 @@
 namespace NOD
 {
 
-class ExtractionContext;
+struct ExtractionContext;
 class DiscBase
 {
 public:
