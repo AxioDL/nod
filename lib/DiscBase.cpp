@@ -37,7 +37,7 @@ void DiscBase::IPartition::parseFST(IPartReadStream& s)
          ++it)
     {
         Node& node = *it;
-        if (node.m_kind == Node::NODE_DIRECTORY)
+        if (node.m_kind == Node::Kind::Directory)
         {
             node.m_childrenBegin = it + 1;
             node.m_childrenEnd = m_nodes.begin() + node.m_discLength;
@@ -66,7 +66,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     SystemStringView nameView(getName());
     SystemString path = basePath + _S("/") + nameView.sys_str();
 
-    if (m_kind == NODE_DIRECTORY)
+    if (m_kind == Kind::Directory)
     {
         if (ctx.verbose && ctx.progressCB && !getName().empty())
             ctx.progressCB(getName());
@@ -79,7 +79,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
             if (!subnode.extractToDirectory(path, ctx))
                 return false;
     }
-    else if (m_kind == NODE_FILE)
+    else if (m_kind == Kind::File)
     {
         Sstat theStat;
         if (ctx.verbose && ctx.progressCB)

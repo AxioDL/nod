@@ -106,7 +106,7 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio)
 : DiscBase(std::move(dio))
 {
     /* One lone partition for GCN */
-    m_partitions.emplace_back(new PartitionGCN(*this, IPartition::PART_DATA, 0));
+    m_partitions.emplace_back(new PartitionGCN(*this, IPartition::Kind::Data, 0));
 }
 
 bool DiscGCN::commit()

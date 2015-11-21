@@ -23,17 +23,17 @@ static const uint8_t COMMON_KEYS[2][16] =
 
 class PartitionWii : public DiscBase::IPartition
 {
-    enum SigType : uint32_t
+    enum class SigType : uint32_t
     {
-        SRSA_4096 = 0x00010000,
-        SRSA_2048 = 0x00010001,
-        SELIPTICAL_CURVE = 0x00010002
+        RSA_4096 = 0x00010000,
+        RSA_2048 = 0x00010001,
+        ELIPTICAL_CURVE = 0x00010002
     };
 
-    enum KeyType : uint32_t
+    enum class KeyType : uint32_t
     {
-        KRSA_4096 = 0x00000000,
-        KRSA_2048 = 0x00000001
+        RSA_4096 = 0x00000000,
+        RSA_2048 = 0x00000001
     };
 
     struct Ticket
@@ -124,7 +124,7 @@ class PartitionWii : public DiscBase::IPartition
         void read(IDiscIO::IReadStream& s)
         {
             s.read(this, 484);
-            sigType = (SigType)SBig(sigType);
+            sigType = SigType(SBig(uint32_t(sigType)));
             iosIdMajor = SBig(iosIdMajor);
             iosIdMinor = SBig(iosIdMinor);
             titleIdMajor = SBig(titleIdMajor);
@@ -158,22 +158,22 @@ class PartitionWii : public DiscBase::IPartition
         void read(IDiscIO::IReadStream& s)
         {
             s.read(&sigType, 4);
-            sigType = (SigType)SBig(sigType);
-            if (sigType == SRSA_4096)
+            sigType = SigType(SBig(uint32_t(sigType)));
+            if (sigType == SigType::RSA_4096)
                 s.read(sig, 512);
-            else if (sigType == SRSA_2048)
+            else if (sigType == SigType::RSA_2048)
                 s.read(sig, 256);
-            else if (sigType == SELIPTICAL_CURVE)
+            else if (sigType == SigType::ELIPTICAL_CURVE)
                 s.read(sig, 64);
             s.seek(60, SEEK_CUR);
 
             s.read(issuer, 64);
             s.read(&keyType, 4);
             s.read(subject, 64);
-            keyType = (KeyType)SBig(keyType);
-            if (keyType == KRSA_4096)
+            keyType = KeyType(SBig(uint32_t(keyType)));
+            if (keyType == KeyType::RSA_4096)
                 s.read(key, 512);
-            else if (keyType == KRSA_2048)
+            else if (keyType == KeyType::RSA_2048)
                 s.read(key, 256);
 
             s.read(&modulus, 8);
@@ -345,18 +345,14 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
 : DiscBase(std::move(dio))
 {
     /* Read partition info */
-    struct PartInfo {
+    struct PartInfo
+    {
         uint32_t partCount;
         uint32_t partInfoOff;
         struct Part
         {
             uint32_t partDataOff;
-            enum Type : uint32_t
-            {
-                PART_DATA = 0,
-                PART_UPDATE = 1,
-                PART_CHANNEL = 2
-            } partType;
+            IPartition::Kind partType;
         } parts[4];
         PartInfo(IDiscIO& dio)
         {
@@ -370,7 +366,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
             {
                 s->read(&parts[p], 8);
                 parts[p].partDataOff = SBig(parts[p].partDataOff);
-                parts[p].partType = (Part::Type)SBig(parts[p].partType);
+                parts[p].partType = IPartition::Kind(SBig(uint32_t(parts[p].partType)));
             }
         }
     } partInfo(*m_discIO);
@@ -380,15 +376,17 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
     for (uint32_t p=0 ; p<partInfo.partCount && p<4 ; ++p)
     {
         PartInfo::Part& part = partInfo.parts[p];
-        IPartition::Kind kind = IPartition::PART_DATA;
-        if (part.partType == PartInfo::Part::PART_DATA)
-            kind = IPartition::PART_DATA;
-        else if (part.partType == PartInfo::Part::PART_UPDATE)
-            kind = IPartition::PART_UPDATE;
-        else if (part.partType == PartInfo::Part::PART_CHANNEL)
-            kind = IPartition::PART_CHANNEL;
-        else
-            LogModule.report(LogVisor::FatalError, "invalid partition type %s", part.partType);
+        IPartition::Kind kind;
+        switch (part.partType)
+        {
+        case IPartition::Kind::Data:
+        case IPartition::Kind::Update:
+        case IPartition::Kind::Channel:
+            kind = part.partType;
+            break;
+        default:
+            LogModule.report(LogVisor::FatalError, "invalid partition type %d", part.partType);
+        }
         m_partitions.emplace_back(new PartitionWii(*this, kind, part.partDataOff << 2));
     }
 }

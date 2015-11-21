@@ -55,11 +55,11 @@ public:
     {
     public:
         virtual ~IPartition() {}
-        enum Kind
+        enum class Kind : uint32_t
         {
-            PART_DATA,
-            PART_UPDATE,
-            PART_CHANNEL
+            Data,
+            Update,
+            Channel
         };
         struct DOLHeader
         {
@@ -77,10 +77,10 @@ public:
         class Node
         {
         public:
-            enum Kind
+            enum class Kind
             {
-                NODE_FILE,
-                NODE_DIRECTORY
+                File,
+                Directory
             };
         private:
             friend class IPartition;
@@ -97,7 +97,7 @@ public:
         public:
             Node(const IPartition& parent, const FSTNode& node, const char* name)
             : m_parent(parent),
-              m_kind(node.isDir() ? NODE_DIRECTORY : NODE_FILE),
+              m_kind(node.isDir() ? Kind::Directory : Kind::File),
               m_discOffset(parent.normalizeOffset(node.getOffset())),
               m_discLength(node.getLength()),
               m_name(name) {}
@@ -106,7 +106,7 @@ public:
             inline uint64_t size() const {return m_discLength;}
             std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const
             {
-                if (m_kind != NODE_FILE)
+                if (m_kind != Kind::File)
                 {
                     LogModule.report(LogVisor::Error, "unable to stream a non-file %s", m_name.c_str());
                     return std::unique_ptr<IPartReadStream>();
@@ -115,7 +115,7 @@ public:
             }
             std::unique_ptr<uint8_t[]> getBuf() const
             {
-                if (m_kind != NODE_FILE)
+                if (m_kind != Kind::File)
                 {
                     LogModule.report(LogVisor::Error, "unable to buffer a non-file %s", m_name.c_str());
                     return std::unique_ptr<uint8_t[]>();
@@ -138,7 +138,7 @@ public:
                 inline bool operator==(const DirectoryIterator& other) {return m_it == other.m_it;}
                 inline DirectoryIterator& operator++()
                 {
-                    if (m_it->m_kind == NODE_DIRECTORY)
+                    if (m_it->m_kind == Kind::Directory)
                         m_it = m_it->rawEnd();
                     else
                         ++m_it;
@@ -151,7 +151,7 @@ public:
             inline DirectoryIterator end() const {return DirectoryIterator(m_childrenEnd);}
             inline DirectoryIterator find(const std::string& name) const
             {
-                if (m_kind == NODE_DIRECTORY)
+                if (m_kind == Kind::Directory)
                 {
                     DirectoryIterator it=begin();
                     for (; it != end() ; ++it)
@@ -235,14 +235,14 @@ public:
     inline IPartition* getDataPartition()
     {
         for (const std::unique_ptr<IPartition>& part : m_partitions)
-            if (part->getKind() == IPartition::PART_DATA)
+            if (part->getKind() == IPartition::Kind::Data)
                 return part.get();
         return nullptr;
     }
     inline IPartition* getUpdatePartition()
     {
         for (const std::unique_ptr<IPartition>& part : m_partitions)
-            if (part->getKind() == IPartition::PART_UPDATE)
+            if (part->getKind() == IPartition::Kind::Update)
                 return part.get();
         return nullptr;
     }
