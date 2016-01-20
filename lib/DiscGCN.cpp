@@ -109,8 +109,16 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio)
     m_partitions.emplace_back(new PartitionGCN(*this, IPartition::Kind::Data, 0));
 }
 
-bool DiscGCN::commit()
+bool DiscGCN::packFromDirectory(const SystemChar* dataPath, const SystemChar* updatePath,
+                                const SystemChar* outPath, const char gameID[6], const char* gameTitle,
+                                bool korean)
 {
+    std::unique_ptr<IDiscIO::IWriteStream> ws = m_discIO->beginWriteStream(0);
+    Header header(gameID, gameTitle);
+    header.write(*ws);
+
+    ws = m_discIO->beginWriteStream(0x420);
+
     return false;
 }
 

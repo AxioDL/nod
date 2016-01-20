@@ -6,7 +6,6 @@
 namespace NOD
 {
 
-/* Not much of a secret anymore I suppose */
 static const uint8_t COMMON_KEYS[2][16] =
 {
     /* Normal */
@@ -391,8 +390,13 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
     }
 }
 
-bool DiscWii::commit()
+bool DiscWii::packFromDirectory(const SystemChar* dataPath, const SystemChar* updatePath,
+                                const SystemChar* outPath, const char gameID[6], const char* gameTitle,
+                                bool korean)
 {
+    std::unique_ptr<IDiscIO::IWriteStream> s = m_discIO->beginWriteStream(0x420);
+
+
     return false;
 }
 

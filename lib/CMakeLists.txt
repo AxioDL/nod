@@ -9,7 +9,6 @@ add_library(NOD
             DiscIOWBFS.cpp
             DiscWii.cpp
             FileIOFILE.cpp
-            FileIOMEM.cpp
             NOD.cpp
             ${NOD_HEADERS})
 if(NOT WIN32)
