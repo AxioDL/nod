@@ -167,7 +167,7 @@ void DiscBuilderBase::IPartitionBuilder::recursiveBuildNodes(const SystemChar* d
         if (e.m_isDir)
         {
             size_t dirNodeIdx = m_buildNodes.size();
-            m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
+            m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx+1);
             addBuildName(e.m_name);
             incParents();
             recursiveBuildNodes(e.m_path.c_str(), dolInode, [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();});
@@ -213,6 +213,8 @@ bool DiscBuilderBase::IPartitionBuilder::buildFromDirectory(const SystemChar* di
 
     /* Clear file */
     m_parent.getFileIO().beginWriteStream();
+    ++m_parent.m_progressIdx;
+    m_parent.m_progressCB(m_parent.m_progressIdx, "Preparing output image", -1);
 
     m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
     addBuildName(_S("<root>"));

@@ -165,6 +165,7 @@ public:
         size_t fstSz = sizeof(FSTNode) * m_buildNodes.size();
         for (size_t i=0 ; i<fstOff-xferSz ; ++i)
             ws->write("\xff", 1);
+        fstOff += 0x2440;
         ws->write(m_buildNodes.data(), fstSz);
         for (const std::string& str : m_buildNames)
             ws->write(str.data(), str.size()+1);

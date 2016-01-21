@@ -93,7 +93,10 @@ int main(int argc, char* argv[])
                 lastIdx = idx;
                 printf("\n");
             }
-            printf("\r%s %" PRISize " B", name.c_str(), bytes);
+            if (bytes != -1)
+                printf("\r%s %" PRISize " B", name.c_str(), bytes);
+            else
+                printf("\r%s", name.c_str());
             fflush(stdout);
         };
 
