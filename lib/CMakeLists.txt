@@ -9,6 +9,7 @@ add_library(NOD
             DiscIOWBFS.cpp
             DiscWii.cpp
             FileIOFILE.cpp
+            DirectoryEnumerator.cpp
             NOD.cpp
             ${NOD_HEADERS})
 if(NOT WIN32)

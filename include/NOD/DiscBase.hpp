@@ -13,71 +13,82 @@
 namespace NOD
 {
 
+class FSTNode
+{
+    uint32_t typeAndNameOffset;
+    uint32_t offset;
+    uint32_t length;
+public:
+    FSTNode(bool isDir, uint32_t nameOff, uint32_t off, uint32_t len)
+    {
+        typeAndNameOffset = nameOff & 0xffffff;
+        typeAndNameOffset |= isDir << 24;
+        typeAndNameOffset = SBig(typeAndNameOffset);
+        offset = SBig(off);
+        length = SBig(len);
+    }
+    inline bool isDir() const {return ((SBig(typeAndNameOffset) >> 24) != 0);}
+    inline uint32_t getNameOffset() const {return SBig(typeAndNameOffset) & 0xffffff;}
+    inline uint32_t getOffset() const {return SBig(offset);}
+    inline uint32_t getLength() const {return SBig(length);}
+    void incrementLength()
+    {
+        uint32_t orig = SBig(length);
+        ++orig;
+        length = SBig(orig);
+    }
+};
+
+struct Header
+{
+    char m_gameID[6];
+    char m_discNum;
+    char m_discVersion;
+    char m_audioStreaming;
+    char m_streamBufSz;
+    char m_unk[14];
+    uint32_t m_wiiMagic;
+    uint32_t m_gcnMagic;
+    char m_gameTitle[64];
+
+    Header(IDiscIO& dio)
+    {
+        std::unique_ptr<IDiscIO::IReadStream> s = dio.beginReadStream(0);
+        s->read(this, sizeof(*this));
+        m_wiiMagic = SBig(m_wiiMagic);
+        m_gcnMagic = SBig(m_gcnMagic);
+    }
+
+    Header(const char gameID[6], const char* gameTitle, bool wii, char discNum=0, char discVersion=0,
+           char audioStreaming=1, char streamBufSz=0)
+    {
+        memset(this, 0, sizeof(*this));
+        memcpy(m_gameID, gameID, 6);
+        strncpy(m_gameTitle, gameTitle, 64);
+        m_discNum = discNum;
+        m_discVersion = discVersion;
+        m_audioStreaming = audioStreaming;
+        m_streamBufSz = streamBufSz;
+        if (wii)
+            m_wiiMagic = 0x5D1C9EA3;
+        else
+            m_gcnMagic = 0xC2339F3D;
+    }
+
+    void write(IFileIO::IWriteStream& ws) const
+    {
+        Header hs(*this);
+        hs.m_wiiMagic = SBig(hs.m_wiiMagic);
+        hs.m_gcnMagic = SBig(hs.m_gcnMagic);
+        ws.write(&hs, sizeof(hs));
+    }
+};
+
 struct ExtractionContext;
 class DiscBase
 {
 public:
     virtual ~DiscBase() {}
-    struct Header
-    {
-        char m_gameID[6];
-        char m_discNum;
-        char m_discVersion;
-        char m_audioStreaming;
-        char m_streamBufSz;
-        char m_unk[14];
-        uint32_t m_wiiMagic;
-        uint32_t m_gcnMagic;
-        char m_gameTitle[64];
-
-        Header(IDiscIO& dio)
-        {
-            std::unique_ptr<IDiscIO::IReadStream> s = dio.beginReadStream(0);
-            s->read(this, sizeof(*this));
-            m_wiiMagic = SBig(m_wiiMagic);
-            m_gcnMagic = SBig(m_gcnMagic);
-        }
-
-        Header(const char gameID[6], const char* gameTitle, char discNum=0, char discVersion=0,
-               char audioStreaming=1, char streamBufSz=0)
-        {
-            memset(this, 0, sizeof(*this));
-            memcpy(m_gameID, gameID, 6);
-            strncpy(m_gameTitle, gameTitle, 64);
-            m_discNum = discNum;
-            m_discVersion = discVersion;
-            m_audioStreaming = audioStreaming;
-            m_streamBufSz = streamBufSz;
-            m_gcnMagic = 0xC2339F3D;
-        }
-
-        void write(IDiscIO::IWriteStream& ws) const
-        {
-            Header hs(*this);
-            hs.m_gcnMagic = SBig(hs.m_gcnMagic);
-            ws.write(&hs, sizeof(hs));
-        }
-    };
-
-    class FSTNode
-    {
-        uint32_t typeAndNameOffset;
-        uint32_t offset;
-        uint32_t length;
-    public:
-        FSTNode(bool isDir, uint32_t nameOff, uint32_t off, uint32_t len)
-        {
-            typeAndNameOffset = nameOff & 0xffffff;
-            typeAndNameOffset |= isDir << 24;
-            typeAndNameOffset = SBig(typeAndNameOffset);
-            offset = SBig(off);
-            length = SBig(len);
-        }
-        inline bool isDir() const {return ((SBig(typeAndNameOffset) >> 24) != 0);}
-        inline uint32_t getNameOffset() const {return SBig(typeAndNameOffset) & 0xffffff;}
-        inline uint32_t getOffset() const {return SBig(offset);}
-        inline uint32_t getLength() const {return SBig(length);}
-    };
 
     class IPartition
     {
@@ -202,6 +213,11 @@ public:
         std::vector<Node> m_nodes;
         void parseFST(IPartReadStream& s);
 
+        std::vector<FSTNode> m_buildNodes;
+        std::vector<std::string> m_buildNames;
+        size_t m_buildNameOff = 0;
+        void recursiveBuildNodes(const SystemChar* dirIn, std::function<void(void)> incParents);
+
         uint64_t m_dolSz;
         void parseDOL(IPartReadStream& s);
 
@@ -278,8 +294,68 @@ public:
         for (std::unique_ptr<IPartition>& part : m_partitions)
             part->extractToDirectory(path, ctx);
     }
-    virtual bool packFromDirectory(const SystemChar* dataPath, const SystemChar* updatePath,
-                                   const SystemChar* outPath, const char gameID[6], const char* gameTitle, bool korean=false)=0;
+};
+
+class DiscBuilderBase
+{
+public:
+    class IPartitionBuilder
+    {
+    public:
+        virtual ~IPartitionBuilder() {}
+        enum class Kind : uint32_t
+        {
+            Data,
+            Update,
+            Channel
+        };
+    protected:
+        std::vector<FSTNode> m_buildNodes;
+        std::vector<std::string> m_buildNames;
+        size_t m_buildNameOff = 0;
+        virtual uint64_t userAllocate(uint64_t reqSz)=0;
+        void recursiveBuildNodes(const SystemChar* dirIn, uint64_t dolInode,
+                                 std::function<void(void)> incParents);
+        void addBuildName(const SystemString& str)
+        {
+            SystemUTF8View utf8View(str);
+            m_buildNames.push_back(utf8View.utf8_str());
+            m_buildNameOff += str.size() + 1;
+        }
+
+        DiscBuilderBase& m_parent;
+        Kind m_kind;
+        uint64_t m_offset;
+
+        char m_gameID[6];
+        std::string m_gameTitle;
+        uint32_t m_fstMemoryAddr;
+        uint64_t m_dolOffset = 0;
+    public:
+        IPartitionBuilder(DiscBuilderBase& parent, Kind kind, uint64_t offset,
+                          const char gameID[6], const char* gameTitle, uint32_t fstMemoryAddr)
+        : m_parent(parent), m_kind(kind), m_offset(offset), m_gameTitle(gameTitle), m_fstMemoryAddr(fstMemoryAddr)
+        {
+            memcpy(m_gameID, gameID, 6);
+        }
+        bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
+                                const SystemChar* apploaderIn);
+    };
+protected:
+    std::unique_ptr<IFileIO> m_fileIO;
+    std::vector<std::unique_ptr<IPartitionBuilder>> m_partitions;
+public:
+    std::function<void(size_t idx, const SystemString&, size_t)> m_progressCB;
+    size_t m_progressIdx = 0;
+    virtual ~DiscBuilderBase() {}
+    DiscBuilderBase(std::unique_ptr<IFileIO>&& fio,
+                    std::function<void(size_t idx, const SystemString&, size_t)> progressCB)
+    : m_fileIO(std::move(fio)), m_progressCB(progressCB) {}
+
+    IFileIO& getFileIO() {return *m_fileIO;}
+
+    virtual bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
+                                    const SystemChar* apploaderIn)=0;
 };
 
 using Partition = DiscBase::IPartition;

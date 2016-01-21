@@ -13,6 +13,7 @@
 #include <windows.h>
 #else
 #include <ctype.h>
+#include <sys/file.h>
 #endif
 #include <sys/stat.h>
 
@@ -180,6 +181,43 @@ static inline uint32_t SBig(uint32_t val) {return val;}
 static inline int64_t SBig(int64_t val) {return val;}
 static inline uint64_t SBig(uint64_t val) {return val;}
 #endif
+
+#ifndef ROUND_UP_32
+#define ROUND_UP_32(val) (((val) + 31) & ~31)
+#define ROUND_UP_16(val) (((val) + 15) & ~15)
+#endif
+
+enum class FileLockType
+{
+    None = 0,
+    Read,
+    Write
+};
+static inline FILE* Fopen(const SystemChar* path, const SystemChar* mode, FileLockType lock=FileLockType::None)
+{
+#if NOD_UCS2
+    FILE* fp = _wfopen(path, mode);
+    if (!fp)
+        return nullptr;
+#else
+    FILE* fp = fopen(path, mode);
+    if (!fp)
+        return nullptr;
+#endif
+
+    if (lock != FileLockType::None)
+    {
+#if _WIN32
+        OVERLAPPED ov = {};
+        LockFileEx((HANDLE)(uintptr_t)_fileno(fp), (lock == FileLockType::Write) ? LOCKFILE_EXCLUSIVE_LOCK : 0, 0, 0, 1, &ov);
+#else
+        if (flock(fileno(fp), ((lock == FileLockType::Write) ? LOCK_EX : LOCK_SH) | LOCK_NB))
+            LogModule.report(LogVisor::Error, "flock %s: %s", path, strerror(errno));
+#endif
+    }
+
+    return fp;
+}
 
 }
 

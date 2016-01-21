@@ -1,11 +1,15 @@
 #include "NOD/DiscBase.hpp"
 #include "NOD/IFileIO.hpp"
+#include "NOD/DirectoryEnumerator.hpp"
 #include "NOD/NOD.hpp"
 
+#include <stdio.h>
 #include <errno.h>
 #ifndef _WIN32
 #include <unistd.h>
 #endif
+
+#include <algorithm>
 
 namespace NOD
 {
@@ -61,7 +65,8 @@ void DiscBase::IPartition::parseDOL(IPartReadStream& s)
     m_dolSz = dolSize;
 }
 
-bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath, const ExtractionContext& ctx) const
+bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath,
+                                                    const ExtractionContext& ctx) const
 {
     SystemStringView nameView(getName());
     SystemString path = basePath + _S("/") + nameView.sys_str();
@@ -95,7 +100,8 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     return true;
 }
 
-bool DiscBase::IPartition::extractToDirectory(const SystemString& path, const ExtractionContext& ctx)
+bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
+                                              const ExtractionContext& ctx)
 {
     Sstat theStat;
     if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
@@ -126,6 +132,123 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path, const Ex
 
     /* Extract Filesystem */
     return m_nodes[0].extractToDirectory(path, ctx);
+}
+
+static uint64_t GetInode(const SystemChar* path)
+{
+    uint64_t inode;
+#if _WIN32
+    OFSTRUCT ofs;
+    HFILE fp = OpenFile(path, &ofs, OF_READ);
+    if (fp == HFILE_ERROR)
+        LogModule.report(LogVisor::FatalError, "unable to open %s", path);
+    BY_HANDLE_FILE_INFORMATION info;
+    if (!GetFileInformationByHandle(fp, &info))
+        LogModule.report(LogVisor::FatalError, "unable to GetFileInformationByHandle %s", path);
+    inode = info.nFileIndexHigh << 32;
+    inode |= info.nFileIndexLow;
+    CloseHandle(fp);
+#else
+    struct stat st;
+    if (stat(path, &st))
+        LogModule.report(LogVisor::FatalError, "unable to stat %s", path);
+    inode = uint64_t(st.st_ino);
+#endif
+    return inode;
+}
+
+void DiscBuilderBase::IPartitionBuilder::recursiveBuildNodes(const SystemChar* dirIn,
+                                                             uint64_t dolInode,
+                                                             std::function<void(void)> incParents)
+{
+    DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+    for (const DirectoryEnumerator::Entry& e : dEnum)
+    {
+        if (e.m_isDir)
+        {
+            size_t dirNodeIdx = m_buildNodes.size();
+            m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
+            addBuildName(e.m_name);
+            incParents();
+            recursiveBuildNodes(e.m_path.c_str(), dolInode, [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();});
+        }
+        else
+        {
+            size_t fileSz = ROUND_UP_32(e.m_fileSz);
+            uint64_t fileOff = userAllocate(fileSz);
+            if (dolInode == GetInode(e.m_path.c_str()))
+                m_dolOffset = fileOff;
+            std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
+            FILE* fp = Fopen(e.m_path.c_str(), _S("rb"), FileLockType::Read);
+            if (!fp)
+                LogModule.report(LogVisor::FatalError, "unable to open '%s' for reading", e.m_path.c_str());
+            char buf[8192];
+            size_t xferSz = 0;
+            ++m_parent.m_progressIdx;
+            while (xferSz < e.m_fileSz)
+            {
+                size_t rdSz = fread(buf, 1, std::min(8192ul, e.m_fileSz - xferSz), fp);
+                if (!rdSz)
+                    break;
+                ws->write(buf, rdSz);
+                xferSz += rdSz;
+                m_parent.m_progressCB(m_parent.m_progressIdx, e.m_name, xferSz);
+            }
+            fclose(fp);
+            for (size_t i=0 ; i<fileSz-xferSz ; ++i)
+                ws->write("\xff", 1);
+            m_buildNodes.emplace_back(false, m_buildNameOff, fileOff, fileSz);
+            addBuildName(e.m_name);
+            incParents();
+        }
+    }
+}
+
+bool DiscBuilderBase::IPartitionBuilder::buildFromDirectory(const SystemChar* dirIn,
+                                                            const SystemChar* dolIn,
+                                                            const SystemChar* apploaderIn)
+{
+    if (!dirIn || !dolIn || !apploaderIn)
+        LogModule.report(LogVisor::FatalError, "all arguments must be supplied to buildFromDirectory()");
+
+    /* Clear file */
+    m_parent.getFileIO().beginWriteStream();
+
+    m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
+    addBuildName(_S("<root>"));
+    recursiveBuildNodes(dirIn, GetInode(dolIn), [&](){m_buildNodes[0].incrementLength();});
+
+    if (!m_dolOffset)
+    {
+        Sstat dolStat;
+        if (Stat(dolIn, &dolStat))
+            LogModule.report(LogVisor::FatalError, "unable to stat %s", dolIn);
+        size_t fileSz = ROUND_UP_32(dolStat.st_size);
+        uint64_t fileOff = userAllocate(fileSz);
+        m_dolOffset = fileOff;
+        std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
+        FILE* fp = Fopen(dolIn, _S("rb"), FileLockType::Read);
+        if (!fp)
+            LogModule.report(LogVisor::FatalError, "unable to open '%s' for reading", dolIn);
+        char buf[8192];
+        size_t xferSz = 0;
+        SystemString dolName(dolIn);
+        ++m_parent.m_progressIdx;
+        while (xferSz < dolStat.st_size)
+        {
+            size_t rdSz = fread(buf, 1, std::min(8192ul, dolStat.st_size - xferSz), fp);
+            if (!rdSz)
+                break;
+            ws->write(buf, rdSz);
+            xferSz += rdSz;
+            m_parent.m_progressCB(m_parent.m_progressIdx, dolName, xferSz);
+        }
+        fclose(fp);
+        for (size_t i=0 ; i<fileSz-xferSz ; ++i)
+            ws->write("\xff", 1);
+    }
+
+    return true;
 }
 
 }

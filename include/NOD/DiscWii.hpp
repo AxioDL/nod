@@ -10,9 +10,9 @@ class DiscWii : public DiscBase
 {
 public:
     DiscWii(std::unique_ptr<IDiscIO>&& dio);
-    bool packFromDirectory(const SystemChar* dataPath, const SystemChar* updatePath,
-                           const SystemChar* outPath, const char gameID[6], const char* gameTitle,
-                           bool korean=false);
+    DiscWii(const SystemChar* dataPath, const SystemChar* updatePath,
+            const SystemChar* outPath, const char gameID[6], const char* gameTitle,
+            bool korean=false);
 };
 
 }

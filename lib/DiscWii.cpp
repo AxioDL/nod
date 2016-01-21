@@ -390,14 +390,4 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
     }
 }
 
-bool DiscWii::packFromDirectory(const SystemChar* dataPath, const SystemChar* updatePath,
-                                const SystemChar* outPath, const char gameID[6], const char* gameTitle,
-                                bool korean)
-{
-    std::unique_ptr<IDiscIO::IWriteStream> s = m_discIO->beginWriteStream(0x420);
-
-
-    return false;
-}
-
 }

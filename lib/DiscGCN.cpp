@@ -109,17 +109,97 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio)
     m_partitions.emplace_back(new PartitionGCN(*this, IPartition::Kind::Data, 0));
 }
 
-bool DiscGCN::packFromDirectory(const SystemChar* dataPath, const SystemChar* updatePath,
-                                const SystemChar* outPath, const char gameID[6], const char* gameTitle,
-                                bool korean)
+class PartitionBuilderGCN : public DiscBuilderBase::IPartitionBuilder
 {
-    std::unique_ptr<IDiscIO::IWriteStream> ws = m_discIO->beginWriteStream(0);
-    Header header(gameID, gameTitle);
-    header.write(*ws);
+    uint64_t m_curUser = 0x57058000;
+public:
+    PartitionBuilderGCN(DiscBuilderBase& parent, Kind kind, uint64_t offset,
+                        const char gameID[6], const char* gameTitle, uint32_t fstMemoryAddr)
+    : DiscBuilderBase::IPartitionBuilder(parent, kind, offset, gameID, gameTitle, fstMemoryAddr) {}
 
-    ws = m_discIO->beginWriteStream(0x420);
+    uint64_t userAllocate(uint64_t reqSz)
+    {
+        m_curUser -= reqSz;
+        m_curUser &= 0xfffffffffffffff0;
+        if (m_curUser < 0x30000)
+        {
+            LogModule.report(LogVisor::FatalError, "user area low mark reached");
+            return -1;
+        }
+        return m_curUser;
+    }
 
-    return false;
+    bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn, const SystemChar* apploaderIn)
+    {
+        bool result = DiscBuilderBase::IPartitionBuilder::buildFromDirectory(dirIn, dolIn, apploaderIn);
+        if (!result)
+            return false;
+
+        std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(0);
+        Header header(m_gameID, m_gameTitle.c_str(), false);
+        header.write(*ws);
+
+        ws = m_parent.getFileIO().beginWriteStream(0x2440);
+        FILE* fp = Fopen(apploaderIn, _S("rb"), FileLockType::Read);
+        if (!fp)
+            LogModule.report(LogVisor::FatalError, "unable to open %s for reading", apploaderIn);
+        char buf[8192];
+        size_t xferSz = 0;
+        SystemString apploaderName(apploaderIn);
+        ++m_parent.m_progressIdx;
+        while (true)
+        {
+            size_t rdSz = fread(buf, 1, 8192, fp);
+            if (!rdSz)
+                break;
+            ws->write(buf, rdSz);
+            xferSz += rdSz;
+            if (0x2440 + xferSz >= m_curUser)
+                LogModule.report(LogVisor::FatalError,
+                                 "apploader flows into user area (one or the other is too big)");
+            m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
+        }
+        fclose(fp);
+
+        size_t fstOff = ROUND_UP_32(xferSz);
+        size_t fstSz = sizeof(FSTNode) * m_buildNodes.size();
+        for (size_t i=0 ; i<fstOff-xferSz ; ++i)
+            ws->write("\xff", 1);
+        ws->write(m_buildNodes.data(), fstSz);
+        for (const std::string& str : m_buildNames)
+            ws->write(str.data(), str.size()+1);
+        fstSz += m_buildNameOff;
+        fstSz = ROUND_UP_32(fstSz);
+
+        ws = m_parent.getFileIO().beginWriteStream(0x420);
+        uint32_t vals[7];
+        vals[0] = SBig(uint32_t(m_dolOffset));
+        vals[1] = SBig(uint32_t(fstOff));
+        vals[2] = SBig(uint32_t(fstSz));
+        vals[3] = SBig(uint32_t(fstSz));
+        vals[4] = SBig(uint32_t(m_fstMemoryAddr));
+        vals[5] = SBig(uint32_t(m_curUser));
+        vals[6] = SBig(uint32_t(0x57058000 - m_curUser));
+        ws->write(vals, sizeof(vals));
+
+        return true;
+    }
+};
+
+bool DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
+                                        const SystemChar* apploaderIn)
+{    
+    PartitionBuilderGCN& pb = static_cast<PartitionBuilderGCN&>(*m_partitions[0]);
+    return pb.buildFromDirectory(dirIn, dolIn, apploaderIn);
+}
+
+DiscBuilderGCN::DiscBuilderGCN(const SystemChar* outPath, const char gameID[6], const char* gameTitle,
+                               uint32_t fstMemoryAddr, std::function<void(size_t, const SystemString&, size_t)> progressCB)
+: DiscBuilderBase(std::move(NewFileIO(outPath)), progressCB)
+{
+    PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this, IPartitionBuilder::Kind::Data, 0,
+                                                               gameID, gameTitle, fstMemoryAddr);
+    m_partitions.emplace_back(partBuilder);
 }
 
 }

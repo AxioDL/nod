@@ -21,6 +21,8 @@ class FileIOFILE : public IFileIO
 public:
     FileIOFILE(const SystemString& path)
     : m_path(path) {}
+    FileIOFILE(const SystemChar* path)
+    : m_path(path) {}
 
     uint64_t size()
     {
@@ -39,8 +41,8 @@ public:
 
     struct WriteStream : public IFileIO::IWriteStream
     {
-        FILE* fp;
         uint8_t buf[0x7c00];
+        FILE* fp;
         WriteStream(const SystemString& path)
         {
 #if NOD_UCS2
@@ -51,9 +53,25 @@ public:
             if (!fp)
                 LogModule.report(LogVisor::Error, _S("unable to open '%s' for writing"), path.c_str());
         }
-        ~WriteStream() {fclose(fp);}
-        uint64_t write(void* buf, uint64_t length)
-        {return fwrite(buf, 1, length, fp);}
+        WriteStream(const SystemString& path, size_t offset)
+        {
+#if NOD_UCS2
+            fp = _wfopen(path.c_str(), L"r+b");
+#else
+            fp = fopen(path.c_str(), "r+b");
+#endif
+            if (!fp)
+                LogModule.report(LogVisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+            fseek(fp, offset, SEEK_SET);
+        }
+        ~WriteStream()
+        {
+            fclose(fp);
+        }
+        uint64_t write(const void* buf, uint64_t length)
+        {
+            return fwrite(buf, 1, length, fp);
+        }
         uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
         {
             uint64_t read = 0;
@@ -78,7 +96,13 @@ public:
         }
     };
     std::unique_ptr<IWriteStream> beginWriteStream() const
-    {return std::unique_ptr<IWriteStream>(new WriteStream(m_path));}
+    {
+        return std::unique_ptr<IWriteStream>(new WriteStream(m_path));
+    }
+    std::unique_ptr<IWriteStream> beginWriteStream(size_t offset) const
+    {
+        return std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset));
+    }
 
     struct ReadStream : public IFileIO::IReadStream
     {
@@ -93,6 +117,11 @@ public:
 #endif
             if (!fp)
                 LogModule.report(LogVisor::Error, _S("unable to open '%s' for reading"), path.c_str());
+        }
+        ReadStream(const SystemString& path, size_t offset)
+        : ReadStream(path)
+        {
+            fseek(fp, offset, SEEK_SET);
         }
         ~ReadStream() {fclose(fp);}
         uint64_t read(void* buf, uint64_t length)
@@ -120,10 +149,21 @@ public:
         }
     };
     std::unique_ptr<IReadStream> beginReadStream() const
-    {return std::unique_ptr<IReadStream>(new ReadStream(m_path));}
+    {
+        return std::unique_ptr<IReadStream>(new ReadStream(m_path));
+    }
+    std::unique_ptr<IReadStream> beginReadStream(size_t offset) const
+    {
+        return std::unique_ptr<IReadStream>(new ReadStream(m_path, offset));
+    }
 };
 
 std::unique_ptr<IFileIO> NewFileIO(const SystemString& path)
+{
+    return std::unique_ptr<IFileIO>(new FileIOFILE(path));
+}
+
+std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path)
 {
     return std::unique_ptr<IFileIO>(new FileIOFILE(path));
 }
