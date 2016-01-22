@@ -121,11 +121,11 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract Dol */
-    SystemString dolPath = path + _S("/main.dol");
+    SystemString dolPath = path + _S("/boot.dol");
     if (ctx.force || Stat(dolPath.c_str(), &theStat))
     {
         if (ctx.verbose && ctx.progressCB)
-            ctx.progressCB("main.dol");
+            ctx.progressCB("boot.dol");
         std::unique_ptr<uint8_t[]> buf = getDOLBuf();
         NewFileIO(dolPath)->beginWriteStream()->write(buf.get(), m_dolSz);
     }
@@ -174,20 +174,26 @@ void DiscBuilderBase::IPartitionBuilder::recursiveBuildNodes(const SystemChar* d
         }
         else
         {
+            if (dolInode == GetInode(e.m_path.c_str()))
+            {
+                m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(m_dolOffset), m_dolSize);
+                addBuildName(e.m_name);
+                incParents();
+                continue;
+            }
+
             size_t fileSz = ROUND_UP_32(e.m_fileSz);
             uint64_t fileOff = userAllocate(fileSz);
-            if (dolInode == GetInode(e.m_path.c_str()))
-                m_dolOffset = fileOff;
             std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
             FILE* fp = Fopen(e.m_path.c_str(), _S("rb"), FileLockType::Read);
             if (!fp)
                 LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), e.m_path.c_str());
-            char buf[8192];
+            char buf[0x8000];
             size_t xferSz = 0;
             ++m_parent.m_progressIdx;
             while (xferSz < e.m_fileSz)
             {
-                size_t rdSz = fread(buf, 1, std::min(8192ul, e.m_fileSz - xferSz), fp);
+                size_t rdSz = fread(buf, 1, std::min(0x8000ul, e.m_fileSz - xferSz), fp);
                 if (!rdSz)
                     break;
                 ws->write(buf, rdSz);
@@ -197,7 +203,7 @@ void DiscBuilderBase::IPartitionBuilder::recursiveBuildNodes(const SystemChar* d
             fclose(fp);
             for (size_t i=0 ; i<fileSz-xferSz ; ++i)
                 ws->write("\xff", 1);
-            m_buildNodes.emplace_back(false, m_buildNameOff, fileOff, fileSz);
+            m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOff), fileSz);
             addBuildName(e.m_name);
             incParents();
         }
@@ -216,11 +222,11 @@ bool DiscBuilderBase::IPartitionBuilder::buildFromDirectory(const SystemChar* di
     ++m_parent.m_progressIdx;
     m_parent.m_progressCB(m_parent.m_progressIdx, "Preparing output image", -1);
 
+    /* Add root node */
     m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
     addBuildName(_S("<root>"));
-    recursiveBuildNodes(dirIn, GetInode(dolIn), [&](){m_buildNodes[0].incrementLength();});
 
-    if (!m_dolOffset)
+    /* Write DOL first (ensures that it's within a 32-bit offset for Wii apploaders) */
     {
         Sstat dolStat;
         if (Stat(dolIn, &dolStat))
@@ -228,6 +234,7 @@ bool DiscBuilderBase::IPartitionBuilder::buildFromDirectory(const SystemChar* di
         size_t fileSz = ROUND_UP_32(dolStat.st_size);
         uint64_t fileOff = userAllocate(fileSz);
         m_dolOffset = fileOff;
+        m_dolSize = fileSz;
         std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
         FILE* fp = Fopen(dolIn, _S("rb"), FileLockType::Read);
         if (!fp)
@@ -249,6 +256,9 @@ bool DiscBuilderBase::IPartitionBuilder::buildFromDirectory(const SystemChar* di
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
             ws->write("\xff", 1);
     }
+
+    /* Gather files in root directory */
+    recursiveBuildNodes(dirIn, GetInode(dolIn), [&](){m_buildNodes[0].incrementLength();});
 
     return true;
 }

@@ -8,7 +8,7 @@ static void printHelp()
     fprintf(stderr, "Usage:\n"
                     "  nodtool extract [-f] <image-in> [<dir-out>]\n"
                     "  nodtool makegcn <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> [<image-out>]\n"
-                    "  nodtool makewii <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> <parthead-in> [<image-out>]\n");
+                    "  nodtool makewii(sl|dl) <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> <parthead-in> [<image-out>]\n");
 }
 
 #if NOD_UCS2
@@ -25,7 +25,8 @@ int main(int argc, char* argv[])
 {
     if (argc < 3 ||
         (!strcasecmp(argv[1], _S("makegcn")) && argc < 7) ||
-        (!strcasecmp(argv[1], _S("makewii")) && argc < 8))
+        (!strcasecmp(argv[1], _S("makewiisl")) && argc < 8) ||
+        (!strcasecmp(argv[1], _S("makewiidl")) && argc < 8))
     {
         printHelp();
         return -1;
@@ -55,9 +56,16 @@ int main(int argc, char* argv[])
 
     if (!strcasecmp(argv[1], _S("extract")))
     {
-        std::unique_ptr<NOD::DiscBase> disc = NOD::OpenDiscFromImage(inDir);
+        bool isWii;
+        std::unique_ptr<NOD::DiscBase> disc = NOD::OpenDiscFromImage(inDir, isWii);
         if (!disc)
             return -1;
+
+        NOD::Mkdir(outDir, 0755);
+
+        if (isWii)
+            static_cast<NOD::DiscWii&>(*disc).writeOutDataPartitionHeader(
+                    (NOD::SystemString(outDir) + _S("/partition_head.bin")).c_str());
 
         NOD::Partition* dataPart = disc->getDataPartition();
         if (!dataPart)
@@ -115,7 +123,7 @@ int main(int argc, char* argv[])
 
         printf("\n");
     }
-    else if (!strcasecmp(argv[1], _S("makewii")))
+    else if (!strcasecmp(argv[1], _S("makewiisl")) || !strcasecmp(argv[1], _S("makewiidl")))
     {
 #if NOD_UCS2
         if (_wcslen(argv[2]) < 6)
@@ -151,16 +159,18 @@ int main(int argc, char* argv[])
             fflush(stdout);
         };
 
+        bool dual = (argv[1][7] == _S('d') || argv[1][7] == _S('D'));
+
         if (argc < 9)
         {
             NOD::SystemString outPath(argv[4]);
             outPath.append(_S(".iso"));
-            NOD::DiscBuilderWii b(outPath.c_str(), argv[2], argv[3], progFunc);
+            NOD::DiscBuilderWii b(outPath.c_str(), argv[2], argv[3], dual, progFunc);
             b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
         else
         {
-            NOD::DiscBuilderWii b(argv[8], argv[2], argv[3], progFunc);
+            NOD::DiscBuilderWii b(argv[8], argv[2], argv[3], dual, progFunc);
             b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
 

@@ -339,6 +339,36 @@ public:
     }
 
     uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset << 2;}
+
+    void writeOutPartitionHeader(const SystemChar* pathOut) const
+    {
+        FILE* fp = Fopen(pathOut, _S("wb"), FileLockType::Write);
+        if (!fp)
+            LogModule.report(LogVisor::FatalError, _S("unable to open %s for writing"), pathOut);
+
+        uint64_t h3Off;
+        {
+            std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset + 0x2B4);
+            uint32_t h3;
+            if (rs->read(&h3, 4) != 4)
+                LogModule.report(LogVisor::FatalError, _S("unable to read H3 offset from %s"), pathOut);
+            h3 = SBig(h3);
+            h3Off = uint64_t(h3) << 2;
+        }
+
+        char buf[8192];
+        size_t rem = h3Off;
+        std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset);
+        while (rem)
+        {
+            size_t rdSz = std::min(rem, 8192ul);
+            rs->read(buf, rdSz);
+            fwrite(buf, 1, rdSz, fp);
+            rem -= rdSz;
+        }
+
+        fclose(fp);
+    }
 };
 
 DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
@@ -391,9 +421,21 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
     }
 }
 
+void DiscWii::writeOutDataPartitionHeader(const SystemChar* pathOut) const
+{
+    for (const std::unique_ptr<IPartition>& part : m_partitions)
+    {
+        if (part->getKind() == IPartition::Kind::Data)
+        {
+            static_cast<PartitionWii&>(*part).writeOutPartitionHeader(pathOut);
+            break;
+        }
+    }
+}
+
 class PartitionBuilderWii : public DiscBuilderBase::IPartitionBuilder
 {
-    uint64_t m_curUser = 0x40000;
+    uint64_t m_curUser = 0x1F0000;
 public:
     PartitionBuilderWii(DiscBuilderBase& parent, Kind kind,
                         const char gameID[6], const char* gameTitle)
@@ -412,6 +454,11 @@ public:
         uint64_t ret = m_curUser;
         m_curUser += reqSz;
         return ret;
+    }
+
+    uint32_t packOffset(uint64_t offset) const
+    {
+        return uint32_t(offset >> uint64_t(2));
     }
 
     bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn, const SystemChar* apploaderIn)
@@ -434,7 +481,7 @@ public:
         }
 
         ws = m_parent.getFileIO().beginWriteStream(0);
-        Header header(m_gameID, m_gameTitle.c_str(), true);
+        Header header(m_gameID, m_gameTitle.c_str(), true, 0, 0, 0);
         header.write(*ws);
 
         ws = m_parent.getFileIO().beginWriteStream(0x2440);
@@ -452,7 +499,7 @@ public:
                 break;
             ws->write(buf, rdSz);
             xferSz += rdSz;
-            if (0x2440 + xferSz >= 0x40000)
+            if (0x2440 + xferSz >= 0x1F0000)
                 LogModule.report(LogVisor::FatalError,
                                  "apploader flows into user area (one or the other is too big)");
             m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
@@ -470,14 +517,14 @@ public:
         fstSz += m_buildNameOff;
         fstSz = ROUND_UP_32(fstSz);
 
-        if (fstOff + fstSz >= 0x40000)
+        if (fstOff + fstSz >= 0x1F0000)
             LogModule.report(LogVisor::FatalError,
                              "FST flows into user area (one or the other is too big)");
 
         ws = m_parent.getFileIO().beginWriteStream(0x420);
         uint32_t vals[4];
-        vals[0] = SBig(uint32_t(m_dolOffset >> 2));
-        vals[1] = SBig(uint32_t(fstOff >> 2));
+        vals[0] = SBig(uint32_t(m_dolOffset >> uint64_t(2)));
+        vals[1] = SBig(uint32_t(fstOff >> uint64_t(2)));
         vals[2] = SBig(uint32_t(fstSz));
         vals[3] = SBig(uint32_t(fstSz));
         ws->write(vals, sizeof(vals));
@@ -659,7 +706,7 @@ public:
         }
 
         /* Write new crypto content size */
-        uint64_t cryptContentSize = (groupCount * 0x200000) >> 2;
+        uint64_t cryptContentSize = (groupCount * 0x200000) >> uint64_t(2);
         uint32_t cryptContentSizeBig = SBig(uint32_t(cryptContentSize));
         ws = out.beginWriteStream(offset + 0x2BC);
         ws->write(&cryptContentSizeBig, 0x4);
@@ -699,14 +746,13 @@ public:
                 sha1_init(&sha);
                 sha1_write(&sha, (char*)(tmdData.get() + 0x140), tmdCheckSz);
                 uint8_t* hash = sha1_result(&sha);
+                ++attempts;
                 if (hash[0] == 0)
                 {
                     good = true;
                     break;
                 }
-                ++attempts;
-                if ((attempts % 1024) == 0)
-                    m_parent.m_progressCB(m_parent.m_progressIdx, bfName, attempts);
+                m_parent.m_progressCB(m_parent.m_progressIdx, bfName, attempts);
             }
             if (good)
                 break;
@@ -723,32 +769,75 @@ public:
 bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
                                         const SystemChar* apploaderIn, const SystemChar* partHeadIn)
 {
+    size_t DISC_CAPACITY = m_dualLayer ? 0x1FB4E0000 : 0x118240000;
+
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_partitions[0]);
     uint64_t filledSz = 0x200000;
     std::unique_ptr<IFileIO> imgOut = NewFileIO(m_outPath);
+    imgOut->beginWriteStream();
 
-    m_fileIO = std::move(NewFileIO(SystemString(m_outPath) + _S(".cleardata")));
+    /* Assemble cleartext data partition into temporary file */
+    SystemString clearPath(m_outPath);
+    clearPath += _S(".cleardata");
+    m_fileIO = std::move(NewFileIO(clearPath));
     if (!pb.buildFromDirectory(dirIn, dolIn, apploaderIn))
         return false;
 
+    /* Fakesign cleartext into output file */
     filledSz = pb.cryptAndFakesign(*imgOut, filledSz, partHeadIn);
-    if (filledSz >= 0x1FB4E0000)
+    if (filledSz >= DISC_CAPACITY)
     {
         LogModule.report(LogVisor::FatalError, "data partition exceeds disc capacity");
         return false;
     }
 
+    ++m_progressIdx;
+    m_progressCB(m_progressIdx, "Finishing Disc", -1);
+
+    /* Populate disc header */
+    std::unique_ptr<IFileIO::IWriteStream> ws = imgOut->beginWriteStream(0);
+    Header header(pb.getGameID(), pb.getGameTitle().c_str(), true, 0, 0, 0);
+    header.write(*ws);
+
+    /* Populate partition info */
+    ws = imgOut->beginWriteStream(0x40000);
+    uint32_t vals[2] = {SBig(uint32_t(1)), SBig(uint32_t(0x40020 >> uint64_t(2)))};
+    ws->write(vals, 8);
+
+    ws = imgOut->beginWriteStream(0x40020);
+    vals[0] = SBig(uint32_t(0x200000 >> uint64_t(2)));
+    ws->write(vals, 4);
+
+    /* Populate region info */
+    ws = imgOut->beginWriteStream(0x4E000);
+    const char* gameID = pb.getGameID();
+    if (gameID[3] == 'P')
+        vals[0] = SBig(uint32_t(2));
+    else if (gameID[3] == 'J')
+        vals[0] = SBig(uint32_t(0));
+    else
+        vals[0] = SBig(uint32_t(1));
+    ws->write(vals, 4);
+
+    /* Make disc unrated */
+    ws = imgOut->beginWriteStream(0x4E010);
+    for (int i=0 ; i<16 ; ++i)
+        ws->write("\x80", 1);
+
     /* Fill image to end */
-    std::unique_ptr<IFileIO::IWriteStream> ws = imgOut->beginWriteStream(filledSz);
-    for (size_t i=0 ; i<0x1FB4E0000-filledSz ; ++i)
+    ws = imgOut->beginWriteStream(filledSz);
+    for (size_t i=0 ; i<DISC_CAPACITY-filledSz ; ++i)
         ws->write("\xff", 1);
+
+    /* Delete cleartext file */
+    Unlink(clearPath.c_str());
 
     return true;
 }
 
-DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, const char gameID[6], const char* gameTitle,
+DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, const char gameID[6], const char* gameTitle, bool dualLayer,
                                std::function<void(size_t, const SystemString&, size_t)> progressCB)
-: DiscBuilderBase(std::move(std::unique_ptr<IFileIO>()), progressCB), m_outPath(outPath)
+: DiscBuilderBase(std::move(std::unique_ptr<IFileIO>()), progressCB), m_outPath(outPath), m_dualLayer(dualLayer)
 {
     PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, IPartitionBuilder::Kind::Data,
                                                                gameID, gameTitle);

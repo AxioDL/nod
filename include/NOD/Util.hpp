@@ -14,6 +14,7 @@
 #else
 #include <ctype.h>
 #include <sys/file.h>
+#include <unistd.h>
 #endif
 #include <sys/stat.h>
 
@@ -101,6 +102,15 @@ public:
 #define _S(val) val
 #endif
 #endif
+
+static inline void Unlink(const SystemChar* file)
+{
+#if _WIN32
+    _wunlink(file);
+#else
+    unlink(file);
+#endif
+}
 
 #undef bswap16
 #undef bswap32

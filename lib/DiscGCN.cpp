@@ -130,6 +130,11 @@ public:
         return m_curUser;
     }
 
+    uint32_t packOffset(uint64_t offset) const
+    {
+        return offset;
+    }
+
     bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn, const SystemChar* apploaderIn)
     {
         bool result = DiscBuilderBase::IPartitionBuilder::buildFromDirectory(dirIn, dolIn, apploaderIn);

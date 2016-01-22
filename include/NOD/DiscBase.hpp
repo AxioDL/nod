@@ -229,6 +229,7 @@ public:
         : m_parent(parent), m_kind(kind), m_offset(offset) {}
         virtual uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset;}
         inline Kind getKind() const {return m_kind;}
+        inline uint64_t getDiscOffset() const {return m_offset;}
         virtual std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const=0;
         inline std::unique_ptr<IPartReadStream> beginDOLReadStream(uint64_t offset=0) const
         {return beginReadStream(m_dolOff + offset);}
@@ -314,6 +315,7 @@ public:
         std::vector<std::string> m_buildNames;
         size_t m_buildNameOff = 0;
         virtual uint64_t userAllocate(uint64_t reqSz)=0;
+        virtual uint32_t packOffset(uint64_t offset) const=0;
         void recursiveBuildNodes(const SystemChar* dirIn, uint64_t dolInode,
                                  std::function<void(void)> incParents);
         void addBuildName(const SystemString& str)
@@ -329,6 +331,7 @@ public:
         char m_gameID[6];
         std::string m_gameTitle;
         uint64_t m_dolOffset = 0;
+        uint64_t m_dolSize = 0;
     public:
         IPartitionBuilder(DiscBuilderBase& parent, Kind kind,
                           const char gameID[6], const char* gameTitle)
@@ -338,6 +341,9 @@ public:
         }
         bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
                                 const SystemChar* apploaderIn);
+
+        const char* getGameID() const {return m_gameID;}
+        const std::string& getGameTitle() const {return m_gameTitle;}
     };
 protected:
     std::unique_ptr<IFileIO> m_fileIO;

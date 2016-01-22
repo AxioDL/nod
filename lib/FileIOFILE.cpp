@@ -56,8 +56,12 @@ public:
         WriteStream(const SystemString& path, uint64_t offset)
         {
 #if NOD_UCS2
+            fp = _wfopen(path.c_str(), L"ab");
+            fclose(fp);
             fp = _wfopen(path.c_str(), L"r+b");
 #else
+            fp = fopen(path.c_str(), "ab");
+            fclose(fp);
             fp = fopen(path.c_str(), "r+b");
 #endif
             if (!fp)
