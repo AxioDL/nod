@@ -141,17 +141,17 @@ static uint64_t GetInode(const SystemChar* path)
     OFSTRUCT ofs;
     HFILE fp = OpenFile(path, &ofs, OF_READ);
     if (fp == HFILE_ERROR)
-        LogModule.report(LogVisor::FatalError, "unable to open %s", path);
+        LogModule.report(LogVisor::FatalError, _S("unable to open %s"), path);
     BY_HANDLE_FILE_INFORMATION info;
     if (!GetFileInformationByHandle(fp, &info))
-        LogModule.report(LogVisor::FatalError, "unable to GetFileInformationByHandle %s", path);
+        LogModule.report(LogVisor::FatalError, _S("unable to GetFileInformationByHandle %s"), path);
     inode = info.nFileIndexHigh << 32;
     inode |= info.nFileIndexLow;
     CloseHandle(fp);
 #else
     struct stat st;
     if (stat(path, &st))
-        LogModule.report(LogVisor::FatalError, "unable to stat %s", path);
+        LogModule.report(LogVisor::FatalError, _S("unable to stat %s"), path);
     inode = uint64_t(st.st_ino);
 #endif
     return inode;
@@ -181,7 +181,7 @@ void DiscBuilderBase::IPartitionBuilder::recursiveBuildNodes(const SystemChar* d
             std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
             FILE* fp = Fopen(e.m_path.c_str(), _S("rb"), FileLockType::Read);
             if (!fp)
-                LogModule.report(LogVisor::FatalError, "unable to open '%s' for reading", e.m_path.c_str());
+                LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), e.m_path.c_str());
             char buf[8192];
             size_t xferSz = 0;
             ++m_parent.m_progressIdx;
@@ -224,14 +224,14 @@ bool DiscBuilderBase::IPartitionBuilder::buildFromDirectory(const SystemChar* di
     {
         Sstat dolStat;
         if (Stat(dolIn, &dolStat))
-            LogModule.report(LogVisor::FatalError, "unable to stat %s", dolIn);
+            LogModule.report(LogVisor::FatalError, _S("unable to stat %s"), dolIn);
         size_t fileSz = ROUND_UP_32(dolStat.st_size);
         uint64_t fileOff = userAllocate(fileSz);
         m_dolOffset = fileOff;
         std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
         FILE* fp = Fopen(dolIn, _S("rb"), FileLockType::Read);
         if (!fp)
-            LogModule.report(LogVisor::FatalError, "unable to open '%s' for reading", dolIn);
+            LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), dolIn);
         char buf[8192];
         size_t xferSz = 0;
         SystemString dolName(dolIn);

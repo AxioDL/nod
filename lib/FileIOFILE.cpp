@@ -53,7 +53,7 @@ public:
             if (!fp)
                 LogModule.report(LogVisor::Error, _S("unable to open '%s' for writing"), path.c_str());
         }
-        WriteStream(const SystemString& path, size_t offset)
+        WriteStream(const SystemString& path, uint64_t offset)
         {
 #if NOD_UCS2
             fp = _wfopen(path.c_str(), L"r+b");
@@ -62,7 +62,7 @@ public:
 #endif
             if (!fp)
                 LogModule.report(LogVisor::Error, _S("unable to open '%s' for writing"), path.c_str());
-            fseek(fp, offset, SEEK_SET);
+            fseeko64(fp, offset, SEEK_SET);
         }
         ~WriteStream()
         {
@@ -99,7 +99,7 @@ public:
     {
         return std::unique_ptr<IWriteStream>(new WriteStream(m_path));
     }
-    std::unique_ptr<IWriteStream> beginWriteStream(size_t offset) const
+    std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
         return std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset));
     }
@@ -118,10 +118,10 @@ public:
             if (!fp)
                 LogModule.report(LogVisor::Error, _S("unable to open '%s' for reading"), path.c_str());
         }
-        ReadStream(const SystemString& path, size_t offset)
+        ReadStream(const SystemString& path, uint64_t offset)
         : ReadStream(path)
         {
-            fseek(fp, offset, SEEK_SET);
+            fseeko64(fp, offset, SEEK_SET);
         }
         ~ReadStream() {fclose(fp);}
         uint64_t read(void* buf, uint64_t length)
@@ -152,7 +152,7 @@ public:
     {
         return std::unique_ptr<IReadStream>(new ReadStream(m_path));
     }
-    std::unique_ptr<IReadStream> beginReadStream(size_t offset) const
+    std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
         return std::unique_ptr<IReadStream>(new ReadStream(m_path, offset));
     }

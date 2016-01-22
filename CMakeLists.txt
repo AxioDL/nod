@@ -13,7 +13,7 @@ if (NOT TARGET LogVisor)
 endif()
 
 include_directories(include ${LOG_VISOR_INCLUDE_DIR})
-file(GLOB NOD_HEADERS include/NOD/*.hpp)
+file(GLOB NOD_HEADERS include/NOD/*.h*)
 
 add_subdirectory(lib)
 add_subdirectory(driver)

@@ -22,7 +22,7 @@ public:
         virtual uint64_t copyFromDisc(struct IPartReadStream& discio, uint64_t length)=0;
     };
     virtual std::unique_ptr<IWriteStream> beginWriteStream() const=0;
-    virtual std::unique_ptr<IWriteStream> beginWriteStream(size_t offset) const=0;
+    virtual std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const=0;
 
     struct IReadStream
     {
@@ -31,7 +31,7 @@ public:
         virtual uint64_t copyToDisc(struct IPartWriteStream& discio, uint64_t length)=0;
     };
     virtual std::unique_ptr<IReadStream> beginReadStream() const=0;
-    virtual std::unique_ptr<IReadStream> beginReadStream(size_t offset) const=0;
+    virtual std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const=0;
 };
 
 std::unique_ptr<IFileIO> NewFileIO(const SystemString& path);

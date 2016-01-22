@@ -112,10 +112,11 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio)
 class PartitionBuilderGCN : public DiscBuilderBase::IPartitionBuilder
 {
     uint64_t m_curUser = 0x57058000;
+    uint32_t m_fstMemoryAddr;
 public:
-    PartitionBuilderGCN(DiscBuilderBase& parent, Kind kind, uint64_t offset,
+    PartitionBuilderGCN(DiscBuilderBase& parent, Kind kind,
                         const char gameID[6], const char* gameTitle, uint32_t fstMemoryAddr)
-    : DiscBuilderBase::IPartitionBuilder(parent, kind, offset, gameID, gameTitle, fstMemoryAddr) {}
+    : DiscBuilderBase::IPartitionBuilder(parent, kind, gameID, gameTitle), m_fstMemoryAddr(fstMemoryAddr) {}
 
     uint64_t userAllocate(uint64_t reqSz)
     {
@@ -142,7 +143,7 @@ public:
         ws = m_parent.getFileIO().beginWriteStream(0x2440);
         FILE* fp = Fopen(apploaderIn, _S("rb"), FileLockType::Read);
         if (!fp)
-            LogModule.report(LogVisor::FatalError, "unable to open %s for reading", apploaderIn);
+            LogModule.report(LogVisor::FatalError, _S("unable to open %s for reading"), apploaderIn);
         char buf[8192];
         size_t xferSz = 0;
         SystemString apploaderName(apploaderIn);
@@ -172,6 +173,10 @@ public:
         fstSz += m_buildNameOff;
         fstSz = ROUND_UP_32(fstSz);
 
+        if (fstOff + fstSz >= m_curUser)
+            LogModule.report(LogVisor::FatalError,
+                             "FST flows into user area (one or the other is too big)");
+
         ws = m_parent.getFileIO().beginWriteStream(0x420);
         uint32_t vals[7];
         vals[0] = SBig(uint32_t(m_dolOffset));
@@ -198,7 +203,7 @@ DiscBuilderGCN::DiscBuilderGCN(const SystemChar* outPath, const char gameID[6], 
                                uint32_t fstMemoryAddr, std::function<void(size_t, const SystemString&, size_t)> progressCB)
 : DiscBuilderBase(std::move(NewFileIO(outPath)), progressCB)
 {
-    PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this, IPartitionBuilder::Kind::Data, 0,
+    PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this, IPartitionBuilder::Kind::Data,
                                                                gameID, gameTitle, fstMemoryAddr);
     m_partitions.emplace_back(partBuilder);
 }

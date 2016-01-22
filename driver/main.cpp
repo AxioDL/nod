@@ -8,7 +8,7 @@ static void printHelp()
     fprintf(stderr, "Usage:\n"
                     "  nodtool extract [-f] <image-in> [<dir-out>]\n"
                     "  nodtool makegcn <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> [<image-out>]\n"
-                    "  nodtool makewii <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> [<image-out>] [-u <updateroot-in>]\n");
+                    "  nodtool makewii <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> <parthead-in> [<image-out>]\n");
 }
 
 #if NOD_UCS2
@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
 {
     if (argc < 3 ||
         (!strcasecmp(argv[1], _S("makegcn")) && argc < 7) ||
-        (!strcasecmp(argv[1], _S("makewii")) && argc < 7))
+        (!strcasecmp(argv[1], _S("makewii")) && argc < 8))
     {
         printHelp();
         return -1;
@@ -111,6 +111,57 @@ int main(int argc, char* argv[])
         {
             NOD::DiscBuilderGCN b(argv[7], argv[2], argv[3], 0x0003EB60, progFunc);
             b.buildFromDirectory(argv[4], argv[5], argv[6]);
+        }
+
+        printf("\n");
+    }
+    else if (!strcasecmp(argv[1], _S("makewii")))
+    {
+#if NOD_UCS2
+        if (_wcslen(argv[2]) < 6)
+            NOD::LogModule.report(LogVisor::FatalError, "game-id is not at least 6 characters");
+#else
+        if (strlen(argv[2]) < 6)
+            NOD::LogModule.report(LogVisor::FatalError, "game-id is not at least 6 characters");
+#endif
+
+        /* Pre-validate paths */
+        NOD::Sstat theStat;
+        if (NOD::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
+            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as directory", argv[4]);
+        if (NOD::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
+            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[5]);
+        if (NOD::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
+            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[6]);
+        if (NOD::Stat(argv[7], &theStat) || !S_ISREG(theStat.st_mode))
+            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[7]);
+
+        size_t lastIdx = -1;
+        auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
+        {
+            if (idx != lastIdx)
+            {
+                lastIdx = idx;
+                printf("\n");
+            }
+            if (bytes != -1)
+                printf("\r%s %" PRISize " B", name.c_str(), bytes);
+            else
+                printf("\r%s", name.c_str());
+            fflush(stdout);
+        };
+
+        if (argc < 9)
+        {
+            NOD::SystemString outPath(argv[4]);
+            outPath.append(_S(".iso"));
+            NOD::DiscBuilderWii b(outPath.c_str(), argv[2], argv[3], progFunc);
+            b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
+        }
+        else
+        {
+            NOD::DiscBuilderWii b(argv[8], argv[2], argv[3], progFunc);
+            b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
 
         printf("\n");

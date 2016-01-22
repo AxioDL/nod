@@ -325,16 +325,14 @@ public:
 
         DiscBuilderBase& m_parent;
         Kind m_kind;
-        uint64_t m_offset;
 
         char m_gameID[6];
         std::string m_gameTitle;
-        uint32_t m_fstMemoryAddr;
         uint64_t m_dolOffset = 0;
     public:
-        IPartitionBuilder(DiscBuilderBase& parent, Kind kind, uint64_t offset,
-                          const char gameID[6], const char* gameTitle, uint32_t fstMemoryAddr)
-        : m_parent(parent), m_kind(kind), m_offset(offset), m_gameTitle(gameTitle), m_fstMemoryAddr(fstMemoryAddr)
+        IPartitionBuilder(DiscBuilderBase& parent, Kind kind,
+                          const char gameID[6], const char* gameTitle)
+        : m_parent(parent), m_kind(kind), m_gameTitle(gameTitle)
         {
             memcpy(m_gameID, gameID, 6);
         }
@@ -353,9 +351,6 @@ public:
     : m_fileIO(std::move(fio)), m_progressCB(progressCB) {}
 
     IFileIO& getFileIO() {return *m_fileIO;}
-
-    virtual bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
-                                    const SystemChar* apploaderIn)=0;
 };
 
 using Partition = DiscBase::IPartition;

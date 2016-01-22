@@ -3,6 +3,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-multichar")
 endif()
 add_library(NOD
             aes.cpp
+            sha1.c
             DiscBase.cpp
             DiscGCN.cpp
             DiscIOISO.cpp
