@@ -541,21 +541,21 @@ public:
 
         uint8_t tkey[16];
         {
-            fseeko64(fp, 0x1BF, SEEK_SET);
+            FSeek(fp, 0x1BF, SEEK_SET);
             if (fread(tkey, 1, 16, fp) != 16)
                 LogModule.report(LogVisor::FatalError, _S("unable to read title key from %s"), partHeadIn);
         }
 
         uint8_t tkeyiv[16] = {};
         {
-            fseeko64(fp, 0x1DC, SEEK_SET);
+            FSeek(fp, 0x1DC, SEEK_SET);
             if (fread(tkeyiv, 1, 8, fp) != 8)
                 LogModule.report(LogVisor::FatalError, _S("unable to read title key IV from %s"), partHeadIn);
         }
 
         uint8_t ccIdx;
         {
-            fseeko64(fp, 0x1F1, SEEK_SET);
+            FSeek(fp, 0x1F1, SEEK_SET);
             if (fread(&ccIdx, 1, 1, fp) != 1)
                 LogModule.report(LogVisor::FatalError, _S("unable to read common key index from %s"), partHeadIn);
             if (ccIdx > 1)
@@ -564,7 +564,7 @@ public:
 
         uint32_t tmdSz;
         {
-            fseeko64(fp, 0x2A4, SEEK_SET);
+            FSeek(fp, 0x2A4, SEEK_SET);
             if (fread(&tmdSz, 1, 4, fp) != 4)
                 LogModule.report(LogVisor::FatalError, _S("unable to read TMD size from %s"), partHeadIn);
             tmdSz = SBig(tmdSz);
@@ -573,7 +573,7 @@ public:
         uint64_t h3Off;
         {
             uint32_t h3Ptr;
-            fseeko64(fp, 0x2B4, SEEK_SET);
+            FSeek(fp, 0x2B4, SEEK_SET);
             if (fread(&h3Ptr, 1, 4, fp) != 4)
                 LogModule.report(LogVisor::FatalError, _S("unable to read H3 pointer from %s"), partHeadIn);
             h3Off = uint64_t(SBig(h3Ptr)) << 2;
@@ -588,7 +588,7 @@ public:
         }
 
         std::unique_ptr<uint8_t[]> tmdData(new uint8_t[tmdSz]);
-        fseeko64(fp, 0x2C0, SEEK_SET);
+        FSeek(fp, 0x2C0, SEEK_SET);
         if (fread(tmdData.get(), 1, tmdSz, fp) != tmdSz)
             LogModule.report(LogVisor::FatalError, _S("unable to read TMD from %s"), partHeadIn);
 
@@ -597,10 +597,10 @@ public:
         {
             uint64_t remCopy = h3Off;
             uint8_t copyBuf[8192];
-            fseeko64(fp, 0, SEEK_SET);
+            FSeek(fp, 0, SEEK_SET);
             while (remCopy)
             {
-                size_t rdBytes = fread(copyBuf, 1, std::min(8192ul, remCopy), fp);
+                size_t rdBytes = fread(copyBuf, 1, std::min(size_t(8192), size_t(remCopy)), fp);
                 if (rdBytes)
                 {
                     ws->write(copyBuf, rdBytes);

@@ -66,7 +66,7 @@ public:
 #endif
             if (!fp)
                 LogModule.report(LogVisor::Error, _S("unable to open '%s' for writing"), path.c_str());
-            fseeko64(fp, offset, SEEK_SET);
+            FSeek(fp, offset, SEEK_SET);
         }
         ~WriteStream()
         {
@@ -125,7 +125,7 @@ public:
         ReadStream(const SystemString& path, uint64_t offset)
         : ReadStream(path)
         {
-            fseeko64(fp, offset, SEEK_SET);
+            FSeek(fp, offset, SEEK_SET);
         }
         ~ReadStream() {fclose(fp);}
         uint64_t read(void* buf, uint64_t length)

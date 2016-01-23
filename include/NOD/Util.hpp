@@ -15,6 +15,7 @@
 #include <ctype.h>
 #include <sys/file.h>
 #include <unistd.h>
+#include <errno.h>
 #endif
 #include <sys/stat.h>
 
@@ -247,6 +248,17 @@ static inline FILE* Fopen(const SystemChar* path, const SystemChar* mode, FileLo
     }
 
     return fp;
+}
+
+static inline int FSeek(FILE* fp, int64_t offset, int whence)
+{
+#if NOD_UCS2
+    return _fseeki64(fp, offset, whence);
+#elif __APPLE__ || __FreeBSD__
+    return fseeko(fp, offset, whence);
+#else
+    return fseeko64(fp, offset, whence);
+#endif
 }
 
 }
