@@ -240,6 +240,7 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* 
             incParents();
             recursiveBuildFST(e.m_path.c_str(), dolInode, [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();});
         }
+        else
         {
             if (dolInode == GetInode(e.m_path.c_str()))
             {
