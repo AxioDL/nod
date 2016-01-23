@@ -48,6 +48,7 @@ static inline void ToLower(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), towlower);}
 static inline void ToUpper(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), towupper);}
+static inline size_t StrLen(const SystemChar* str) {return _wcslen(str);}
 class SystemUTF8View
 {
     std::string m_utf8;
@@ -82,6 +83,7 @@ static inline void ToLower(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), tolower);}
 static inline void ToUpper(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), toupper);}
+static inline size_t StrLen(const SystemChar* str) {return strlen(str);}
 class SystemUTF8View
 {
     const std::string& m_utf8;
@@ -109,6 +111,24 @@ static inline void Unlink(const SystemChar* file)
     _wunlink(file);
 #else
     unlink(file);
+#endif
+}
+
+static inline int StrCmp(const SystemChar* str1, const SystemChar* str2)
+{
+#if HECL_UCS2
+    return _wcscmp(str1, str2);
+#else
+    return strcmp(str1, str2);
+#endif
+}
+
+static inline int StrCaseCmp(const SystemChar* str1, const SystemChar* str2)
+{
+#if HECL_UCS2
+    return _wcsicmp(str1, str2);
+#else
+    return strcasecmp(str1, str2);
 #endif
 }
 

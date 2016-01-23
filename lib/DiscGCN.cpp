@@ -109,14 +109,14 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio)
     m_partitions.emplace_back(new PartitionGCN(*this, IPartition::Kind::Data, 0));
 }
 
-class PartitionBuilderGCN : public DiscBuilderBase::IPartitionBuilder
+class PartitionBuilderGCN : public DiscBuilderBase::PartitionBuilderBase
 {
     uint64_t m_curUser = 0x57058000;
     uint32_t m_fstMemoryAddr;
 public:
     PartitionBuilderGCN(DiscBuilderBase& parent, Kind kind,
                         const char gameID[6], const char* gameTitle, uint32_t fstMemoryAddr)
-    : DiscBuilderBase::IPartitionBuilder(parent, kind, gameID, gameTitle), m_fstMemoryAddr(fstMemoryAddr) {}
+    : DiscBuilderBase::PartitionBuilderBase(parent, kind, gameID, gameTitle), m_fstMemoryAddr(fstMemoryAddr) {}
 
     uint64_t userAllocate(uint64_t reqSz)
     {
@@ -137,7 +137,7 @@ public:
 
     bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn, const SystemChar* apploaderIn)
     {
-        bool result = DiscBuilderBase::IPartitionBuilder::buildFromDirectory(dirIn, dolIn, apploaderIn);
+        bool result = DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(dirIn, dolIn, apploaderIn);
         if (!result)
             return false;
 
@@ -208,7 +208,7 @@ DiscBuilderGCN::DiscBuilderGCN(const SystemChar* outPath, const char gameID[6], 
                                uint32_t fstMemoryAddr, std::function<void(size_t, const SystemString&, size_t)> progressCB)
 : DiscBuilderBase(std::move(NewFileIO(outPath)), progressCB)
 {
-    PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this, IPartitionBuilder::Kind::Data,
+    PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this, PartitionBuilderBase::Kind::Data,
                                                                gameID, gameTitle, fstMemoryAddr);
     m_partitions.emplace_back(partBuilder);
 }

@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <stdio.h>
 #include <stdint.h>
 #include "Util.hpp"
@@ -300,10 +301,10 @@ public:
 class DiscBuilderBase
 {
 public:
-    class IPartitionBuilder
+    class PartitionBuilderBase
     {
     public:
-        virtual ~IPartitionBuilder() {}
+        virtual ~PartitionBuilderBase() {}
         enum class Kind : uint32_t
         {
             Data,
@@ -311,13 +312,15 @@ public:
             Channel
         };
     protected:
+        std::unordered_map<SystemString, std::pair<uint64_t,uint64_t>> m_fileOffsetsSizes;
         std::vector<FSTNode> m_buildNodes;
         std::vector<std::string> m_buildNames;
         size_t m_buildNameOff = 0;
         virtual uint64_t userAllocate(uint64_t reqSz)=0;
         virtual uint32_t packOffset(uint64_t offset) const=0;
-        void recursiveBuildNodes(const SystemChar* dirIn, uint64_t dolInode,
-                                 std::function<void(void)> incParents);
+        void recursiveBuildNodes(bool system, const SystemChar* dirIn, uint64_t dolInode);
+        void recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
+                               std::function<void(void)> incParents);
         void addBuildName(const SystemString& str)
         {
             SystemUTF8View utf8View(str);
@@ -333,8 +336,8 @@ public:
         uint64_t m_dolOffset = 0;
         uint64_t m_dolSize = 0;
     public:
-        IPartitionBuilder(DiscBuilderBase& parent, Kind kind,
-                          const char gameID[6], const char* gameTitle)
+        PartitionBuilderBase(DiscBuilderBase& parent, Kind kind,
+                             const char gameID[6], const char* gameTitle)
         : m_parent(parent), m_kind(kind), m_gameTitle(gameTitle)
         {
             memcpy(m_gameID, gameID, 6);
@@ -347,7 +350,7 @@ public:
     };
 protected:
     std::unique_ptr<IFileIO> m_fileIO;
-    std::vector<std::unique_ptr<IPartitionBuilder>> m_partitions;
+    std::vector<std::unique_ptr<PartitionBuilderBase>> m_partitions;
 public:
     std::function<void(size_t idx, const SystemString&, size_t)> m_progressCB;
     size_t m_progressIdx = 0;

@@ -145,8 +145,8 @@ static uint64_t GetInode(const SystemChar* path)
     BY_HANDLE_FILE_INFORMATION info;
     if (!GetFileInformationByHandle(fp, &info))
         LogModule.report(LogVisor::FatalError, _S("unable to GetFileInformationByHandle %s"), path);
-    inode = info.nFileIndexHigh << 32;
-    inode |= info.nFileIndexLow;
+    inode = uint64_t(info.nFileIndexHigh) << 32;
+    inode |= uint64_t(info.nFileIndexLow);
     CloseHandle(fp);
 #else
     struct stat st;
@@ -157,9 +157,31 @@ static uint64_t GetInode(const SystemChar* path)
     return inode;
 }
 
-void DiscBuilderBase::IPartitionBuilder::recursiveBuildNodes(const SystemChar* dirIn,
-                                                             uint64_t dolInode,
-                                                             std::function<void(void)> incParents)
+static bool IsSystemFile(const SystemString& name)
+{
+    if (name.size() < 4)
+        return false;
+
+    if (!StrCaseCmp((&*name.cend()) - 4, _S(".dol")))
+        return true;
+    if (!StrCaseCmp((&*name.cend()) - 4, _S(".rel")))
+        return true;
+    if (!StrCaseCmp((&*name.cend()) - 4, _S(".rso")))
+        return true;
+    if (!StrCaseCmp((&*name.cend()) - 4, _S(".sel")))
+        return true;
+    if (!StrCaseCmp((&*name.cend()) - 4, _S(".bnr")))
+        return true;
+    if (!StrCaseCmp((&*name.cend()) - 4, _S(".elf")))
+        return true;
+    if (!StrCaseCmp((&*name.cend()) - 4, _S(".wad")))
+        return true;
+
+    return false;
+}
+
+void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(bool system, const SystemChar* dirIn,
+                                                                uint64_t dolInode)
 {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum)
@@ -167,23 +189,20 @@ void DiscBuilderBase::IPartitionBuilder::recursiveBuildNodes(const SystemChar* d
         if (e.m_isDir)
         {
             size_t dirNodeIdx = m_buildNodes.size();
-            m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx+1);
-            addBuildName(e.m_name);
-            incParents();
-            recursiveBuildNodes(e.m_path.c_str(), dolInode, [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();});
+            recursiveBuildNodes(system, e.m_path.c_str(), dolInode);
         }
         else
         {
-            if (dolInode == GetInode(e.m_path.c_str()))
-            {
-                m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(m_dolOffset), m_dolSize);
-                addBuildName(e.m_name);
-                incParents();
+            bool isSys = IsSystemFile(e.m_name);
+            if (system ^ isSys)
                 continue;
-            }
+
+            if (dolInode == GetInode(e.m_path.c_str()))
+                continue;
 
             size_t fileSz = ROUND_UP_32(e.m_fileSz);
             uint64_t fileOff = userAllocate(fileSz);
+            m_fileOffsetsSizes[e.m_path] = std::make_pair(fileOff, fileSz);
             std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
             FILE* fp = Fopen(e.m_path.c_str(), _S("rb"), FileLockType::Read);
             if (!fp)
@@ -203,14 +222,42 @@ void DiscBuilderBase::IPartitionBuilder::recursiveBuildNodes(const SystemChar* d
             fclose(fp);
             for (size_t i=0 ; i<fileSz-xferSz ; ++i)
                 ws->write("\xff", 1);
-            m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOff), fileSz);
+        }
+    }
+}
+
+void DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
+                                                              std::function<void(void)> incParents)
+{
+    DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+    for (const DirectoryEnumerator::Entry& e : dEnum)
+    {
+        if (e.m_isDir)
+        {
+            size_t dirNodeIdx = m_buildNodes.size();
+            m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx+1);
+            addBuildName(e.m_name);
+            incParents();
+            recursiveBuildFST(e.m_path.c_str(), dolInode, [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();});
+        }
+        {
+            if (dolInode == GetInode(e.m_path.c_str()))
+            {
+                m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(m_dolOffset), m_dolSize);
+                addBuildName(e.m_name);
+                incParents();
+                continue;
+            }
+
+            std::pair<uint64_t,uint64_t> fileOffSz = m_fileOffsetsSizes.at(e.m_path);
+            m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
             addBuildName(e.m_name);
             incParents();
         }
     }
 }
 
-bool DiscBuilderBase::IPartitionBuilder::buildFromDirectory(const SystemChar* dirIn,
+bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(const SystemChar* dirIn,
                                                             const SystemChar* dolIn,
                                                             const SystemChar* apploaderIn)
 {
@@ -258,7 +305,10 @@ bool DiscBuilderBase::IPartitionBuilder::buildFromDirectory(const SystemChar* di
     }
 
     /* Gather files in root directory */
-    recursiveBuildNodes(dirIn, GetInode(dolIn), [&](){m_buildNodes[0].incrementLength();});
+    uint64_t dolInode = GetInode(dolIn);
+    recursiveBuildNodes(true, dirIn, dolInode);
+    recursiveBuildNodes(false, dirIn, dolInode);
+    recursiveBuildFST(dirIn, dolInode, [&](){m_buildNodes[0].incrementLength();});
 
     return true;
 }

@@ -433,13 +433,13 @@ void DiscWii::writeOutDataPartitionHeader(const SystemChar* pathOut) const
     }
 }
 
-class PartitionBuilderWii : public DiscBuilderBase::IPartitionBuilder
+class PartitionBuilderWii : public DiscBuilderBase::PartitionBuilderBase
 {
     uint64_t m_curUser = 0x1F0000;
 public:
     PartitionBuilderWii(DiscBuilderBase& parent, Kind kind,
                         const char gameID[6], const char* gameTitle)
-    : DiscBuilderBase::IPartitionBuilder(parent, kind, gameID, gameTitle) {}
+    : DiscBuilderBase::PartitionBuilderBase(parent, kind, gameID, gameTitle) {}
 
     uint64_t getCurUserEnd() const {return m_curUser;}
 
@@ -463,7 +463,7 @@ public:
 
     bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn, const SystemChar* apploaderIn)
     {
-        bool result = DiscBuilderBase::IPartitionBuilder::buildFromDirectory(dirIn, dolIn, apploaderIn);
+        bool result = DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(dirIn, dolIn, apploaderIn);
         if (!result)
             return false;
 
@@ -839,7 +839,7 @@ DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, const char gameID[6], 
                                std::function<void(size_t, const SystemString&, size_t)> progressCB)
 : DiscBuilderBase(std::move(std::unique_ptr<IFileIO>()), progressCB), m_outPath(outPath), m_dualLayer(dualLayer)
 {
-    PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, IPartitionBuilder::Kind::Data,
+    PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionBuilderBase::Kind::Data,
                                                                gameID, gameTitle);
     m_partitions.emplace_back(partBuilder);
 }
