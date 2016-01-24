@@ -20,11 +20,37 @@
 #include <sys/stat.h>
 
 #include <string>
+#include <cstring>
 #include <algorithm>
 #include <LogVisor/LogVisor.hpp>
+#ifdef _MSC_VER
+#pragma warning(disable : 4996)
+
+#include <sys/stat.h>
+
+#if !defined(S_ISREG) && defined(S_IFMT) && defined(S_IFREG)
+#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+
+#if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
+#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+
+#if !defined(S_ISLNK)
+#define S_ISLNK(m) 0
+#endif
+#endif
+
+#undef min
+#undef max
 
 namespace NOD
 {
+/* define our own min/max to avoid MSVC BS */
+template<typename T>
+inline T min(T a, T b) { return a < b ? a : b; }
+template<typename T>
+inline T max(T a, T b) { return a > b ? a : b; }
 
 /* Log Module */
 extern LogVisor::LogModule LogModule;
@@ -49,7 +75,7 @@ static inline void ToLower(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), towlower);}
 static inline void ToUpper(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), towupper);}
-static inline size_t StrLen(const SystemChar* str) {return _wcslen(str);}
+static inline size_t StrLen(const SystemChar* str) {return wcslen(str);}
 class SystemUTF8View
 {
     std::string m_utf8;
@@ -108,7 +134,7 @@ public:
 
 static inline void Unlink(const SystemChar* file)
 {
-#if _WIN32
+#if NOD_UCS2
     _wunlink(file);
 #else
     unlink(file);
@@ -117,8 +143,8 @@ static inline void Unlink(const SystemChar* file)
 
 static inline int StrCmp(const SystemChar* str1, const SystemChar* str2)
 {
-#if HECL_UCS2
-    return _wcscmp(str1, str2);
+#if NOD_UCS2
+    return wcscmp(str1, str2);
 #else
     return strcmp(str1, str2);
 #endif
@@ -126,7 +152,7 @@ static inline int StrCmp(const SystemChar* str1, const SystemChar* str2)
 
 static inline int StrCaseCmp(const SystemChar* str1, const SystemChar* str2)
 {
-#if HECL_UCS2
+#if NOD_UCS2
     return _wcsicmp(str1, str2);
 #else
     return strcasecmp(str1, str2);

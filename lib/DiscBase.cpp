@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -138,9 +139,14 @@ static uint64_t GetInode(const SystemChar* path)
 {
     uint64_t inode;
 #if _WIN32
-    OFSTRUCT ofs;
-    HFILE fp = OpenFile(path, &ofs, OF_READ);
-    if (fp == HFILE_ERROR)
+    HANDLE fp = CreateFileW(path,
+                            GENERIC_READ | GENERIC_WRITE,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            nullptr,
+                            OPEN_EXISTING,
+                            FILE_ATTRIBUTE_NORMAL,
+                            nullptr);
+    if (!fp)
         LogModule.report(LogVisor::FatalError, _S("unable to open %s"), path);
     BY_HANDLE_FILE_INFORMATION info;
     if (!GetFileInformationByHandle(fp, &info))
@@ -212,7 +218,7 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(bool system, con
             ++m_parent.m_progressIdx;
             while (xferSz < e.m_fileSz)
             {
-                size_t rdSz = fread(buf, 1, std::min(0x8000ul, e.m_fileSz - xferSz), fp);
+                size_t rdSz = fread(buf, 1, NOD::min(size_t(0x8000ul), e.m_fileSz - xferSz), fp);
                 if (!rdSz)
                     break;
                 ws->write(buf, rdSz);
@@ -263,12 +269,12 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(const SystemChar*
                                                             const SystemChar* apploaderIn)
 {
     if (!dirIn || !dolIn || !apploaderIn)
-        LogModule.report(LogVisor::FatalError, "all arguments must be supplied to buildFromDirectory()");
+        LogModule.report(LogVisor::FatalError, _S("all arguments must be supplied to buildFromDirectory()"));
 
     /* Clear file */
     m_parent.getFileIO().beginWriteStream();
     ++m_parent.m_progressIdx;
-    m_parent.m_progressCB(m_parent.m_progressIdx, "Preparing output image", -1);
+    m_parent.m_progressCB(m_parent.m_progressIdx, _S("Preparing output image"), -1);
 
     /* Add root node */
     m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);

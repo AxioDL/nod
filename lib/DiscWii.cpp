@@ -361,7 +361,7 @@ public:
         std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset);
         while (rem)
         {
-            size_t rdSz = std::min(rem, 8192ul);
+            size_t rdSz = NOD::min(rem, size_t(8192ul));
             rs->read(buf, rdSz);
             fwrite(buf, 1, rdSz, fp);
             rem -= rdSz;
@@ -792,7 +792,7 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     }
 
     ++m_progressIdx;
-    m_progressCB(m_progressIdx, "Finishing Disc", -1);
+    m_progressCB(m_progressIdx, _S("Finishing Disc"), -1);
 
     /* Populate disc header */
     std::unique_ptr<IFileIO::IWriteStream> ws = imgOut->beginWriteStream(0);

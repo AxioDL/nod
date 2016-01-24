@@ -77,22 +77,24 @@ int main(int argc, char* argv[])
     else if (!strcasecmp(argv[1], _S("makegcn")))
     {
 #if NOD_UCS2
-        if (_wcslen(argv[2]) < 6)
-            NOD::LogModule.report(LogVisor::FatalError, "game-id is not at least 6 characters");
+        if (wcslen(argv[2]) < 6)
+            NOD::LogModule.report(LogVisor::FatalError, _S("game-id is not at least 6 characters"));
 #else
         if (strlen(argv[2]) < 6)
-            NOD::LogModule.report(LogVisor::FatalError, "game-id is not at least 6 characters");
+            NOD::LogModule.report(LogVisor::FatalError, _S("game-id is not at least 6 characters"));
 #endif
 
         /* Pre-validate paths */
         NOD::Sstat theStat;
         if (NOD::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as directory", argv[4]);
+            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as directory"), argv[4]);
         if (NOD::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[5]);
+            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[5]);
         if (NOD::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
             NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[6]);
 
+        NOD::SystemUTF8View gameId(argv[2]);
+        NOD::SystemUTF8View gameTitle(argv[3]);
         size_t lastIdx = -1;
         auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
         {
@@ -112,12 +114,12 @@ int main(int argc, char* argv[])
         {
             NOD::SystemString outPath(argv[4]);
             outPath.append(_S(".iso"));
-            NOD::DiscBuilderGCN b(outPath.c_str(), argv[2], argv[3], 0x0003EB60, progFunc);
+            NOD::DiscBuilderGCN b(outPath.c_str(), gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), 0x0003EB60, progFunc);
             b.buildFromDirectory(argv[4], argv[5], argv[6]);
         }
         else
         {
-            NOD::DiscBuilderGCN b(argv[7], argv[2], argv[3], 0x0003EB60, progFunc);
+            NOD::DiscBuilderGCN b(argv[7], gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), 0x0003EB60, progFunc);
             b.buildFromDirectory(argv[4], argv[5], argv[6]);
         }
 
@@ -126,24 +128,26 @@ int main(int argc, char* argv[])
     else if (!strcasecmp(argv[1], _S("makewiisl")) || !strcasecmp(argv[1], _S("makewiidl")))
     {
 #if NOD_UCS2
-        if (_wcslen(argv[2]) < 6)
-            NOD::LogModule.report(LogVisor::FatalError, "game-id is not at least 6 characters");
+        if (wcslen(argv[2]) < 6)
+            NOD::LogModule.report(LogVisor::FatalError, _S("game-id is not at least 6 characters"));
 #else
         if (strlen(argv[2]) < 6)
-            NOD::LogModule.report(LogVisor::FatalError, "game-id is not at least 6 characters");
+            NOD::LogModule.report(LogVisor::FatalError, _S("game-id is not at least 6 characters"));
 #endif
 
         /* Pre-validate paths */
         NOD::Sstat theStat;
         if (NOD::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as directory", argv[4]);
+            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as directory"), argv[4]);
         if (NOD::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[5]);
+            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[5]);
         if (NOD::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[6]);
+            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[6]);
         if (NOD::Stat(argv[7], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[7]);
+            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[7]);
 
+        NOD::SystemUTF8View gameId(argv[2]);
+        NOD::SystemUTF8View gameTitle(argv[3]);
         size_t lastIdx = -1;
         auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
         {
@@ -165,12 +169,12 @@ int main(int argc, char* argv[])
         {
             NOD::SystemString outPath(argv[4]);
             outPath.append(_S(".iso"));
-            NOD::DiscBuilderWii b(outPath.c_str(), argv[2], argv[3], dual, progFunc);
+            NOD::DiscBuilderWii b(outPath.c_str(), gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), dual, progFunc);
             b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
         else
         {
-            NOD::DiscBuilderWii b(argv[8], argv[2], argv[3], dual, progFunc);
+            NOD::DiscBuilderWii b(argv[8], gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), dual, progFunc);
             b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
 
