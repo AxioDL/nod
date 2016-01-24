@@ -299,7 +299,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(const SystemChar*
         ++m_parent.m_progressIdx;
         while (xferSz < dolStat.st_size)
         {
-            size_t rdSz = fread(buf, 1, std::min(size_t(8192), size_t(dolStat.st_size - xferSz)), fp);
+            size_t rdSz = fread(buf, 1, NOD::min(size_t(8192), dolStat.st_size - xferSz), fp);
             if (!rdSz)
                 break;
             ws->write(buf, rdSz);
