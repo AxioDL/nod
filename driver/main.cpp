@@ -104,9 +104,9 @@ int main(int argc, char* argv[])
                 printf("\n");
             }
             if (bytes != -1)
-                printf("\r%s %" PRISize " B", name.c_str(), bytes);
+                NOD::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
             else
-                printf("\r%s", name.c_str());
+                NOD::Printf(_S("\r%s"), name.c_str());
             fflush(stdout);
         };
 
@@ -157,9 +157,9 @@ int main(int argc, char* argv[])
                 printf("\n");
             }
             if (bytes != -1)
-                printf("\r%s %" PRISize " B", name.c_str(), bytes);
+                NOD::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
             else
-                printf("\r%s", name.c_str());
+                NOD::Printf(_S("\r%s"), name.c_str());
             fflush(stdout);
         };
 

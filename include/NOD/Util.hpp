@@ -287,6 +287,18 @@ static inline int FSeek(FILE* fp, int64_t offset, int whence)
 #endif
 }
 
+static inline void Printf(const SystemChar* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+#if NOD_UCS2
+    vwprintf(fmt, args);
+#else
+    vprintf(fmt, args);
+#endif
+    va_end(args);
+}
+
 }
 
 #endif // __NOD_UTIL_HPP__

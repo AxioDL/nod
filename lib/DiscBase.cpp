@@ -168,19 +168,19 @@ static bool IsSystemFile(const SystemString& name)
     if (name.size() < 4)
         return false;
 
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".dol")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".dol")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".rel")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".rel")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".rso")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".rso")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".sel")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".sel")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".bnr")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".bnr")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".elf")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".elf")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".wad")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".wad")))
         return true;
 
     return false;
