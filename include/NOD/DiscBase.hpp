@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <stdio.h>
 #include <stdint.h>
+#include <functional>
 #include "Util.hpp"
 #include "IDiscIO.hpp"
 #include "IFileIO.hpp"

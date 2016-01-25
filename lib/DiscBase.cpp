@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -145,9 +146,14 @@ static uint64_t GetInode(const SystemChar* path)
 {
     uint64_t inode;
 #if _WIN32
-    OFSTRUCT ofs;
-    HFILE fp = OpenFile(path, &ofs, OF_READ);
-    if (fp == HFILE_ERROR)
+    HANDLE fp = CreateFileW(path,
+                            GENERIC_READ | GENERIC_WRITE,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            nullptr,
+                            OPEN_EXISTING,
+                            FILE_ATTRIBUTE_NORMAL,
+                            nullptr);
+    if (!fp)
         LogModule.report(LogVisor::FatalError, _S("unable to open %s"), path);
     BY_HANDLE_FILE_INFORMATION info;
     if (!GetFileInformationByHandle(fp, &info))
@@ -170,22 +176,22 @@ static bool IsSystemFile(const SystemString& name, bool& isDol)
     if (name.size() < 4)
         return false;
 
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".dol")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".dol")))
     {
         isDol = true;
         return true;
     }
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".rel")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".rel")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".rso")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".rso")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".sel")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".sel")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".bnr")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".bnr")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".elf")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".elf")))
         return true;
-    if (!StrCaseCmp((&*name.cend()) - 4, _S(".wad")))
+    if (!StrCaseCmp((&*(name.cend() - 4)), _S(".wad")))
         return true;
 
     return false;
@@ -243,7 +249,7 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
                 ++m_parent.m_progressIdx;
                 while (xferSz < e.m_fileSz)
                 {
-                    size_t rdSz = rs->read(buf, std::min(0x8000ul, e.m_fileSz - xferSz));
+                    size_t rdSz = rs->read(buf, NOD::min(size_t(0x8000ul), e.m_fileSz - xferSz));
                     if (!rdSz)
                         break;
                     ws.write(buf, rdSz);
@@ -295,11 +301,11 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
                                                                const SystemChar* apploaderIn)
 {
     if (!dirIn || !dolIn || !apploaderIn)
-        LogModule.report(LogVisor::FatalError, "all arguments must be supplied to buildFromDirectory()");
+        LogModule.report(LogVisor::FatalError, _S("all arguments must be supplied to buildFromDirectory()"));
 
     /* Clear file */
     ++m_parent.m_progressIdx;
-    m_parent.m_progressCB(m_parent.m_progressIdx, "Preparing output image", -1);
+    m_parent.m_progressCB(m_parent.m_progressIdx, _S("Preparing output image"), -1);
 
     /* Add root node */
     m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
@@ -314,9 +320,30 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
         uint64_t fileOff = userAllocate(fileSz, ws);
         m_dolOffset = fileOff;
         m_dolSize = fileSz;
+<<<<<<< HEAD
         std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn)->beginReadStream();
         size_t xferSz = PatchDOL(*rs, ws, dolStat.st_size);
         m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(dolIn) + _S(" [PATCHED]"), xferSz);
+=======
+        std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
+        FILE* fp = Fopen(dolIn, _S("rb"), FileLockType::Read);
+        if (!fp)
+            LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), dolIn);
+        char buf[8192];
+        size_t xferSz = 0;
+        SystemString dolName(dolIn);
+        ++m_parent.m_progressIdx;
+        while (xferSz < dolStat.st_size)
+        {
+            size_t rdSz = fread(buf, 1, NOD::min(size_t(8192), dolStat.st_size - xferSz), fp);
+            if (!rdSz)
+                break;
+            ws->write(buf, rdSz);
+            xferSz += rdSz;
+            m_parent.m_progressCB(m_parent.m_progressIdx, dolName, xferSz);
+        }
+        fclose(fp);
+>>>>>>> 1c740a3da8495cfaebb7dc648602b9273c097a74
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
             ws.write("\xff", 1);
     }
