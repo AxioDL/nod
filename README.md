@@ -52,11 +52,11 @@ auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
 
 /* Making a GCN image */
 NOD::DiscBuilderGCN b(isoOutPath, gameID, gameTitle, dolLoadAddress, progFunc);
-ret = b.buildFromDirectory(fsRootDirPath, boolDolPath, apploaderPath);
+ret = b.buildFromDirectory(fsRootDirPath, bootDolPath, apploaderPath);
 
 /* Making a Wii image */
 NOD::DiscBuilderWii b(isoOutPath, gameID, gameTitle, dualLayer, progFunc);
-ret = b.buildFromDirectory(fsRootDirPath, boolDolPath, apploaderPath, partitionHeadPath);
+ret = b.buildFromDirectory(fsRootDirPath, bootDolPath, apploaderPath, partitionHeadPath);
 ```
 
 Wii images are fakesigned using a commonly-applied [signing bug](http://wiibrew.org/wiki/Signing_bug).
