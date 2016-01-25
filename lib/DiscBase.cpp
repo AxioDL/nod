@@ -8,6 +8,29 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+#else
+static void* memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
+{
+    int needle_first;
+    const uint8_t *p = static_cast<const uint8_t*>(haystack);
+    size_t plen = hlen;
+
+    if (!nlen)
+        return NULL;
+
+    needle_first = *(unsigned char *)needle;
+
+    while (plen >= nlen && (p = static_cast<const uint8_t*>(memchr(p, needle_first, plen - nlen + 1))))
+    {
+        if (!memcmp(p, needle, nlen))
+            return (void *)p;
+
+        p++;
+        plen = hlen - (p - static_cast<const uint8_t*>(haystack));
+    }
+
+    return NULL;
+}
 #endif
 
 #include <algorithm>
@@ -320,30 +343,9 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
         uint64_t fileOff = userAllocate(fileSz, ws);
         m_dolOffset = fileOff;
         m_dolSize = fileSz;
-<<<<<<< HEAD
         std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn)->beginReadStream();
         size_t xferSz = PatchDOL(*rs, ws, dolStat.st_size);
         m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(dolIn) + _S(" [PATCHED]"), xferSz);
-=======
-        std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
-        FILE* fp = Fopen(dolIn, _S("rb"), FileLockType::Read);
-        if (!fp)
-            LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), dolIn);
-        char buf[8192];
-        size_t xferSz = 0;
-        SystemString dolName(dolIn);
-        ++m_parent.m_progressIdx;
-        while (xferSz < dolStat.st_size)
-        {
-            size_t rdSz = fread(buf, 1, NOD::min(size_t(8192), dolStat.st_size - xferSz), fp);
-            if (!rdSz)
-                break;
-            ws->write(buf, rdSz);
-            xferSz += rdSz;
-            m_parent.m_progressCB(m_parent.m_progressIdx, dolName, xferSz);
-        }
-        fclose(fp);
->>>>>>> 1c740a3da8495cfaebb7dc648602b9273c097a74
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
             ws.write("\xff", 1);
     }

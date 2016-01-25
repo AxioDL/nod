@@ -281,7 +281,7 @@ static inline FILE* Fopen(const SystemChar* path, const SystemChar* mode, FileLo
 
 static inline int FSeek(FILE* fp, int64_t offset, int whence)
 {
-#if NOD_UCS2
+#if _WIN32
     return _fseeki64(fp, offset, whence);
 #elif __APPLE__ || __FreeBSD__
     return fseeko(fp, offset, whence);
