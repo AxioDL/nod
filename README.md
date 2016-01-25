@@ -28,7 +28,7 @@ if (!dataPart->extractToDirectory(outDir, ctx))
 return SUCCESS;
 ```
 
-Authoring images is always done from the user's filesystem and may be integrated into
+*Image authoring* is always done from the user's filesystem and may be integrated into
 a content pipeline using the `NOD::DiscBuilderBase` interface.
 
 ```cpp
