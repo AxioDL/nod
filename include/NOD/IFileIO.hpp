@@ -13,6 +13,7 @@ class IFileIO
 {
 public:
     virtual ~IFileIO() {}
+    virtual bool exists()=0;
     virtual uint64_t size()=0;
 
     struct IWriteStream
@@ -27,6 +28,7 @@ public:
     struct IReadStream
     {
         virtual ~IReadStream() {}
+        virtual void seek(int64_t offset, int whence)=0;
         virtual uint64_t read(void* buf, uint64_t length)=0;
         virtual uint64_t copyToDisc(struct IPartWriteStream& discio, uint64_t length)=0;
     };

@@ -24,57 +24,115 @@ public:
     FileIOFILE(const SystemChar* path)
     : m_path(path) {}
 
-    uint64_t size()
+    bool exists()
     {
-#if NOD_UCS2
-        FILE* fp = _wfopen(m_path.c_str(), L"rb");
+#if _WIN32
+        HANDLE fp = CreateFileW(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (fp == INVALID_HANDLE_VALUE)
+            return false;
+        CloseHandle(fp);
+        return true;
 #else
         FILE* fp = fopen(m_path.c_str(), "rb");
+        if (!fp)
+            return false;
+        fclose(fp);
+        return true;
 #endif
+    }
+
+    uint64_t size()
+    {
+#if _WIN32
+        HANDLE fp = CreateFileW(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (fp == INVALID_HANDLE_VALUE)
+            return 0;
+        LARGE_INTEGER sz;
+        if (!GetFileSizeEx(fp, &sz))
+        {
+            CloseHandle(fp);
+            return 0;
+        }
+        CloseHandle(fp);
+        return sz.QuadPart;
+#else
+        FILE* fp = fopen(m_path.c_str(), "rb");
         if (!fp)
             return 0;
-        fseeko(fp, 0, SEEK_END);
+        FSeek(fp, 0, SEEK_END);
         uint64_t result = ftello(fp);
         fclose(fp);
         return result;
+#endif
     }
 
     struct WriteStream : public IFileIO::IWriteStream
     {
         uint8_t buf[0x7c00];
+#if _WIN32
+        HANDLE fp;
+#else
         FILE* fp;
+#endif
         WriteStream(const SystemString& path)
         {
-#if NOD_UCS2
-            fp = _wfopen(path.c_str(), L"wb");
+#if _WIN32
+            fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
+                             nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (fp == INVALID_HANDLE_VALUE)
+                goto FailLoc;
 #else
             fp = fopen(path.c_str(), "wb");
-#endif
             if (!fp)
-                LogModule.report(LogVisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+                goto FailLoc;
+#endif
+            return;
+        FailLoc:
+            LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for writing"), path.c_str());
         }
         WriteStream(const SystemString& path, uint64_t offset)
         {
-#if NOD_UCS2
-            fp = _wfopen(path.c_str(), L"ab");
-            fclose(fp);
-            fp = _wfopen(path.c_str(), L"r+b");
+#if _WIN32
+            fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
+                             nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (fp == INVALID_HANDLE_VALUE)
+                goto FailLoc;
+            LARGE_INTEGER lioffset;
+            lioffset.QuadPart = offset;
+            SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
 #else
             fp = fopen(path.c_str(), "ab");
+            if (!fp)
+                goto FailLoc;
             fclose(fp);
             fp = fopen(path.c_str(), "r+b");
-#endif
             if (!fp)
-                LogModule.report(LogVisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+                goto FailLoc;
             FSeek(fp, offset, SEEK_SET);
+#endif
+            return;
+        FailLoc:
+            LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for writing"), path.c_str());
         }
         ~WriteStream()
         {
+#if _WIN32
+            CloseHandle(fp);
+#else
             fclose(fp);
+#endif
         }
         uint64_t write(const void* buf, uint64_t length)
         {
+#if _WIN32
+            DWORD ret = 0;
+            WriteFile(fp, buf, length, &ret, nullptr);
+            return ret;
+#else
             return fwrite(buf, 1, length, fp);
+#endif
         }
         uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
         {
@@ -85,12 +143,12 @@ public:
                 uint64_t readSz = discio.read(buf, thisSz);
                 if (thisSz != readSz)
                 {
-                    LogModule.report(LogVisor::Error, "unable to read enough from disc");
+                    LogModule.report(LogVisor::FatalError, "unable to read enough from disc");
                     return read;
                 }
-                if (fwrite(buf, 1, readSz, fp) != readSz)
+                if (write(buf, readSz) != readSz)
                 {
-                    LogModule.report(LogVisor::Error, "unable to write in file");
+                    LogModule.report(LogVisor::FatalError, "unable to write in file");
                     return read;
                 }
                 length -= thisSz;
@@ -110,40 +168,81 @@ public:
 
     struct ReadStream : public IFileIO::IReadStream
     {
+#if _WIN32
+        HANDLE fp;
+#else
         FILE* fp;
+#endif
         uint8_t buf[0x7c00];
         ReadStream(const SystemString& path)
         {
-#if NOD_UCS2
-            fp = _wfopen(path.c_str(), L"rb");
+#if _WIN32
+            fp = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                             nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (fp == INVALID_HANDLE_VALUE)
+                goto FailLoc;
 #else
             fp = fopen(path.c_str(), "rb");
-#endif
             if (!fp)
-                LogModule.report(LogVisor::Error, _S("unable to open '%s' for reading"), path.c_str());
+                goto FailLoc;
+#endif
+            return;
+        FailLoc:
+            LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), path.c_str());
         }
         ReadStream(const SystemString& path, uint64_t offset)
         : ReadStream(path)
         {
+#if _WIN32
+            LARGE_INTEGER lioffset;
+            lioffset.QuadPart = offset;
+            SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
+#else
             FSeek(fp, offset, SEEK_SET);
+#endif
         }
-        ~ReadStream() {fclose(fp);}
+        ~ReadStream()
+        {
+#if _WIN32
+            CloseHandle(fp);
+#else
+            fclose(fp);
+#endif
+        }
+        void seek(int64_t offset, int whence)
+        {
+#if _WIN32
+            LARGE_INTEGER li;
+            li.QuadPart = offset;
+            SetFilePointerEx(fp, li, nullptr, whence);
+#else
+            FSeek(fp, offset, whence);
+#endif
+        }
         uint64_t read(void* buf, uint64_t length)
-        {return fread(buf, 1, length, fp);}
+        {
+#if _WIN32
+            DWORD ret = 0;
+            ReadFile(fp, buf, length, &ret, nullptr);
+            return ret;
+#else
+            return fread(buf, 1, length, fp);
+#endif
+        }
         uint64_t copyToDisc(IPartWriteStream& discio, uint64_t length)
         {
             uint64_t written = 0;
             while (length)
             {
                 uint64_t thisSz = MIN(0x7c00, length);
-                if (fread(buf, 1, thisSz, fp) != thisSz)
+                if (read(buf, thisSz) != thisSz)
                 {
-                    LogModule.report(LogVisor::Error, "unable to read enough from file");
+                    LogModule.report(LogVisor::FatalError, "unable to read enough from file");
                     return written;
                 }
                 if (discio.write(buf, thisSz) != thisSz)
                 {
-                    LogModule.report(LogVisor::Error, "unable to write enough to disc");
+                    LogModule.report(LogVisor::FatalError, "unable to write enough to disc");
                     return written;
                 }
                 length -= thisSz;

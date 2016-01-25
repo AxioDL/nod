@@ -342,10 +342,7 @@ public:
 
     void writeOutPartitionHeader(const SystemChar* pathOut) const
     {
-        FILE* fp = Fopen(pathOut, _S("wb"), FileLockType::Write);
-        if (!fp)
-            LogModule.report(LogVisor::FatalError, _S("unable to open %s for writing"), pathOut);
-
+        std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(pathOut)->beginWriteStream();
         uint64_t h3Off;
         {
             std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset + 0x2B4);
@@ -363,11 +360,9 @@ public:
         {
             size_t rdSz = NOD::min(rem, size_t(8192ul));
             rs->read(buf, rdSz);
-            fwrite(buf, 1, rdSz, fp);
+            ws->write(buf, rdSz);
             rem -= rdSz;
         }
-
-        fclose(fp);
     }
 };
 
@@ -910,8 +905,19 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
 
     /* Fill image to end */
     ws = m_fileIO->beginWriteStream(filledSz);
-    for (size_t i=0 ; i<DISC_CAPACITY-filledSz ; ++i)
-        ws->write("\xff", 1);
+    uint8_t fillBuf[512];
+    memset(fillBuf, 0xff, 512);
+    for (size_t i=DISC_CAPACITY-filledSz ; i>0 ;)
+    {
+        if (i >= 512)
+        {
+            ws->write(fillBuf, 512);
+            i -= 512;
+            continue;
+        }
+        ws->write(fillBuf, i);
+        break;
+    }
 
     return true;
 }

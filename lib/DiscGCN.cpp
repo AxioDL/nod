@@ -181,16 +181,14 @@ public:
         header.write(*ws);
 
         ws = beginWriteStream(0x2440);
-        FILE* fp = Fopen(apploaderIn, _S("rb"), FileLockType::Read);
-        if (!fp)
-            LogModule.report(LogVisor::FatalError, _S("unable to open %s for reading"), apploaderIn);
+        std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(apploaderIn)->beginReadStream();
         char buf[8192];
         size_t xferSz = 0;
         SystemString apploaderName(apploaderIn);
         ++m_parent.m_progressIdx;
         while (true)
         {
-            size_t rdSz = fread(buf, 1, 8192, fp);
+            size_t rdSz = rs->read(buf, 8192);
             if (!rdSz)
                 break;
             ws->write(buf, rdSz);
@@ -200,7 +198,6 @@ public:
                                  "apploader flows into user area (one or the other is too big)");
             m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
         }
-        fclose(fp);
 
         size_t fstOff = ROUND_UP_32(xferSz);
         size_t fstSz = sizeof(FSTNode) * m_buildNodes.size();
@@ -234,7 +231,7 @@ public:
 
 bool DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
                                         const SystemChar* apploaderIn)
-{    
+{
     m_fileIO->beginWriteStream();
 
     if (!CheckFreeSpace(m_outPath, 0x57058000))

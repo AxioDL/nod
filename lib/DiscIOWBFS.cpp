@@ -2,11 +2,7 @@
 #include <inttypes.h>
 #include "NOD/Util.hpp"
 #include "NOD/IDiscIO.hpp"
-
-#if _WIN32
-#define ftello _ftelli64
-#define fseeko _fseeki64
-#endif
+#include "NOD/IFileIO.hpp"
 
 namespace NOD
 {
@@ -77,16 +73,13 @@ class DiscIOWBFS : public IDiscIO
 
     } wbfs;
 
-    static int _wbfsReadSector(FILE* fp, uint32_t lba, uint32_t count, void* buf)
+    static int _wbfsReadSector(IFileIO::IReadStream& rs, uint32_t lba, uint32_t count, void* buf)
     {
         uint64_t off = lba;
         off*=512ULL;
-        if (fseeko(fp, off, SEEK_SET))
+        rs.seek(off, SEEK_SET);
+        if (rs.read(buf, count*512ULL) != count*512ULL)
         {
-            LogModule.report(LogVisor::FatalError, "error seeking in disc partition: %" PRId64 " %d", off, count);
-            return 1;
-        }
-        if (fread(buf, count*512ULL, 1, fp) != 1){
             LogModule.report(LogVisor::FatalError, "error reading disc");
             return 1;
         }
@@ -98,23 +91,20 @@ public:
     : filepath(fpin)
     {
         /* Temporary file handle to read LBA table */
-#if NOD_UCS2
-        FILE* fp = _wfopen(filepath.c_str(), L"rb");
-#else
-        FILE* fp = fopen(filepath.c_str(), "rb");
-#endif
+        std::unique_ptr<IFileIO> fio = NewFileIO(filepath);
+        std::unique_ptr<IFileIO::IReadStream> rs = fio->beginReadStream();
 
         WBFS* p = &wbfs;
         WBFSHead tmpHead;
-        if (fread(&tmpHead, 1, sizeof(tmpHead), fp) != sizeof(tmpHead))
+        if (rs->read(&tmpHead, sizeof(tmpHead)) != sizeof(tmpHead))
             LogModule.report(LogVisor::FatalError, "unable to read WBFS head");
-        fseek(fp, 0, SEEK_SET);
         unsigned hd_sector_size = 1 << tmpHead.hd_sec_sz_s;
         unsigned num_hd_sector = SBig(tmpHead.n_hd_sec);
 
         wbfsHead.reset(new uint8_t[hd_sector_size]);
         WBFSHead* head = (WBFSHead*)wbfsHead.get();
-        if (fread(head, 1, hd_sector_size, fp) != hd_sector_size)
+        rs->seek(0, SEEK_SET);
+        if (rs->read(head, hd_sector_size) != hd_sector_size)
             LogModule.report(LogVisor::FatalError, "unable to read WBFS head");
 
         //constants, but put here for consistancy
@@ -123,7 +113,7 @@ public:
         p->n_wii_sec = (num_hd_sector/0x8000)*hd_sector_size;
         p->n_wii_sec_per_disc = 143432*2;//support for double layers discs..
         p->part_lba = 0;
-        _wbfsReadSector(fp, p->part_lba, 1, head);
+        _wbfsReadSector(*rs, p->part_lba, 1, head);
         if (hd_sector_size && head->hd_sec_sz_s !=  size_to_shift(hd_sector_size)) {
             LogModule.report(LogVisor::FatalError, "hd sector size doesn't match");
         }
@@ -157,7 +147,7 @@ public:
             wbfsDiscInfo.reset(new uint8_t[p->disc_info_sz]);
             if (!wbfsDiscInfo)
                 LogModule.report(LogVisor::FatalError, "allocating memory");
-            _wbfsReadSector(fp, p->part_lba+1, disc_info_sz_lba, wbfsDiscInfo.get());
+            _wbfsReadSector(*rs, p->part_lba+1, disc_info_sz_lba, wbfsDiscInfo.get());
             p->n_disc_open++;
             //for(i=0;i<p->n_wbfs_sec_per_disc;i++)
             //    printf("%d,",wbfs_ntohs(d->header->wlba_table[i]));
@@ -168,19 +158,18 @@ public:
     {
         friend class DiscIOWBFS;
         const DiscIOWBFS& m_parent;
-        FILE* fp;
+        std::unique_ptr<IFileIO::IReadStream> fp;
         uint64_t m_offset;
         std::unique_ptr<uint8_t[]> m_tmpBuffer;
 
-        ReadStream(const DiscIOWBFS& parent, FILE* fpin, uint64_t offset)
+        ReadStream(const DiscIOWBFS& parent, std::unique_ptr<IFileIO::IReadStream>&& fpin, uint64_t offset)
         : m_parent(parent),
-          fp(fpin),
+          fp(std::move(fpin)),
           m_offset(offset),
           m_tmpBuffer(new uint8_t[parent.wbfs.hd_sec_sz]) {}
-        ~ReadStream() {fclose(fp);}
 
         int wbfsReadSector(uint32_t lba, uint32_t count, void* buf)
-        {return DiscIOWBFS::_wbfsReadSector(fp, lba, count, buf);}
+        {return DiscIOWBFS::_wbfsReadSector(*fp, lba, count, buf);}
 
         int wbfsDiscRead(uint32_t offset, uint8_t *data, uint64_t len)
         {
@@ -279,46 +268,15 @@ public:
                 m_offset += offset;
         }
     };
+
     std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
-#if NOD_UCS2
-        FILE* fp = _wfopen(filepath.c_str(), L"rb");
-#else
-        FILE* fp = fopen(filepath.c_str(), "rb");
-#endif
-        if (!fp)
-        {
-            LogModule.report(LogVisor::Error, _S("Unable to open '%s' for reading"), filepath.c_str());
-            return std::unique_ptr<IReadStream>();
-        }
-        return std::unique_ptr<IReadStream>(new ReadStream(*this, fp, offset));
+        return std::unique_ptr<IReadStream>(new ReadStream(*this, NewFileIO(filepath)->beginReadStream(), offset));
     }
 
-    class WriteStream : public IWriteStream
-    {
-        friend class DiscIOWBFS;
-        FILE* fp;
-        WriteStream(FILE* fpin)
-        : fp(fpin) {}
-        ~WriteStream() {fclose(fp);}
-    public:
-        uint64_t write(void* buf, uint64_t length)
-        {return fwrite(buf, 1, length, fp);}
-    };
     std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
-#if NOD_UCS2
-        FILE* fp = _wfopen(filepath.c_str(), L"wb");
-#else
-        FILE* fp = fopen(filepath.c_str(), "wb");
-#endif
-        if (!fp)
-        {
-            LogModule.report(LogVisor::Error, _S("Unable to open '%s' for writing"), filepath.c_str());
-            return std::unique_ptr<IWriteStream>();
-        }
-        fseeko(fp, offset, SEEK_SET);
-        return std::unique_ptr<IWriteStream>(new WriteStream(fp));
+        return std::unique_ptr<IWriteStream>();
     }
 };
 

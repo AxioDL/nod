@@ -31,7 +31,7 @@ public:
     struct IWriteStream
     {
         virtual ~IWriteStream() {}
-        virtual uint64_t write(void* buf, uint64_t length)=0;
+        virtual uint64_t write(const void* buf, uint64_t length)=0;
     };
     virtual std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset=0) const=0;
 };

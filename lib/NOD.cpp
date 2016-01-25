@@ -2,10 +2,6 @@
 #include "NOD/NOD.hpp"
 #include "NOD/DiscBase.hpp"
 
-#if _WIN32
-#define fseeko _fseeki64
-#endif
-
 namespace NOD
 {
 
@@ -17,49 +13,41 @@ std::unique_ptr<IDiscIO> NewDiscIOWBFS(const SystemChar* path);
 std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path, bool& isWii)
 {
     /* Temporary file handle to determine image type */
-#if NOD_UCS2
-    FILE* fp = _wfopen(path, L"rb");
-#else
-    FILE* fp = fopen(path, "rb");
-#endif
-    if (!fp)
+    std::unique_ptr<IFileIO> fio = NewFileIO(path);
+    if (!fio->exists())
     {
         LogModule.report(LogVisor::Error, _S("Unable to open '%s'"), path);
         return std::unique_ptr<DiscBase>();
     }
+    std::unique_ptr<IFileIO::IReadStream> rs = fio->beginReadStream();
 
     isWii = false;
     std::unique_ptr<IDiscIO> discIO;
-    uint32_t magic;
-    fread(&magic, 1, 4, fp);
+    uint32_t magic = 0;
+    if (rs->read(&magic, 4) != 4)
+        LogModule.report(LogVisor::FatalError, _S("Unable to read magic from '%s'"), path);
+
     if (magic == NOD::SBig((uint32_t)'WBFS'))
     {
-        fclose(fp);
         discIO = NewDiscIOWBFS(path);
         isWii = true;
     }
     else
     {
-        fseeko(fp, 0x18, SEEK_SET);
-        fread(&magic, 1, 4, fp);
+        rs->seek(0x18, SEEK_SET);
+        rs->read(&magic, 4);
         magic = NOD::SBig(magic);
         if (magic == 0x5D1C9EA3)
         {
-            fclose(fp);
             discIO = NewDiscIOISO(path);
             isWii = true;
         }
         else
         {
-            fread(&magic, 1, 4, fp);
+            rs->read(&magic, 4);
             magic = NOD::SBig(magic);
             if (magic == 0xC2339F3D)
-            {
-                fclose(fp);
                 discIO = NewDiscIOISO(path);
-            }
-            else
-                fclose(fp);
         }
     }
 
