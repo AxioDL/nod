@@ -76,7 +76,8 @@ struct Header
             m_gcnMagic = 0xC2339F3D;
     }
 
-    void write(IFileIO::IWriteStream& ws) const
+    template <class WriteStream>
+    void write(WriteStream& ws) const
     {
         Header hs(*this);
         hs.m_wiiMagic = SBig(hs.m_wiiMagic);
@@ -316,9 +317,9 @@ public:
         std::vector<FSTNode> m_buildNodes;
         std::vector<std::string> m_buildNames;
         size_t m_buildNameOff = 0;
-        virtual uint64_t userAllocate(uint64_t reqSz)=0;
+        virtual uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws)=0;
         virtual uint32_t packOffset(uint64_t offset) const=0;
-        void recursiveBuildNodes(bool system, const SystemChar* dirIn, uint64_t dolInode);
+        void recursiveBuildNodes(IPartWriteStream& ws, bool system, const SystemChar* dirIn, uint64_t dolInode);
         void recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
                                std::function<void(void)> incParents);
         void addBuildName(const SystemString& str)
@@ -342,22 +343,25 @@ public:
         {
             memcpy(m_gameID, gameID, 6);
         }
-        bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
+        virtual std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset)=0;
+        bool buildFromDirectory(IPartWriteStream& ws,
+                                const SystemChar* dirIn, const SystemChar* dolIn,
                                 const SystemChar* apploaderIn);
 
         const char* getGameID() const {return m_gameID;}
         const std::string& getGameTitle() const {return m_gameTitle;}
     };
 protected:
+    const SystemChar* m_outPath;
     std::unique_ptr<IFileIO> m_fileIO;
     std::vector<std::unique_ptr<PartitionBuilderBase>> m_partitions;
 public:
     std::function<void(size_t idx, const SystemString&, size_t)> m_progressCB;
     size_t m_progressIdx = 0;
     virtual ~DiscBuilderBase() {}
-    DiscBuilderBase(std::unique_ptr<IFileIO>&& fio,
+    DiscBuilderBase(const SystemChar* outPath,
                     std::function<void(size_t idx, const SystemString&, size_t)> progressCB)
-    : m_fileIO(std::move(fio)), m_progressCB(progressCB) {}
+    : m_fileIO(std::move(NewFileIO(outPath))), m_outPath(outPath), m_progressCB(progressCB) {}
 
     IFileIO& getFileIO() {return *m_fileIO;}
 };

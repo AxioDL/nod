@@ -16,6 +16,9 @@
 #include <sys/file.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/param.h>
+#include <sys/statvfs.h>
+
 #endif
 #include <sys/stat.h>
 
@@ -258,6 +261,21 @@ static inline int FSeek(FILE* fp, int64_t offset, int whence)
     return fseeko(fp, offset, whence);
 #else
     return fseeko64(fp, offset, whence);
+#endif
+}
+
+static inline bool CheckFreeSpace(const SystemChar* path, size_t reqSz)
+{
+#if _WIN32
+    ULARGE_INTEGER freeBytes;
+    if (!GetDiskFreeSpaceExW(path, &freeBytes, nullptr, nullptr))
+        LogModule.report(LogVisor::FatalError, "GetDiskFreeSpaceExW %s: %d", path, GetLastError());
+    return reqSz < freeBytes;
+#else
+    struct statvfs svfs;
+    if (statvfs(path, &svfs))
+        LogModule.report(LogVisor::FatalError, "statvfs %s: %s", path, strerror(errno));
+    return reqSz < svfs.f_bsize * svfs.f_bfree;
 #endif
 }
 

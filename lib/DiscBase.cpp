@@ -131,7 +131,14 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract Filesystem */
-    return m_nodes[0].extractToDirectory(path, ctx);
+    SystemString fsPath = path + _S("/fsroot");
+    if (Mkdir(fsPath.c_str(), 0755) && errno != EEXIST)
+    {
+        LogModule.report(LogVisor::Error, _S("unable to mkdir '%s'"), fsPath.c_str());
+        return false;
+    }
+
+    return m_nodes[0].extractToDirectory(fsPath, ctx);
 }
 
 static uint64_t GetInode(const SystemChar* path)
@@ -157,13 +164,17 @@ static uint64_t GetInode(const SystemChar* path)
     return inode;
 }
 
-static bool IsSystemFile(const SystemString& name)
+static bool IsSystemFile(const SystemString& name, bool& isDol)
 {
+    isDol = false;
     if (name.size() < 4)
         return false;
 
     if (!StrCaseCmp((&*name.cend()) - 4, _S(".dol")))
+    {
+        isDol = true;
         return true;
+    }
     if (!StrCaseCmp((&*name.cend()) - 4, _S(".rel")))
         return true;
     if (!StrCaseCmp((&*name.cend()) - 4, _S(".rso")))
@@ -180,7 +191,23 @@ static bool IsSystemFile(const SystemString& name)
     return false;
 }
 
-void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(bool system, const SystemChar* dirIn,
+/** Patches out pesky #001 integrity check performed by game's OSInit.
+ *  This is required for multi-DOL games, but doesn't harm functionality otherwise */
+static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t sz)
+{
+    std::unique_ptr<uint8_t[]> buf(new uint8_t[sz]);
+    sz = in.read(buf.get(), sz);
+    uint8_t* found = static_cast<uint8_t*>(memmem(buf.get(), sz,
+                            "\x3C\x03\xF8\x00\x28\x00\x00\x00\x40\x82\x00\x0C"
+                            "\x38\x60\x00\x01\x48\x00\x02\x44\x38\x61\x00\x18\x48", 25));
+    if (found)
+        found[11] = '\x04';
+    return out.write(buf.get(), sz);
+}
+
+void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream& ws,
+                                                                bool system,
+                                                                const SystemChar* dirIn,
                                                                 uint64_t dolInode)
 {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
@@ -188,12 +215,12 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(bool system, con
     {
         if (e.m_isDir)
         {
-            size_t dirNodeIdx = m_buildNodes.size();
-            recursiveBuildNodes(system, e.m_path.c_str(), dolInode);
+            recursiveBuildNodes(ws, system, e.m_path.c_str(), dolInode);
         }
         else
         {
-            bool isSys = IsSystemFile(e.m_name);
+            bool isDol;
+            bool isSys = IsSystemFile(e.m_name, isDol);
             if (system ^ isSys)
                 continue;
 
@@ -201,27 +228,31 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(bool system, con
                 continue;
 
             size_t fileSz = ROUND_UP_32(e.m_fileSz);
-            uint64_t fileOff = userAllocate(fileSz);
+            uint64_t fileOff = userAllocate(fileSz, ws);
             m_fileOffsetsSizes[e.m_path] = std::make_pair(fileOff, fileSz);
-            std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
-            FILE* fp = Fopen(e.m_path.c_str(), _S("rb"), FileLockType::Read);
-            if (!fp)
-                LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), e.m_path.c_str());
-            char buf[0x8000];
+            std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(e.m_path)->beginReadStream();
             size_t xferSz = 0;
-            ++m_parent.m_progressIdx;
-            while (xferSz < e.m_fileSz)
+            if (isDol)
             {
-                size_t rdSz = fread(buf, 1, std::min(0x8000ul, e.m_fileSz - xferSz), fp);
-                if (!rdSz)
-                    break;
-                ws->write(buf, rdSz);
-                xferSz += rdSz;
-                m_parent.m_progressCB(m_parent.m_progressIdx, e.m_name, xferSz);
+                xferSz = PatchDOL(*rs, ws, e.m_fileSz);
+                m_parent.m_progressCB(++m_parent.m_progressIdx, e.m_name + _S(" [PATCHED]"), xferSz);
             }
-            fclose(fp);
+            else
+            {
+                char buf[0x8000];
+                ++m_parent.m_progressIdx;
+                while (xferSz < e.m_fileSz)
+                {
+                    size_t rdSz = rs->read(buf, std::min(0x8000ul, e.m_fileSz - xferSz));
+                    if (!rdSz)
+                        break;
+                    ws.write(buf, rdSz);
+                    xferSz += rdSz;
+                    m_parent.m_progressCB(m_parent.m_progressIdx, e.m_name, xferSz);
+                }
+            }
             for (size_t i=0 ; i<fileSz-xferSz ; ++i)
-                ws->write("\xff", 1);
+                ws.write("\xff", 1);
         }
     }
 }
@@ -258,15 +289,15 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* 
     }
 }
 
-bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(const SystemChar* dirIn,
-                                                            const SystemChar* dolIn,
-                                                            const SystemChar* apploaderIn)
+bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream& ws,
+                                                               const SystemChar* dirIn,
+                                                               const SystemChar* dolIn,
+                                                               const SystemChar* apploaderIn)
 {
     if (!dirIn || !dolIn || !apploaderIn)
         LogModule.report(LogVisor::FatalError, "all arguments must be supplied to buildFromDirectory()");
 
     /* Clear file */
-    m_parent.getFileIO().beginWriteStream();
     ++m_parent.m_progressIdx;
     m_parent.m_progressCB(m_parent.m_progressIdx, "Preparing output image", -1);
 
@@ -274,41 +305,26 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(const SystemChar*
     m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
     addBuildName(_S("<root>"));
 
-    /* Write DOL first (ensures that it's within a 32-bit offset for Wii apploaders) */
+    /* Write Boot DOL first (first thing seeked to after Apploader) */
     {
         Sstat dolStat;
         if (Stat(dolIn, &dolStat))
             LogModule.report(LogVisor::FatalError, _S("unable to stat %s"), dolIn);
         size_t fileSz = ROUND_UP_32(dolStat.st_size);
-        uint64_t fileOff = userAllocate(fileSz);
+        uint64_t fileOff = userAllocate(fileSz, ws);
         m_dolOffset = fileOff;
         m_dolSize = fileSz;
-        std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(fileOff);
-        FILE* fp = Fopen(dolIn, _S("rb"), FileLockType::Read);
-        if (!fp)
-            LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), dolIn);
-        char buf[8192];
-        size_t xferSz = 0;
-        SystemString dolName(dolIn);
-        ++m_parent.m_progressIdx;
-        while (xferSz < dolStat.st_size)
-        {
-            size_t rdSz = fread(buf, 1, std::min(size_t(8192), size_t(dolStat.st_size - xferSz)), fp);
-            if (!rdSz)
-                break;
-            ws->write(buf, rdSz);
-            xferSz += rdSz;
-            m_parent.m_progressCB(m_parent.m_progressIdx, dolName, xferSz);
-        }
-        fclose(fp);
+        std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn)->beginReadStream();
+        size_t xferSz = PatchDOL(*rs, ws, dolStat.st_size);
+        m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(dolIn) + _S(" [PATCHED]"), xferSz);
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
-            ws->write("\xff", 1);
+            ws.write("\xff", 1);
     }
 
     /* Gather files in root directory */
     uint64_t dolInode = GetInode(dolIn);
-    recursiveBuildNodes(true, dirIn, dolInode);
-    recursiveBuildNodes(false, dirIn, dolInode);
+    recursiveBuildNodes(ws, true, dirIn, dolInode);
+    recursiveBuildNodes(ws, false, dirIn, dolInode);
     recursiveBuildFST(dirIn, dolInode, [&](){m_buildNodes[0].incrementLength();});
 
     return true;

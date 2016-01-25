@@ -47,9 +47,9 @@ struct IPartReadStream
 struct IPartWriteStream
 {
     virtual ~IPartWriteStream() {}
-    virtual void seek(int64_t offset, int whence=SEEK_SET)=0;
+    virtual void close()=0;
     virtual uint64_t position() const=0;
-    virtual uint64_t write(void* buf, uint64_t length)=0;
+    virtual uint64_t write(const void* buf, uint64_t length)=0;
 };
 
 #if NOD_ATHENA
@@ -70,24 +70,6 @@ public:
     inline atUint64 position()    const {return m_rs->position();}
     inline atUint64 length()      const {return 0;}
     inline atUint64 readUBytesToBuf(void* buf, atUint64 sz) {m_rs->read(buf, sz); return sz;}
-};
-
-class AthenaPartWriteStream : public Athena::io::IStreamWriter
-{
-    std::unique_ptr<IPartWriteStream> m_ws;
-public:
-    AthenaPartWriteStream(std::unique_ptr<IPartWriteStream>&& ws) : m_ws(std::move(ws)) {}
-
-    inline void seek(atInt64 off, Athena::SeekOrigin origin)
-    {
-        if (origin == Athena::Begin)
-            m_ws->seek(off, SEEK_SET);
-        else if (origin == Athena::Current)
-            m_ws->seek(off, SEEK_CUR);
-    }
-    inline atUint64 position()    const {return m_ws->position();}
-    inline atUint64 length()      const {return 0;}
-    inline void writeUBytes(const atUint8* buf, atUint64 len) {m_ws->write((void*)buf, len);}
 };
 
 #endif

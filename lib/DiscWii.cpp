@@ -433,17 +433,171 @@ void DiscWii::writeOutDataPartitionHeader(const SystemChar* pathOut) const
     }
 }
 
+static const uint8_t ZEROIV[16] = {0};
+
 class PartitionBuilderWii : public DiscBuilderBase::PartitionBuilderBase
 {
+    friend class DiscBuilderWii;
+    uint64_t m_baseOffset;
+    uint64_t m_userOffset = 0;
     uint64_t m_curUser = 0x1F0000;
+    std::unique_ptr<IAES> m_aes;
+    uint8_t m_h3[4916][20] = {};
+
 public:
+    class PartWriteStream : public IPartWriteStream
+    {
+        friend class PartitionBuilderWii;
+        PartitionBuilderWii& m_parent;
+        uint64_t m_baseOffset;
+        uint64_t m_offset;
+        std::unique_ptr<IFileIO::IWriteStream> m_fio;
+        bool m_closed = false;
+
+        size_t m_curGroup = SIZE_MAX;
+        char m_buf[0x200000];
+
+        void encryptGroup(uint8_t h3Out[20])
+        {
+            sha1nfo sha;
+            uint8_t h2[8][20];
+
+            for (int s=0 ; s<8 ; ++s)
+            {
+                char* ptr1 = m_buf + s*0x40000;
+                uint8_t h1[8][20];
+
+                for (int c=0 ; c<8 ; ++c)
+                {
+                    char* ptr0 = ptr1 + c*0x8000;
+                    uint8_t h0[31][20];
+
+                    for (int j=0 ; j<31 ; ++j)
+                    {
+                        sha1_init(&sha);
+                        sha1_write(&sha, ptr0 + (j+1)*0x400, 0x400);
+                        memcpy(h0[j], sha1_result(&sha), 20);
+                    }
+
+                    sha1_init(&sha);
+                    sha1_write(&sha, (char*)h0, 0x26C);
+                    memcpy(h1[c], sha1_result(&sha), 20);
+
+                    memcpy(ptr0, h0, 0x26C);
+                    memset(ptr0+0x26C, 0, 0x014);
+                }
+
+                sha1_init(&sha);
+                sha1_write(&sha, (char*)h1, 0x0A0);
+                memcpy(h2[s], sha1_result(&sha), 20);
+
+                for (int c=0 ; c<8 ; ++c)
+                {
+                    char* ptr0 = ptr1 + c*0x8000;
+                    memcpy(ptr0+0x280, h1, 0x0A0);
+                    memset(ptr0+0x320, 0, 0x020);
+                }
+            }
+
+            sha1_init(&sha);
+            sha1_write(&sha, (char*)h2, 0x0A0);
+            memcpy(h3Out, sha1_result(&sha), 20);
+
+            for (int s=0 ; s<8 ; ++s)
+            {
+                char* ptr1 = m_buf + s*0x40000;
+                for (int c=0 ; c<8 ; ++c)
+                {
+                    char* ptr0 = ptr1 + c*0x8000;
+                    memcpy(ptr0+0x340, h2, 0x0A0);
+                    memset(ptr0+0x3E0, 0, 0x020);
+                    m_parent.m_aes->encrypt(ZEROIV, (uint8_t*)ptr0, (uint8_t*)ptr0, 0x400);
+                    m_parent.m_aes->encrypt((uint8_t*)(ptr0+0x3D0), (uint8_t*)(ptr0+0x400), (uint8_t*)(ptr0+0x400), 0x7c00);
+                }
+            }
+
+            if (m_fio->write(m_buf, 0x200000) != 0x200000)
+                LogModule.report(LogVisor::FatalError, "unable to write full disc group");
+        }
+
+    public:
+        PartWriteStream(PartitionBuilderWii& parent, uint64_t baseOffset, uint64_t offset)
+        : m_parent(parent), m_baseOffset(baseOffset), m_offset(offset)
+        {
+            if (offset % 0x1F0000)
+                LogModule.report(LogVisor::FatalError, "partition write stream MUST begin on 0x1F0000-aligned boundary");
+            size_t group = m_offset / 0x1F0000;
+            m_fio = m_parent.m_parent.getFileIO().beginWriteStream(m_baseOffset + group * 0x200000);
+            m_curGroup = group;
+        }
+        ~PartWriteStream() {close();}
+        void close()
+        {
+            if (m_closed)
+                return;
+            m_closed = true;
+            size_t rem = m_offset % 0x1F0000;
+            if (rem)
+            {
+                rem = 0x1F0000 - rem;
+                write(nullptr, rem);
+            }
+            encryptGroup(m_parent.m_h3[m_curGroup]);
+            m_fio.reset();
+        }
+        uint64_t position() const {return m_offset;}
+        uint64_t write(const void* buf, uint64_t length)
+        {
+            size_t group = m_offset / 0x1F0000;
+            size_t block = (m_offset - group * 0x1F0000) / 0x7c00;
+            size_t cacheOffset = m_offset % 0x7c00;
+            uint64_t cacheSize;
+            uint64_t rem = length;
+            const uint8_t* src = (uint8_t*)buf;
+
+            while (rem)
+            {
+                if (group != m_curGroup)
+                {
+                    encryptGroup(m_parent.m_h3[m_curGroup]);
+                    m_curGroup = group;
+                }
+
+                cacheSize = rem;
+                if (cacheSize + cacheOffset > 0x7c00)
+                    cacheSize = 0x7c00 - cacheOffset;
+
+                if (src)
+                {
+                    memcpy(m_buf + block * 0x8000 + 0x400 + cacheOffset, src, cacheSize);
+                    src += cacheSize;
+                }
+                else
+                    memset(m_buf + block * 0x8000 + 0x400 + cacheOffset, 0, cacheSize);
+
+                rem -= cacheSize;
+                cacheOffset = 0;
+                ++block;
+                if (block == 64)
+                {
+                    block = 0;
+                    ++group;
+                }
+            }
+
+            m_offset += length;
+            return length;
+        }
+    };
+
     PartitionBuilderWii(DiscBuilderBase& parent, Kind kind,
-                        const char gameID[6], const char* gameTitle)
-    : DiscBuilderBase::PartitionBuilderBase(parent, kind, gameID, gameTitle) {}
+                        const char gameID[6], const char* gameTitle, uint64_t baseOffset)
+    : DiscBuilderBase::PartitionBuilderBase(parent, kind, gameID, gameTitle),
+      m_baseOffset(baseOffset), m_aes(NewAES()) {}
 
     uint64_t getCurUserEnd() const {return m_curUser;}
 
-    uint64_t userAllocate(uint64_t reqSz)
+    uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws)
     {
         reqSz = ROUND_UP_32(reqSz);
         if (m_curUser + reqSz >= 0x1FB450000)
@@ -452,6 +606,14 @@ public:
             return -1;
         }
         uint64_t ret = m_curUser;
+        PartWriteStream& cws = static_cast<PartWriteStream&>(ws);
+        if (cws.m_offset > ret)
+        {
+            LogModule.report(LogVisor::FatalError, "partition overwrite error");
+            return -1;
+        }
+        while (cws.m_offset < ret)
+            cws.write("\xff", 1);
         m_curUser += reqSz;
         return ret;
     }
@@ -461,102 +623,34 @@ public:
         return uint32_t(offset >> uint64_t(2));
     }
 
-    bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn, const SystemChar* apploaderIn)
+    std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset)
     {
-        bool result = DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(dirIn, dolIn, apploaderIn);
-        if (!result)
-            return false;
-
-        std::unique_ptr<IFileIO::IWriteStream> ws;
-
-        /* Pad out user area to nearest cleartext sector */
-        uint64_t curUserRem = m_curUser % 0x1F0000;
-        if (curUserRem)
-        {
-            ws = m_parent.getFileIO().beginWriteStream(m_curUser);
-            curUserRem = 0x1F0000 - curUserRem;
-            for (size_t i=0 ; i<curUserRem ; ++i)
-                ws->write("\xff", 1);
-            m_curUser += curUserRem;
-        }
-
-        ws = m_parent.getFileIO().beginWriteStream(0);
-        Header header(m_gameID, m_gameTitle.c_str(), true, 0, 0, 0);
-        header.write(*ws);
-
-        ws = m_parent.getFileIO().beginWriteStream(0x2440);
-        FILE* fp = Fopen(apploaderIn, _S("rb"), FileLockType::Read);
-        if (!fp)
-            LogModule.report(LogVisor::FatalError, _S("unable to open %s for reading"), apploaderIn);
-        char buf[8192];
-        size_t xferSz = 0;
-        SystemString apploaderName(apploaderIn);
-        ++m_parent.m_progressIdx;
-        while (true)
-        {
-            size_t rdSz = fread(buf, 1, 8192, fp);
-            if (!rdSz)
-                break;
-            ws->write(buf, rdSz);
-            xferSz += rdSz;
-            if (0x2440 + xferSz >= 0x1F0000)
-                LogModule.report(LogVisor::FatalError,
-                                 "apploader flows into user area (one or the other is too big)");
-            m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
-        }
-        fclose(fp);
-
-        size_t fstOff = ROUND_UP_32(xferSz);
-        size_t fstSz = sizeof(FSTNode) * m_buildNodes.size();
-        for (size_t i=0 ; i<fstOff-xferSz ; ++i)
-            ws->write("\xff", 1);
-        fstOff += 0x2440;
-        ws->write(m_buildNodes.data(), fstSz);
-        for (const std::string& str : m_buildNames)
-            ws->write(str.data(), str.size()+1);
-        fstSz += m_buildNameOff;
-        fstSz = ROUND_UP_32(fstSz);
-
-        if (fstOff + fstSz >= 0x1F0000)
-            LogModule.report(LogVisor::FatalError,
-                             "FST flows into user area (one or the other is too big)");
-
-        ws = m_parent.getFileIO().beginWriteStream(0x420);
-        uint32_t vals[4];
-        vals[0] = SBig(uint32_t(m_dolOffset >> uint64_t(2)));
-        vals[1] = SBig(uint32_t(fstOff >> uint64_t(2)));
-        vals[2] = SBig(uint32_t(fstSz));
-        vals[3] = SBig(uint32_t(fstSz));
-        ws->write(vals, sizeof(vals));
-
-        return true;
+        return std::make_unique<PartWriteStream>(*this, m_baseOffset + m_userOffset, offset);
     }
 
-    uint64_t cryptAndFakesign(IFileIO& out, uint64_t offset, const SystemChar* partHeadIn) const
+    uint64_t buildFromDirectory(const SystemChar* dirIn,
+                                const SystemChar* dolIn,
+                                const SystemChar* apploaderIn,
+                                const SystemChar* partHeadIn)
     {
         /* Read head and validate key members */
-        FILE* fp = Fopen(partHeadIn, _S("rb"), FileLockType::Read);
-        if (!fp)
-            LogModule.report(LogVisor::FatalError, _S("unable to open %s for reading"), partHeadIn);
+        std::unique_ptr<IFileIO> ph = NewFileIO(partHeadIn);
 
         uint8_t tkey[16];
         {
-            FSeek(fp, 0x1BF, SEEK_SET);
-            if (fread(tkey, 1, 16, fp) != 16)
+            if (ph->beginReadStream(0x1BF)->read(tkey, 16) != 16)
                 LogModule.report(LogVisor::FatalError, _S("unable to read title key from %s"), partHeadIn);
         }
 
         uint8_t tkeyiv[16] = {};
         {
-            FSeek(fp, 0x1DC, SEEK_SET);
-            if (fread(tkeyiv, 1, 8, fp) != 8)
+            if (ph->beginReadStream(0x1DC)->read(tkeyiv, 8) != 8)
                 LogModule.report(LogVisor::FatalError, _S("unable to read title key IV from %s"), partHeadIn);
         }
 
         uint8_t ccIdx;
         {
-            FSeek(fp, 0x1F1, SEEK_SET);
-            if (fread(&ccIdx, 1, 1, fp) != 1)
+            if (ph->beginReadStream(0x1F1)->read(&ccIdx, 1) != 1)
                 LogModule.report(LogVisor::FatalError, _S("unable to read common key index from %s"), partHeadIn);
             if (ccIdx > 1)
                 LogModule.report(LogVisor::FatalError, _S("common key index may only be 0 or 1"));
@@ -564,8 +658,7 @@ public:
 
         uint32_t tmdSz;
         {
-            FSeek(fp, 0x2A4, SEEK_SET);
-            if (fread(&tmdSz, 1, 4, fp) != 4)
+            if (ph->beginReadStream(0x2A4)->read(&tmdSz, 4) != 4)
                 LogModule.report(LogVisor::FatalError, _S("unable to read TMD size from %s"), partHeadIn);
             tmdSz = SBig(tmdSz);
         }
@@ -573,8 +666,7 @@ public:
         uint64_t h3Off;
         {
             uint32_t h3Ptr;
-            FSeek(fp, 0x2B4, SEEK_SET);
-            if (fread(&h3Ptr, 1, 4, fp) != 4)
+            if (ph->beginReadStream(0x2B4)->read(&h3Ptr, 4) != 4)
                 LogModule.report(LogVisor::FatalError, _S("unable to read H3 pointer from %s"), partHeadIn);
             h3Off = uint64_t(SBig(h3Ptr)) << 2;
         }
@@ -582,25 +674,26 @@ public:
         uint64_t dataOff;
         {
             uint32_t dataPtr;
-            if (fread(&dataPtr, 1, 4, fp) != 4)
+            if (ph->beginReadStream(0x2B8)->read(&dataPtr, 4) != 4)
                 LogModule.report(LogVisor::FatalError, _S("unable to read data pointer from %s"), partHeadIn);
             dataOff = uint64_t(SBig(dataPtr)) << 2;
         }
+        m_userOffset = dataOff;
 
         std::unique_ptr<uint8_t[]> tmdData(new uint8_t[tmdSz]);
-        FSeek(fp, 0x2C0, SEEK_SET);
-        if (fread(tmdData.get(), 1, tmdSz, fp) != tmdSz)
+        if (ph->beginReadStream(0x2C0)->read(tmdData.get(), tmdSz) != tmdSz)
             LogModule.report(LogVisor::FatalError, _S("unable to read TMD from %s"), partHeadIn);
 
         /* Copy partition head up to H3 table */
-        std::unique_ptr<IFileIO::IWriteStream> ws = out.beginWriteStream(offset);
+        std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(m_baseOffset);
         {
             uint64_t remCopy = h3Off;
+
             uint8_t copyBuf[8192];
-            FSeek(fp, 0, SEEK_SET);
+            std::unique_ptr<IFileIO::IReadStream> rs = ph->beginReadStream();
             while (remCopy)
             {
-                size_t rdBytes = fread(copyBuf, 1, std::min(size_t(8192), size_t(remCopy)), fp);
+                size_t rdBytes = rs->read(copyBuf, std::min(size_t(8192), size_t(remCopy)));
                 if (rdBytes)
                 {
                     ws->write(copyBuf, rdBytes);
@@ -613,111 +706,104 @@ public:
             }
         }
 
-        fclose(fp);
-
         /* Prepare crypto pass */
-        std::unique_ptr<IFileIO::IReadStream> rs = m_parent.getFileIO().beginReadStream(0);
-        sha1nfo sha;
-        std::unique_ptr<IAES> aes = NewAES();
-        aes->setKey(COMMON_KEYS[ccIdx]);
-        aes->decrypt(tkeyiv, tkey, tkey, 16);
-        aes->setKey(tkey);
-        static const uint8_t ZEROIV[16] = {0};
+        m_aes->setKey(COMMON_KEYS[ccIdx]);
+        m_aes->decrypt(tkeyiv, tkey, tkey, 16);
+        m_aes->setKey(tkey);
 
-        std::unique_ptr<char[]> cleartext(new char[0x1F0000]);
-        std::unique_ptr<char[]> ciphertext(new char[0x200000]);
-        uint8_t h3[4916][20] = {};
-
-        uint64_t groupCount = m_curUser / 0x1F0000;
-        ws = out.beginWriteStream(offset + dataOff);
-        SystemString cryptoName(_S("Hashing and encrypting"));
-        ++m_parent.m_progressIdx;
-        for (uint64_t g=0 ; g<groupCount ; ++g)
         {
-            char* cleartext2 = cleartext.get();
-            char* ciphertext2 = ciphertext.get();
+            /* Assemble partition data */
+            std::unique_ptr<IPartWriteStream> cws = beginWriteStream(0x1F0000);
+            bool result = DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(*cws, dirIn, dolIn, apploaderIn);
+            if (!result)
+                return 0;
 
-            if (rs->read(cleartext2, 0x1F0000) != 0x1F0000)
-                LogModule.report(LogVisor::FatalError, "cleartext file too short");
-
-            uint8_t h2[8][20];
-
-            for (int s=0 ; s<8 ; ++s)
+            /* Pad out user area to nearest cleartext sector */
+            m_curUser = cws->position();
+            uint64_t curUserRem = m_curUser % 0x1F0000;
+            if (curUserRem)
             {
-                char* cleartext1 = cleartext2 + s*0x3E000;
-                char* ciphertext1 = ciphertext2 + s*0x40000;
-                uint8_t h1[8][20];
-
-                for (int c=0 ; c<8 ; ++c)
-                {
-                    char* cleartext0 = cleartext1 + c*0x7c00;
-                    char* ciphertext0 = ciphertext1 + c*0x8000;
-                    uint8_t h0[31][20];
-
-                    for (int j=0 ; j<31 ; ++j)
-                    {
-                        sha1_init(&sha);
-                        sha1_write(&sha, cleartext0 + j*0x400, 0x400);
-                        memcpy(h0[j], sha1_result(&sha), 20);
-                    }
-
-                    sha1_init(&sha);
-                    sha1_write(&sha, (char*)h0, 0x26C);
-                    memcpy(h1[c], sha1_result(&sha), 20);
-
-                    memcpy(ciphertext0, h0, 0x26C);
-                    memset(ciphertext0+0x26C, 0, 0x014);
-                }
-
-                sha1_init(&sha);
-                sha1_write(&sha, (char*)h1, 0x0A0);
-                memcpy(h2[s], sha1_result(&sha), 20);
-
-                for (int c=0 ; c<8 ; ++c)
-                {
-                    char* ciphertext0 = ciphertext1 + c*0x8000;
-                    memcpy(ciphertext0+0x280, h1, 0x0A0);
-                    memset(ciphertext0+0x320, 0, 0x020);
-                }
+                curUserRem = 0x1F0000 - curUserRem;
+                for (size_t i=0 ; i<curUserRem ; ++i)
+                    cws->write("\xff", 1);
+                m_curUser += curUserRem;
             }
 
-            sha1_init(&sha);
-            sha1_write(&sha, (char*)h2, 0x0A0);
-            memcpy(h3[g], sha1_result(&sha), 20);
+            /* Begin crypto write and add content header */
+            cws = beginWriteStream(0);
+            Header header(m_gameID, m_gameTitle.c_str(), true, 0, 0, 0);
+            header.write(*cws);
 
-            for (int s=0 ; s<8 ; ++s)
+            /* Get Apploader Size */
+            Sstat theStat;
+            if (Stat(apploaderIn, &theStat))
+                LogModule.report(LogVisor::FatalError, _S("unable to stat %s"), apploaderIn);
+
+            /* Compute boot table members and write */
+            size_t fstOff = 0x2440 + ROUND_UP_32(theStat.st_size);
+            size_t fstSz = sizeof(FSTNode) * m_buildNodes.size();
+            fstSz += m_buildNameOff;
+            fstSz = ROUND_UP_32(fstSz);
+
+            if (fstOff + fstSz >= 0x1F0000)
+                LogModule.report(LogVisor::FatalError,
+                                 "FST flows into user area (one or the other is too big)");
+
+            cws->write(nullptr, 0x420 - sizeof(Header));
+            uint32_t vals[4];
+            vals[0] = SBig(uint32_t(m_dolOffset >> uint64_t(2)));
+            vals[1] = SBig(uint32_t(fstOff >> uint64_t(2)));
+            vals[2] = SBig(uint32_t(fstSz));
+            vals[3] = SBig(uint32_t(fstSz));
+            cws->write(vals, 16);
+
+            /* Write Apploader */
+            cws->write(nullptr, 0x2440 - 0x430);
+            std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(apploaderIn)->beginReadStream();
+            char buf[8192];
+            size_t xferSz = 0;
+            SystemString apploaderName(apploaderIn);
+            ++m_parent.m_progressIdx;
+            while (true)
             {
-                char* cleartext1 = cleartext2 + s*0x3E000;
-                char* ciphertext1 = ciphertext2 + s*0x40000;
-                for (int c=0 ; c<8 ; ++c)
-                {
-                    char* cleartext0 = cleartext1 + c*0x7c00;
-                    char* ciphertext0 = ciphertext1 + c*0x8000;
-                    memcpy(ciphertext0+0x340, h2, 0x0A0);
-                    memset(ciphertext0+0x3E0, 0, 0x020);
-                    aes->encrypt(ZEROIV, (uint8_t*)ciphertext0, (uint8_t*)ciphertext0, 0x400);
-                    aes->encrypt((uint8_t*)(ciphertext0+0x3D0), (uint8_t*)cleartext0, (uint8_t*)(ciphertext0+0x400), 0x7c00);
-                }
+                size_t rdSz = rs->read(buf, 8192);
+                if (!rdSz)
+                    break;
+                cws->write(buf, rdSz);
+                xferSz += rdSz;
+                if (0x2440 + xferSz >= 0x1F0000)
+                    LogModule.report(LogVisor::FatalError,
+                                     "apploader flows into user area (one or the other is too big)");
+                m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
             }
 
-            if (ws->write(ciphertext2, 0x200000) != 0x200000)
-                LogModule.report(LogVisor::FatalError, "unable to write full disc sector");
-            m_parent.m_progressCB(m_parent.m_progressIdx, cryptoName, (g+1)*0x200000);
+            size_t fstOffRel = fstOff - 0x2440;
+            if (xferSz > fstOffRel)
+                LogModule.report(LogVisor::FatalError, "apploader unexpectedly flows into FST");
+            for (size_t i=0 ; i<fstOffRel-xferSz ; ++i)
+                cws->write("\xff", 1);
+
+            /* Write FST */
+            cws->write(m_buildNodes.data(), m_buildNodes.size() * sizeof(FSTNode));
+            for (const std::string& str : m_buildNames)
+                cws->write(str.data(), str.size()+1);
         }
 
         /* Write new crypto content size */
+        uint64_t groupCount = m_curUser / 0x1F0000;
         uint64_t cryptContentSize = (groupCount * 0x200000) >> uint64_t(2);
         uint32_t cryptContentSizeBig = SBig(uint32_t(cryptContentSize));
-        ws = out.beginWriteStream(offset + 0x2BC);
+        ws = m_parent.getFileIO().beginWriteStream(m_baseOffset + 0x2BC);
         ws->write(&cryptContentSizeBig, 0x4);
 
         /* Write new H3 */
-        ws = out.beginWriteStream(offset + h3Off);
-        ws->write(h3, 0x18000);
+        ws = m_parent.getFileIO().beginWriteStream(m_baseOffset + h3Off);
+        ws->write(m_h3, 0x18000);
 
         /* Compute content hash and replace in TMD */
+        sha1nfo sha;
         sha1_init(&sha);
-        sha1_write(&sha, (char*)h3, 0x18000);
+        sha1_write(&sha, (char*)m_h3, 0x18000);
         memcpy(tmdData.get() + 0x1F4, sha1_result(&sha), 20);
 
         /* Same for content size */
@@ -759,10 +845,10 @@ public:
         }
         m_parent.m_progressCB(m_parent.m_progressIdx, bfName, attempts);
 
-        ws = out.beginWriteStream(offset + 0x2C0);
+        ws = m_parent.getFileIO().beginWriteStream(m_baseOffset + 0x2C0);
         ws->write(tmdData.get(), tmdSz);
 
-        return offset + dataOff + groupCount * 0x200000;
+        return m_baseOffset + dataOff + groupCount * 0x200000;
     }
 };
 
@@ -772,19 +858,17 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     size_t DISC_CAPACITY = m_dualLayer ? 0x1FB4E0000 : 0x118240000;
 
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_partitions[0]);
-    uint64_t filledSz = 0x200000;
-    std::unique_ptr<IFileIO> imgOut = NewFileIO(m_outPath);
-    imgOut->beginWriteStream();
+    uint64_t filledSz = pb.m_baseOffset;
+    m_fileIO->beginWriteStream();
 
-    /* Assemble cleartext data partition into temporary file */
-    SystemString clearPath(m_outPath);
-    clearPath += _S(".cleardata");
-    m_fileIO = std::move(NewFileIO(clearPath));
-    if (!pb.buildFromDirectory(dirIn, dolIn, apploaderIn))
+    if (!CheckFreeSpace(m_outPath, DISC_CAPACITY))
+    {
+        LogModule.report(LogVisor::Error, _S("not enough free disk space for %s"), m_outPath);
         return false;
+    }
 
-    /* Fakesign cleartext into output file */
-    filledSz = pb.cryptAndFakesign(*imgOut, filledSz, partHeadIn);
+    /* Assemble image */
+    filledSz = pb.buildFromDirectory(dirIn, dolIn, apploaderIn, partHeadIn);
     if (filledSz >= DISC_CAPACITY)
     {
         LogModule.report(LogVisor::FatalError, "data partition exceeds disc capacity");
@@ -795,21 +879,21 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     m_progressCB(m_progressIdx, "Finishing Disc", -1);
 
     /* Populate disc header */
-    std::unique_ptr<IFileIO::IWriteStream> ws = imgOut->beginWriteStream(0);
+    std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(0);
     Header header(pb.getGameID(), pb.getGameTitle().c_str(), true, 0, 0, 0);
     header.write(*ws);
 
     /* Populate partition info */
-    ws = imgOut->beginWriteStream(0x40000);
+    ws = m_fileIO->beginWriteStream(0x40000);
     uint32_t vals[2] = {SBig(uint32_t(1)), SBig(uint32_t(0x40020 >> uint64_t(2)))};
     ws->write(vals, 8);
 
-    ws = imgOut->beginWriteStream(0x40020);
-    vals[0] = SBig(uint32_t(0x200000 >> uint64_t(2)));
+    ws = m_fileIO->beginWriteStream(0x40020);
+    vals[0] = SBig(uint32_t(pb.m_baseOffset >> uint64_t(2)));
     ws->write(vals, 4);
 
     /* Populate region info */
-    ws = imgOut->beginWriteStream(0x4E000);
+    ws = m_fileIO->beginWriteStream(0x4E000);
     const char* gameID = pb.getGameID();
     if (gameID[3] == 'P')
         vals[0] = SBig(uint32_t(2));
@@ -820,27 +904,24 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     ws->write(vals, 4);
 
     /* Make disc unrated */
-    ws = imgOut->beginWriteStream(0x4E010);
+    ws = m_fileIO->beginWriteStream(0x4E010);
     for (int i=0 ; i<16 ; ++i)
         ws->write("\x80", 1);
 
     /* Fill image to end */
-    ws = imgOut->beginWriteStream(filledSz);
+    ws = m_fileIO->beginWriteStream(filledSz);
     for (size_t i=0 ; i<DISC_CAPACITY-filledSz ; ++i)
         ws->write("\xff", 1);
-
-    /* Delete cleartext file */
-    Unlink(clearPath.c_str());
 
     return true;
 }
 
 DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, const char gameID[6], const char* gameTitle, bool dualLayer,
                                std::function<void(size_t, const SystemString&, size_t)> progressCB)
-: DiscBuilderBase(std::move(std::unique_ptr<IFileIO>()), progressCB), m_outPath(outPath), m_dualLayer(dualLayer)
+: DiscBuilderBase(outPath, progressCB), m_dualLayer(dualLayer)
 {
     PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionBuilderBase::Kind::Data,
-                                                               gameID, gameTitle);
+                                                               gameID, gameTitle, 0x200000);
     m_partitions.emplace_back(partBuilder);
 }
 

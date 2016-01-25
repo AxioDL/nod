@@ -15,13 +15,14 @@ public:
 
 class DiscBuilderWii : public DiscBuilderBase
 {
-    const SystemChar* m_outPath;
     bool m_dualLayer;
 public:
     DiscBuilderWii(const SystemChar* outPath, const char gameID[6], const char* gameTitle, bool dualLayer,
                    std::function<void(size_t, const SystemString&, size_t)> progressCB);
-    bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
-                            const SystemChar* apploaderIn, const SystemChar* partHeadIn);
+    bool buildFromDirectory(const SystemChar* dirIn,
+                            const SystemChar* dolIn,
+                            const SystemChar* apploaderIn,
+                            const SystemChar* partHeadIn);
 };
 
 }
