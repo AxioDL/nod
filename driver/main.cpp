@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
         (!strcasecmp(argv[1], _S("makewiidl")) && argc < 8))
     {
         printHelp();
-        return -1;
+        return 1;
     }
 
     /* Enable logging to console */
@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
         bool isWii;
         std::unique_ptr<NOD::DiscBase> disc = NOD::OpenDiscFromImage(inDir, isWii);
         if (!disc)
-            return -1;
+            return 1;
 
         NOD::Mkdir(outDir, 0755);
 
@@ -69,10 +69,10 @@ int main(int argc, char* argv[])
 
         NOD::Partition* dataPart = disc->getDataPartition();
         if (!dataPart)
-            return -1;
+            return 1;
 
         if (!dataPart->extractToDirectory(outDir, ctx))
-            return -1;
+            return 1;
     }
     else if (!strcasecmp(argv[1], _S("makegcn")))
     {
@@ -110,20 +110,24 @@ int main(int argc, char* argv[])
             fflush(stdout);
         };
 
+        bool ret;
+
         if (argc < 8)
         {
             NOD::SystemString outPath(argv[4]);
             outPath.append(_S(".iso"));
             NOD::DiscBuilderGCN b(outPath.c_str(), gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), 0x0003EB60, progFunc);
-            b.buildFromDirectory(argv[4], argv[5], argv[6]);
+            ret = b.buildFromDirectory(argv[4], argv[5], argv[6]);
         }
         else
         {
             NOD::DiscBuilderGCN b(argv[7], gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), 0x0003EB60, progFunc);
-            b.buildFromDirectory(argv[4], argv[5], argv[6]);
+            ret = b.buildFromDirectory(argv[4], argv[5], argv[6]);
         }
 
         printf("\n");
+        if (!ret)
+            return 1;
     }
     else if (!strcasecmp(argv[1], _S("makewiisl")) || !strcasecmp(argv[1], _S("makewiidl")))
     {
@@ -164,26 +168,29 @@ int main(int argc, char* argv[])
         };
 
         bool dual = (argv[1][7] == _S('d') || argv[1][7] == _S('D'));
+        bool ret;
 
         if (argc < 9)
         {
             NOD::SystemString outPath(argv[4]);
             outPath.append(_S(".iso"));
             NOD::DiscBuilderWii b(outPath.c_str(), gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), dual, progFunc);
-            b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
+            ret = b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
         else
         {
             NOD::DiscBuilderWii b(argv[8], gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), dual, progFunc);
-            b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
+            ret = b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
 
         printf("\n");
+        if (!ret)
+            return 1;
     }
     else
     {
         printHelp();
-        return -1;
+        return 1;
     }
 
     return 0;

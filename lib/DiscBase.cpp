@@ -222,15 +222,19 @@ static bool IsSystemFile(const SystemString& name, bool& isDol)
 
 /** Patches out pesky #001 integrity check performed by game's OSInit.
  *  This is required for multi-DOL games, but doesn't harm functionality otherwise */
-static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t sz)
+static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t sz, bool& patched)
 {
+    patched = false;
     std::unique_ptr<uint8_t[]> buf(new uint8_t[sz]);
     sz = in.read(buf.get(), sz);
     uint8_t* found = static_cast<uint8_t*>(memmem(buf.get(), sz,
                             "\x3C\x03\xF8\x00\x28\x00\x00\x00\x40\x82\x00\x0C"
                             "\x38\x60\x00\x01\x48\x00\x02\x44\x38\x61\x00\x18\x48", 25));
     if (found)
+    {
         found[11] = '\x04';
+        patched = true;
+    }
     return out.write(buf.get(), sz);
 }
 
@@ -263,8 +267,9 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
             size_t xferSz = 0;
             if (isDol)
             {
-                xferSz = PatchDOL(*rs, ws, e.m_fileSz);
-                m_parent.m_progressCB(++m_parent.m_progressIdx, e.m_name + _S(" [PATCHED]"), xferSz);
+                bool patched;
+                xferSz = PatchDOL(*rs, ws, e.m_fileSz, patched);
+                m_parent.m_progressCB(++m_parent.m_progressIdx, e.m_name + (patched ? _S(" [PATCHED]") : _S("")), xferSz);
             }
             else
             {
@@ -344,8 +349,9 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
         m_dolOffset = fileOff;
         m_dolSize = fileSz;
         std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn)->beginReadStream();
-        size_t xferSz = PatchDOL(*rs, ws, dolStat.st_size);
-        m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(dolIn) + _S(" [PATCHED]"), xferSz);
+        bool patched;
+        size_t xferSz = PatchDOL(*rs, ws, dolStat.st_size, patched);
+        m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(dolIn) + (patched ? _S(" [PATCHED]") : _S("")), xferSz);
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
             ws.write("\xff", 1);
     }

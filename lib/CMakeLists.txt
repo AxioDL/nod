@@ -1,5 +1,8 @@
 if(NOT WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-multichar")
+set(PLAT_SRCS FileIOFILE.cpp)
+else()
+set(PLAT_SRCS FileIOWin32.cpp)
 endif()
 add_library(NOD
             aes.cpp
@@ -9,9 +12,9 @@ add_library(NOD
             DiscIOISO.cpp
             DiscIOWBFS.cpp
             DiscWii.cpp
-            FileIOFILE.cpp
             DirectoryEnumerator.cpp
             NOD.cpp
+			${PLAT_SRCS}
             ${NOD_HEADERS})
 if(NOT WIN32)
 set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)

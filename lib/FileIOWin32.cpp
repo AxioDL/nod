@@ -6,66 +6,71 @@
 namespace NOD
 {
 
-class FileIOFILE : public IFileIO
+class FileIOWin32 : public IFileIO
 {
     SystemString m_path;
 public:
-    FileIOFILE(const SystemString& path)
+    FileIOWin32(const SystemString& path)
     : m_path(path) {}
-    FileIOFILE(const SystemChar* path)
+    FileIOWin32(const SystemChar* path)
     : m_path(path) {}
 
     bool exists()
     {
-        FILE* fp = fopen(m_path.c_str(), "rb");
-        if (!fp)
+        HANDLE fp = CreateFileW(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (fp == INVALID_HANDLE_VALUE)
             return false;
-        fclose(fp);
+        CloseHandle(fp);
         return true;
     }
 
     uint64_t size()
     {
-        FILE* fp = fopen(m_path.c_str(), "rb");
-        if (!fp)
+        HANDLE fp = CreateFileW(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (fp == INVALID_HANDLE_VALUE)
             return 0;
-        FSeek(fp, 0, SEEK_END);
-        uint64_t result = ftello(fp);
-        fclose(fp);
-        return result;
+        LARGE_INTEGER sz;
+        if (!GetFileSizeEx(fp, &sz))
+        {
+            CloseHandle(fp);
+            return 0;
+        }
+        CloseHandle(fp);
+        return sz.QuadPart;
     }
 
     struct WriteStream : public IFileIO::IWriteStream
     {
         uint8_t buf[0x7c00];
-        FILE* fp;
+        HANDLE fp;
         WriteStream(const SystemString& path)
         {
-            fp = fopen(path.c_str(), "wb");
-            if (!fp)
+            fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
+                             nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (fp == INVALID_HANDLE_VALUE)
                 LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for writing"), path.c_str());
         }
         WriteStream(const SystemString& path, uint64_t offset)
         {
-            fp = fopen(path.c_str(), "ab");
-            if (!fp)
-                goto FailLoc;
-            fclose(fp);
-            fp = fopen(path.c_str(), "r+b");
-            if (!fp)
-                goto FailLoc;
-            FSeek(fp, offset, SEEK_SET);
-            return;
-        FailLoc:
-            LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for writing"), path.c_str());
+            fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
+                             nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (fp == INVALID_HANDLE_VALUE)
+                LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for writing"), path.c_str());
+            LARGE_INTEGER lioffset;
+            lioffset.QuadPart = offset;
+            SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
         }
         ~WriteStream()
         {
-            fclose(fp);
+            CloseHandle(fp);
         }
         uint64_t write(const void* buf, uint64_t length)
         {
-            return fwrite(buf, 1, length, fp);
+            DWORD ret = 0;
+            WriteFile(fp, buf, length, &ret, nullptr);
+            return ret;
         }
         uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
         {
@@ -101,30 +106,37 @@ public:
 
     struct ReadStream : public IFileIO::IReadStream
     {
-        FILE* fp;
+        HANDLE fp;
         uint8_t buf[0x7c00];
         ReadStream(const SystemString& path)
         {
-            fp = fopen(path.c_str(), "rb");
-            if (!fp)
+            fp = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                             nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (fp == INVALID_HANDLE_VALUE)
                 LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), path.c_str());
         }
         ReadStream(const SystemString& path, uint64_t offset)
         : ReadStream(path)
         {
-            FSeek(fp, offset, SEEK_SET);
+            LARGE_INTEGER lioffset;
+            lioffset.QuadPart = offset;
+            SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
         }
         ~ReadStream()
         {
-            fclose(fp);
+            CloseHandle(fp);
         }
         void seek(int64_t offset, int whence)
         {
-            FSeek(fp, offset, whence);
+            LARGE_INTEGER li;
+            li.QuadPart = offset;
+            SetFilePointerEx(fp, li, nullptr, whence);
         }
         uint64_t read(void* buf, uint64_t length)
         {
-            return fread(buf, 1, length, fp);
+            DWORD ret = 0;
+            ReadFile(fp, buf, length, &ret, nullptr);
+            return ret;
         }
         uint64_t copyToDisc(IPartWriteStream& discio, uint64_t length)
         {
@@ -160,12 +172,12 @@ public:
 
 std::unique_ptr<IFileIO> NewFileIO(const SystemString& path)
 {
-    return std::unique_ptr<IFileIO>(new FileIOFILE(path));
+    return std::unique_ptr<IFileIO>(new FileIOWin32(path));
 }
 
 std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path)
 {
-    return std::unique_ptr<IFileIO>(new FileIOFILE(path));
+    return std::unique_ptr<IFileIO>(new FileIOWin32(path));
 }
 
 }
