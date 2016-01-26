@@ -93,8 +93,10 @@ int main(int argc, char* argv[])
         if (NOD::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
             NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[6]);
 
-        NOD::SystemUTF8View gameId(argv[2]);
-        NOD::SystemUTF8View gameTitle(argv[3]);
+        NOD::SystemString gameIdSys(argv[2]);
+        NOD::SystemUTF8View gameId(gameIdSys);
+        NOD::SystemString gameTitleSys(argv[3]);
+        NOD::SystemUTF8View gameTitle(gameTitleSys);
         size_t lastIdx = -1;
         auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
         {
@@ -150,8 +152,10 @@ int main(int argc, char* argv[])
         if (NOD::Stat(argv[7], &theStat) || !S_ISREG(theStat.st_mode))
             NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[7]);
 
-        NOD::SystemUTF8View gameId(argv[2]);
-        NOD::SystemUTF8View gameTitle(argv[3]);
+        NOD::SystemString gameIdSys(argv[2]);
+        NOD::SystemUTF8View gameId(gameIdSys);
+        NOD::SystemString gameTitleSys(argv[3]);
+        NOD::SystemUTF8View gameTitle(gameTitleSys);
         size_t lastIdx = -1;
         auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
         {

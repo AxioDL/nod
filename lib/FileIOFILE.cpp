@@ -30,7 +30,7 @@ public:
         if (!fp)
             return 0;
         FSeek(fp, 0, SEEK_END);
-        uint64_t result = ftello(fp);
+        uint64_t result = FTell(fp);
         fclose(fp);
         return result;
     }

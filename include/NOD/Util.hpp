@@ -83,7 +83,7 @@ class SystemUTF8View
 {
     std::string m_utf8;
 public:
-    SystemUTF8View(const SystemString& str)
+    explicit SystemUTF8View(const SystemString& str)
     {
         int len = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), str.size(), nullptr, 0, nullptr, nullptr);
         m_utf8.assign(len, '\0');
@@ -95,7 +95,7 @@ class SystemStringView
 {
     std::wstring m_sys;
 public:
-    SystemStringView(const std::string& str)
+    explicit SystemStringView(const std::string& str)
     {
         int len = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), nullptr, 0);
         m_sys.assign(len, L'\0');
@@ -118,7 +118,7 @@ class SystemUTF8View
 {
     const std::string& m_utf8;
 public:
-    SystemUTF8View(const SystemString& str)
+    explicit SystemUTF8View(const SystemString& str)
     : m_utf8(str) {}
     inline const std::string& utf8_str() {return m_utf8;}
 };
@@ -126,7 +126,7 @@ class SystemStringView
 {
     const std::string& m_sys;
 public:
-    SystemStringView(const std::string& str)
+    explicit SystemStringView(const std::string& str)
     : m_sys(str) {}
     inline const std::string& sys_str() {return m_sys;}
 };
