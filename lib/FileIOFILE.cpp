@@ -37,7 +37,6 @@ public:
 
     struct WriteStream : public IFileIO::IWriteStream
     {
-        uint8_t buf[0x7c00];
         FILE* fp;
         WriteStream(const SystemString& path)
         {
@@ -70,6 +69,7 @@ public:
         uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
         {
             uint64_t read = 0;
+            uint8_t buf[0x7c00];
             while (length)
             {
                 uint64_t thisSz = NOD::min(uint64_t(0x7c00), length);
@@ -102,7 +102,6 @@ public:
     struct ReadStream : public IFileIO::IReadStream
     {
         FILE* fp;
-        uint8_t buf[0x7c00];
         ReadStream(const SystemString& path)
         {
             fp = fopen(path.c_str(), "rb");
@@ -122,6 +121,10 @@ public:
         {
             FSeek(fp, offset, whence);
         }
+        int64_t position()
+        {
+            return FTell(fp);
+        }
         uint64_t read(void* buf, uint64_t length)
         {
             return fread(buf, 1, length, fp);
@@ -129,6 +132,7 @@ public:
         uint64_t copyToDisc(IPartWriteStream& discio, uint64_t length)
         {
             uint64_t written = 0;
+            uint8_t buf[0x7c00];
             while (length)
             {
                 uint64_t thisSz = NOD::min(uint64_t(0x7c00), length);

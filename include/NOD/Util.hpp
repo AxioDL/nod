@@ -290,6 +290,17 @@ static inline int FSeek(FILE* fp, int64_t offset, int whence)
 #endif
 }
 
+static inline int64_t FTell(FILE* fp)
+{
+#if _WIN32
+    return _ftelli64(fp);
+#elif __APPLE__ || __FreeBSD__
+    return ftello(fp);
+#else
+    return ftello64(fp);
+#endif
+}
+
 static inline bool CheckFreeSpace(const SystemChar* path, size_t reqSz)
 {
 #if _WIN32
@@ -308,7 +319,7 @@ static inline bool CheckFreeSpace(const SystemChar* path, size_t reqSz)
     struct statvfs svfs;
     if (statvfs(path, &svfs))
         LogModule.report(LogVisor::FatalError, "statvfs %s: %s", path, strerror(errno));
-    return reqSz < svfs.f_bsize * svfs.f_bfree;
+    return reqSz < svfs.f_frsize * svfs.f_bavail;
 #endif
 }
 

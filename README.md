@@ -1,6 +1,6 @@
 ### NODLib
 
-**NODLib** is a library and utility (`nodtool`) for traversing, dumping, and authoring 
+**NODLib** is a library and utility (`nodtool`) for traversing, dumping, and authoring
 *GameCube* and *Wii* optical disc images.
 
 #### Library
@@ -8,23 +8,23 @@
 The primary motivation of NODLib is to supply a *uniform C++11 API* for accessing data
 from image files directly. `NOD::DiscBase` provides a common interface for traversing partitions
 and individual files. Files may be individually streamed, or the whole partition may be extracted
-to the user's filesystem. Raw *ISO* and *WBFS* images are supported read sources. 
+to the user's filesystem. Raw *ISO* and *WBFS* images are supported read sources.
 
 ```cpp
 bool isWii; /* Set by reference next line */
 std::unique_ptr<NOD::DiscBase> disc = NOD::OpenDiscFromImage(path, isWii);
 if (!disc)
-	return FAILURE;
+    return FAILURE;
 
 /* Access first data-partition on Wii, or full GameCube disc */
 NOD::Partition* dataPart = disc->getDataPartition();
 if (!dataPart)
-	return FAILURE;
+    return FAILURE;
 
 /* One-shot extraction to filesystem */
 if (!dataPart->extractToDirectory(outDir, ctx))
-	return FAILURE;
-	
+    return FAILURE;
+
 return SUCCESS;
 ```
 
@@ -36,18 +36,18 @@ a content pipeline using the `NOD::DiscBuilderBase` interface.
 size_t lastIdx = -1;
 auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
 {
-	if (idx != lastIdx)
-	{
-		lastIdx = idx;
-		/* NOD provides I/O wrappers using wchar_t on Windows; 
-		 * _S() conditionally makes string-literals wide */
-		NOD::Printf(_S("\n")); 
-	}
-	if (bytes != -1)
-		NOD::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
-	else
-		NOD::Printf(_S("\r%s"), name.c_str());
-	fflush(stdout);
+    if (idx != lastIdx)
+    {
+        lastIdx = idx;
+        /* NOD provides I/O wrappers using wchar_t on Windows;
+         * _S() conditionally makes string-literals wide */
+        NOD::Printf(_S("\n"));
+    }
+    if (bytes != -1)
+        NOD::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
+    else
+        NOD::Printf(_S("\r%s"), name.c_str());
+    fflush(stdout);
 };
 
 /* Making a GCN image */

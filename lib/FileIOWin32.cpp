@@ -43,7 +43,6 @@ public:
 
     struct WriteStream : public IFileIO::IWriteStream
     {
-        uint8_t buf[0x7c00];
         HANDLE fp;
         WriteStream(const SystemString& path)
         {
@@ -75,6 +74,7 @@ public:
         uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
         {
             uint64_t read = 0;
+            uint8_t buf[0x7c00];
             while (length)
             {
                 uint64_t thisSz = NOD::min(uint64_t(0x7c00), length);
@@ -107,7 +107,6 @@ public:
     struct ReadStream : public IFileIO::IReadStream
     {
         HANDLE fp;
-        uint8_t buf[0x7c00];
         ReadStream(const SystemString& path)
         {
             fp = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
@@ -132,6 +131,13 @@ public:
             li.QuadPart = offset;
             SetFilePointerEx(fp, li, nullptr, whence);
         }
+        int64_t position()
+        {
+            LARGE_INTEGER li = {};
+            LARGE_INTEGER res;
+            SetFilePointerEx(fp, li, &res, FILE_CURRENT);
+            return res.QuadPart;
+        }
         uint64_t read(void* buf, uint64_t length)
         {
             DWORD ret = 0;
@@ -141,6 +147,7 @@ public:
         uint64_t copyToDisc(IPartWriteStream& discio, uint64_t length)
         {
             uint64_t written = 0;
+            uint8_t buf[0x7c00];
             while (length)
             {
                 uint64_t thisSz = NOD::min(uint64_t(0x7c00), length);
