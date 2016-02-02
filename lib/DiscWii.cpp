@@ -850,24 +850,22 @@ public:
 bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
                                         const SystemChar* apploaderIn, const SystemChar* partHeadIn)
 {
-    size_t DISC_CAPACITY = m_dualLayer ? 0x1FB4E0000 : 0x118240000;
-
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_partitions[0]);
     uint64_t filledSz = pb.m_baseOffset;
     m_fileIO->beginWriteStream();
 
-    if (!CheckFreeSpace(m_outPath, DISC_CAPACITY))
+    if (!CheckFreeSpace(m_outPath, m_discCapacity))
     {
         LogModule.report(LogVisor::Error, _S("not enough free disk space for %s"), m_outPath);
         return false;
     }
     ++m_progressIdx;
     m_progressCB(m_progressIdx, _S("Preallocating image"), -1);
-    m_fileIO->beginWriteStream(DISC_CAPACITY - 1)->write("", 1);
+    m_fileIO->beginWriteStream(m_discCapacity - 1)->write("", 1);
 
     /* Assemble image */
     filledSz = pb.buildFromDirectory(dirIn, dolIn, apploaderIn, partHeadIn);
-    if (filledSz >= DISC_CAPACITY)
+    if (filledSz >= m_discCapacity)
     {
         LogModule.report(LogVisor::FatalError, "data partition exceeds disc capacity");
         return false;
@@ -910,7 +908,7 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     ws = m_fileIO->beginWriteStream(filledSz);
     uint8_t fillBuf[512];
     memset(fillBuf, 0xff, 512);
-    for (size_t i=DISC_CAPACITY-filledSz ; i>0 ;)
+    for (size_t i=m_discCapacity-filledSz ; i>0 ;)
     {
         if (i >= 512)
         {
@@ -927,7 +925,7 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
 
 DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, const char gameID[6], const char* gameTitle, bool dualLayer,
                                std::function<void(size_t, const SystemString&, size_t)> progressCB)
-: DiscBuilderBase(outPath, progressCB), m_dualLayer(dualLayer)
+: DiscBuilderBase(outPath, dualLayer ? 0x1FB4E0000 : 0x118240000, progressCB), m_dualLayer(dualLayer)
 {
     PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionBuilderBase::Kind::Data,
                                                                gameID, gameTitle, 0x200000);

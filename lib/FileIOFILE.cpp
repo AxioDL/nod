@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include "NOD/Util.hpp"
 #include "NOD/IFileIO.hpp"
 
@@ -9,11 +10,12 @@ namespace NOD
 class FileIOFILE : public IFileIO
 {
     SystemString m_path;
+    int64_t m_maxWriteSize;
 public:
-    FileIOFILE(const SystemString& path)
-    : m_path(path) {}
-    FileIOFILE(const SystemChar* path)
-    : m_path(path) {}
+    FileIOFILE(const SystemString& path, int64_t maxWriteSize)
+    : m_path(path), m_maxWriteSize(maxWriteSize) {}
+    FileIOFILE(const SystemChar* path, int64_t maxWriteSize)
+    : m_path(path), m_maxWriteSize(maxWriteSize) {}
 
     bool exists()
     {
@@ -38,13 +40,16 @@ public:
     struct WriteStream : public IFileIO::IWriteStream
     {
         FILE* fp;
-        WriteStream(const SystemString& path)
+        int64_t m_maxWriteSize;
+        WriteStream(const SystemString& path, int64_t maxWriteSize)
+        : m_maxWriteSize(maxWriteSize)
         {
             fp = fopen(path.c_str(), "wb");
             if (!fp)
                 LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for writing"), path.c_str());
         }
-        WriteStream(const SystemString& path, uint64_t offset)
+        WriteStream(const SystemString& path, uint64_t offset, int64_t maxWriteSize)
+        : m_maxWriteSize(maxWriteSize)
         {
             fp = fopen(path.c_str(), "ab");
             if (!fp)
@@ -64,6 +69,8 @@ public:
         }
         uint64_t write(const void* buf, uint64_t length)
         {
+            if (FTell(fp) + length > m_maxWriteSize)
+                LogModule.report(LogVisor::FatalError, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
             return fwrite(buf, 1, length, fp);
         }
         uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
@@ -92,11 +99,11 @@ public:
     };
     std::unique_ptr<IWriteStream> beginWriteStream() const
     {
-        return std::unique_ptr<IWriteStream>(new WriteStream(m_path));
+        return std::unique_ptr<IWriteStream>(new WriteStream(m_path, m_maxWriteSize));
     }
     std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
-        return std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset));
+        return std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset, m_maxWriteSize));
     }
 
     struct ReadStream : public IFileIO::IReadStream
@@ -162,14 +169,14 @@ public:
     }
 };
 
-std::unique_ptr<IFileIO> NewFileIO(const SystemString& path)
+std::unique_ptr<IFileIO> NewFileIO(const SystemString& path, int64_t maxWriteSize)
 {
-    return std::unique_ptr<IFileIO>(new FileIOFILE(path));
+    return std::unique_ptr<IFileIO>(new FileIOFILE(path, maxWriteSize));
 }
 
-std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path)
+std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path, int64_t maxWriteSize)
 {
-    return std::unique_ptr<IFileIO>(new FileIOFILE(path));
+    return std::unique_ptr<IFileIO>(new FileIOFILE(path, maxWriteSize));
 }
 
 }

@@ -356,13 +356,15 @@ protected:
     const SystemChar* m_outPath;
     std::unique_ptr<IFileIO> m_fileIO;
     std::vector<std::unique_ptr<PartitionBuilderBase>> m_partitions;
+    int64_t m_discCapacity;
 public:
     std::function<void(size_t idx, const SystemString&, size_t)> m_progressCB;
     size_t m_progressIdx = 0;
     virtual ~DiscBuilderBase() {}
-    DiscBuilderBase(const SystemChar* outPath,
+    DiscBuilderBase(const SystemChar* outPath, int64_t discCapacity,
                     std::function<void(size_t idx, const SystemString&, size_t)> progressCB)
-    : m_fileIO(std::move(NewFileIO(outPath))), m_outPath(outPath), m_progressCB(progressCB) {}
+    : m_outPath(outPath), m_fileIO(std::move(NewFileIO(outPath, discCapacity))),
+      m_discCapacity(discCapacity), m_progressCB(progressCB) {}
 
     IFileIO& getFileIO() {return *m_fileIO;}
 };

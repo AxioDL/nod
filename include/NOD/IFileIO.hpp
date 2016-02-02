@@ -37,9 +37,8 @@ public:
     virtual std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const=0;
 };
 
-std::unique_ptr<IFileIO> NewFileIO(const SystemString& path);
-std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path);
-std::unique_ptr<IFileIO> NewMemIO(void* buf, uint64_t size);
+std::unique_ptr<IFileIO> NewFileIO(const SystemString& path, int64_t maxWriteSize=-1);
+std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path, int64_t maxWriteSize=-1);
 
 }
 

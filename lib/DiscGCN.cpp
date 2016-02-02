@@ -249,7 +249,7 @@ bool DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const SystemCha
 
 DiscBuilderGCN::DiscBuilderGCN(const SystemChar* outPath, const char gameID[6], const char* gameTitle,
                                uint32_t fstMemoryAddr, std::function<void(size_t, const SystemString&, size_t)> progressCB)
-: DiscBuilderBase(outPath, progressCB)
+: DiscBuilderBase(outPath, 0x57058000, progressCB)
 {
     PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this, PartitionBuilderBase::Kind::Data,
                                                                gameID, gameTitle, fstMemoryAddr);
