@@ -72,8 +72,12 @@ public:
         }
         uint64_t write(const void* buf, uint64_t length)
         {
-            if (FTell(fp) + length > m_maxWriteSize)
+            LARGE_INTEGER li = {};
+            LARGE_INTEGER res;
+            SetFilePointerEx(fp, li, &res, FILE_CURRENT);
+            if (res.QuadPart + int64_t(length) > m_maxWriteSize)
                 LogModule.report(LogVisor::FatalError, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+
             DWORD ret = 0;
             WriteFile(fp, buf, length, &ret, nullptr);
             return ret;
@@ -184,14 +188,14 @@ public:
     }
 };
 
-std::unique_ptr<IFileIO> NewFileIO(const SystemString& path)
+std::unique_ptr<IFileIO> NewFileIO(const SystemString& path, int64_t maxWriteSize)
 {
-    return std::unique_ptr<IFileIO>(new FileIOWin32(path));
+    return std::unique_ptr<IFileIO>(new FileIOWin32(path, maxWriteSize));
 }
 
-std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path)
+std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path, int64_t maxWriteSize)
 {
-    return std::unique_ptr<IFileIO>(new FileIOWin32(path));
+    return std::unique_ptr<IFileIO>(new FileIOWin32(path, maxWriteSize));
 }
 
 }
