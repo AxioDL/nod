@@ -69,8 +69,11 @@ public:
         }
         uint64_t write(const void* buf, uint64_t length)
         {
-            if (FTell(fp) + length > m_maxWriteSize)
-                LogModule.report(LogVisor::FatalError, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+            if (m_maxWriteSize >= 0)
+            {
+                if (FTell(fp) + length > m_maxWriteSize)
+                    LogModule.report(LogVisor::FatalError, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+            }
             return fwrite(buf, 1, length, fp);
         }
         uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)

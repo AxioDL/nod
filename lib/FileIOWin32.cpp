@@ -72,11 +72,14 @@ public:
         }
         uint64_t write(const void* buf, uint64_t length)
         {
-            LARGE_INTEGER li = {};
-            LARGE_INTEGER res;
-            SetFilePointerEx(fp, li, &res, FILE_CURRENT);
-            if (res.QuadPart + int64_t(length) > m_maxWriteSize)
-                LogModule.report(LogVisor::FatalError, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+            if (m_maxWriteSize >= 0)
+            {
+                LARGE_INTEGER li = {};
+                LARGE_INTEGER res;
+                SetFilePointerEx(fp, li, &res, FILE_CURRENT);
+                if (res.QuadPart + int64_t(length) > m_maxWriteSize)
+                    LogModule.report(LogVisor::FatalError, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+            }
 
             DWORD ret = 0;
             WriteFile(fp, buf, length, &ret, nullptr);
