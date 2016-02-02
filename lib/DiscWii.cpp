@@ -861,6 +861,9 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
         LogModule.report(LogVisor::Error, _S("not enough free disk space for %s"), m_outPath);
         return false;
     }
+    ++m_progressIdx;
+    m_progressCB(m_progressIdx, _S("Preallocating image"), -1);
+    m_fileIO->beginWriteStream(DISC_CAPACITY - 1)->write("", 1);
 
     /* Assemble image */
     filledSz = pb.buildFromDirectory(dirIn, dolIn, apploaderIn, partHeadIn);

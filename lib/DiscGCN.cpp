@@ -239,6 +239,9 @@ bool DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const SystemCha
         LogModule.report(LogVisor::Error, _S("not enough free disk space for %s"), m_outPath);
         return false;
     }
+    ++m_progressIdx;
+    m_progressCB(m_progressIdx, _S("Preallocating image"), -1);
+    m_fileIO->beginWriteStream(0x57058000 - 1)->write("", 1);
 
     PartitionBuilderGCN& pb = static_cast<PartitionBuilderGCN&>(*m_partitions[0]);
     return pb.buildFromDirectory(dirIn, dolIn, apploaderIn);
