@@ -12,7 +12,7 @@
 #include "IDiscIO.hpp"
 #include "IFileIO.hpp"
 
-namespace NOD
+namespace nod
 {
 
 class FSTNode
@@ -150,7 +150,7 @@ public:
             {
                 if (m_kind != Kind::File)
                 {
-                    LogModule.report(LogVisor::Error, "unable to stream a non-file %s", m_name.c_str());
+                    LogModule.report(logvisor::Error, "unable to stream a non-file %s", m_name.c_str());
                     return std::unique_ptr<IPartReadStream>();
                 }
                 return m_parent.beginReadStream(m_discOffset + offset);
@@ -159,7 +159,7 @@ public:
             {
                 if (m_kind != Kind::File)
                 {
-                    LogModule.report(LogVisor::Error, "unable to buffer a non-file %s", m_name.c_str());
+                    LogModule.report(logvisor::Error, "unable to buffer a non-file %s", m_name.c_str());
                     return std::unique_ptr<uint8_t[]>();
                 }
                 uint8_t* buf = new uint8_t[m_discLength];

@@ -3,10 +3,10 @@
 
 #include <memory>
 #include <functional>
-#include <LogVisor/LogVisor.hpp>
+#include "logvisor/logvisor.hpp"
 #include "Util.hpp"
 
-namespace NOD
+namespace nod
 {
 
 class DiscBase;

@@ -1,7 +1,7 @@
-#include "NOD/DiscGCN.hpp"
+#include "nod/DiscGCN.hpp"
 #define BUFFER_SZ 0x8000
 
-namespace NOD
+namespace nod
 {
 
 class PartitionGCN : public DiscBase::IPartition
@@ -152,7 +152,7 @@ public:
         m_curUser &= 0xfffffffffffffff0;
         if (m_curUser < 0x30000)
         {
-            LogModule.report(LogVisor::FatalError, "user area low mark reached");
+            LogModule.report(logvisor::Fatal, "user area low mark reached");
             return -1;
         }
         static_cast<PartWriteStream&>(ws).seek(m_curUser);
@@ -194,7 +194,7 @@ public:
             ws->write(buf, rdSz);
             xferSz += rdSz;
             if (0x2440 + xferSz >= m_curUser)
-                LogModule.report(LogVisor::FatalError,
+                LogModule.report(logvisor::Fatal,
                                  "apploader flows into user area (one or the other is too big)");
             m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
         }
@@ -211,7 +211,7 @@ public:
         fstSz = ROUND_UP_32(fstSz);
 
         if (fstOff + fstSz >= m_curUser)
-            LogModule.report(LogVisor::FatalError,
+            LogModule.report(logvisor::Fatal,
                              "FST flows into user area (one or the other is too big)");
 
         ws = beginWriteStream(0x420);
@@ -236,7 +236,7 @@ bool DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const SystemCha
 
     if (!CheckFreeSpace(m_outPath, 0x57058000))
     {
-        LogModule.report(LogVisor::Error, _S("not enough free disk space for %s"), m_outPath);
+        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_outPath);
         return false;
     }
     ++m_progressIdx;

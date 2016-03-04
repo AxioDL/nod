@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include <LogVisor/LogVisor.hpp>
-#include "NOD/NOD.hpp"
+#include "logvisor/logvisor.hpp"
+#include "nod/nod.hpp"
 
 static void printHelp()
 {
@@ -33,13 +33,13 @@ int main(int argc, char* argv[])
     }
 
     /* Enable logging to console */
-    LogVisor::RegisterConsoleLogger();
+    logvisor::RegisterConsoleLogger();
 
-    NOD::ExtractionContext ctx = { true, true, [&](const std::string& str){
+    nod::ExtractionContext ctx = { true, true, [&](const std::string& str){
                                        fprintf(stderr, "%s\n", str.c_str());
                                    }};
-    const NOD::SystemChar* inDir = nullptr;
-    const NOD::SystemChar* outDir = _S(".");
+    const nod::SystemChar* inDir = nullptr;
+    const nod::SystemChar* outDir = _S(".");
 
     for (int a=2 ; a<argc ; ++a)
     {
@@ -57,17 +57,17 @@ int main(int argc, char* argv[])
     if (!strcasecmp(argv[1], _S("extract")))
     {
         bool isWii;
-        std::unique_ptr<NOD::DiscBase> disc = NOD::OpenDiscFromImage(inDir, isWii);
+        std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(inDir, isWii);
         if (!disc)
             return 1;
 
-        NOD::Mkdir(outDir, 0755);
+        nod::Mkdir(outDir, 0755);
 
         if (isWii)
-            static_cast<NOD::DiscWii&>(*disc).writeOutDataPartitionHeader(
-                    (NOD::SystemString(outDir) + _S("/partition_head.bin")).c_str());
+            static_cast<nod::DiscWii&>(*disc).writeOutDataPartitionHeader(
+                    (nod::SystemString(outDir) + _S("/partition_head.bin")).c_str());
 
-        NOD::Partition* dataPart = disc->getDataPartition();
+        nod::Partition* dataPart = disc->getDataPartition();
         if (!dataPart)
             return 1;
 
@@ -78,27 +78,27 @@ int main(int argc, char* argv[])
     {
 #if NOD_UCS2
         if (wcslen(argv[2]) < 6)
-            NOD::LogModule.report(LogVisor::FatalError, _S("game-id is not at least 6 characters"));
+            nod::LogModule.report(logvisor::Fatal, _S("game-id is not at least 6 characters"));
 #else
         if (strlen(argv[2]) < 6)
-            NOD::LogModule.report(LogVisor::FatalError, _S("game-id is not at least 6 characters"));
+            nod::LogModule.report(logvisor::Fatal, _S("game-id is not at least 6 characters"));
 #endif
 
         /* Pre-validate paths */
-        NOD::Sstat theStat;
-        if (NOD::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as directory"), argv[4]);
-        if (NOD::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[5]);
-        if (NOD::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, "unable to stat %s as file", argv[6]);
+        nod::Sstat theStat;
+        if (nod::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
+            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as directory"), argv[4]);
+        if (nod::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
+            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as file"), argv[5]);
+        if (nod::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
+            nod::LogModule.report(logvisor::Fatal, "unable to stat %s as file", argv[6]);
 
-        NOD::SystemString gameIdSys(argv[2]);
-        NOD::SystemUTF8View gameId(gameIdSys);
-        NOD::SystemString gameTitleSys(argv[3]);
-        NOD::SystemUTF8View gameTitle(gameTitleSys);
+        nod::SystemString gameIdSys(argv[2]);
+        nod::SystemUTF8View gameId(gameIdSys);
+        nod::SystemString gameTitleSys(argv[3]);
+        nod::SystemUTF8View gameTitle(gameTitleSys);
         size_t lastIdx = -1;
-        auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
+        auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
         {
             if (idx != lastIdx)
             {
@@ -106,9 +106,9 @@ int main(int argc, char* argv[])
                 printf("\n");
             }
             if (bytes != -1)
-                NOD::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
+                nod::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
             else
-                NOD::Printf(_S("\r%s"), name.c_str());
+                nod::Printf(_S("\r%s"), name.c_str());
             fflush(stdout);
         };
 
@@ -116,14 +116,14 @@ int main(int argc, char* argv[])
 
         if (argc < 8)
         {
-            NOD::SystemString outPath(argv[4]);
+            nod::SystemString outPath(argv[4]);
             outPath.append(_S(".iso"));
-            NOD::DiscBuilderGCN b(outPath.c_str(), gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), 0x0003EB60, progFunc);
+            nod::DiscBuilderGCN b(outPath.c_str(), gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), 0x0003EB60, progFunc);
             ret = b.buildFromDirectory(argv[4], argv[5], argv[6]);
         }
         else
         {
-            NOD::DiscBuilderGCN b(argv[7], gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), 0x0003EB60, progFunc);
+            nod::DiscBuilderGCN b(argv[7], gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), 0x0003EB60, progFunc);
             ret = b.buildFromDirectory(argv[4], argv[5], argv[6]);
         }
 
@@ -135,29 +135,29 @@ int main(int argc, char* argv[])
     {
 #if NOD_UCS2
         if (wcslen(argv[2]) < 6)
-            NOD::LogModule.report(LogVisor::FatalError, _S("game-id is not at least 6 characters"));
+            nod::LogModule.report(logvisor::Fatal, _S("game-id is not at least 6 characters"));
 #else
         if (strlen(argv[2]) < 6)
-            NOD::LogModule.report(LogVisor::FatalError, _S("game-id is not at least 6 characters"));
+            nod::LogModule.report(logvisor::Fatal, _S("game-id is not at least 6 characters"));
 #endif
 
         /* Pre-validate paths */
-        NOD::Sstat theStat;
-        if (NOD::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as directory"), argv[4]);
-        if (NOD::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[5]);
-        if (NOD::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[6]);
-        if (NOD::Stat(argv[7], &theStat) || !S_ISREG(theStat.st_mode))
-            NOD::LogModule.report(LogVisor::FatalError, _S("unable to stat %s as file"), argv[7]);
+        nod::Sstat theStat;
+        if (nod::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
+            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as directory"), argv[4]);
+        if (nod::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
+            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as file"), argv[5]);
+        if (nod::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
+            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as file"), argv[6]);
+        if (nod::Stat(argv[7], &theStat) || !S_ISREG(theStat.st_mode))
+            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as file"), argv[7]);
 
-        NOD::SystemString gameIdSys(argv[2]);
-        NOD::SystemUTF8View gameId(gameIdSys);
-        NOD::SystemString gameTitleSys(argv[3]);
-        NOD::SystemUTF8View gameTitle(gameTitleSys);
+        nod::SystemString gameIdSys(argv[2]);
+        nod::SystemUTF8View gameId(gameIdSys);
+        nod::SystemString gameTitleSys(argv[3]);
+        nod::SystemUTF8View gameTitle(gameTitleSys);
         size_t lastIdx = -1;
-        auto progFunc = [&](size_t idx, const NOD::SystemString& name, size_t bytes)
+        auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
         {
             if (idx != lastIdx)
             {
@@ -165,9 +165,9 @@ int main(int argc, char* argv[])
                 printf("\n");
             }
             if (bytes != -1)
-                NOD::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
+                nod::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
             else
-                NOD::Printf(_S("\r%s"), name.c_str());
+                nod::Printf(_S("\r%s"), name.c_str());
             fflush(stdout);
         };
 
@@ -176,14 +176,14 @@ int main(int argc, char* argv[])
 
         if (argc < 9)
         {
-            NOD::SystemString outPath(argv[4]);
+            nod::SystemString outPath(argv[4]);
             outPath.append(_S(".iso"));
-            NOD::DiscBuilderWii b(outPath.c_str(), gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), dual, progFunc);
+            nod::DiscBuilderWii b(outPath.c_str(), gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), dual, progFunc);
             ret = b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
         else
         {
-            NOD::DiscBuilderWii b(argv[8], gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), dual, progFunc);
+            nod::DiscBuilderWii b(argv[8], gameId.utf8_str().c_str(), gameTitle.utf8_str().c_str(), dual, progFunc);
             ret = b.buildFromDirectory(argv[4], argv[5], argv[6], argv[7]);
         }
 

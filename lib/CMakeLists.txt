@@ -4,7 +4,7 @@ set(PLAT_SRCS FileIOFILE.cpp)
 else()
 set(PLAT_SRCS FileIOWin32.cpp)
 endif()
-add_library(NOD
+add_library(nod
             aes.cpp
             sha1.c
             DiscBase.cpp
@@ -13,9 +13,9 @@ add_library(NOD
             DiscIOWBFS.cpp
             DiscWii.cpp
             DirectoryEnumerator.cpp
-            NOD.cpp
+            nod.cpp
 			${PLAT_SRCS}
             ${NOD_HEADERS})
-if(NOT WIN32)
+if(NOT MSVC)
 set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)
 endif()

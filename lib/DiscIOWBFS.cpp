@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <inttypes.h>
-#include "NOD/Util.hpp"
-#include "NOD/IDiscIO.hpp"
-#include "NOD/IFileIO.hpp"
+#include "nod/Util.hpp"
+#include "nod/IDiscIO.hpp"
+#include "nod/IFileIO.hpp"
 
-namespace NOD
+namespace nod
 {
 
 #define ALIGN_LBA(x) (((x)+p->hd_sec_sz-1)&(~(p->hd_sec_sz-1)))
@@ -80,7 +80,7 @@ class DiscIOWBFS : public IDiscIO
         rs.seek(off, SEEK_SET);
         if (rs.read(buf, count*512ULL) != count*512ULL)
         {
-            LogModule.report(LogVisor::FatalError, "error reading disc");
+            LogModule.report(logvisor::Fatal, "error reading disc");
             return 1;
         }
         return 0;
@@ -97,7 +97,7 @@ public:
         WBFS* p = &wbfs;
         WBFSHead tmpHead;
         if (rs->read(&tmpHead, sizeof(tmpHead)) != sizeof(tmpHead))
-            LogModule.report(LogVisor::FatalError, "unable to read WBFS head");
+            LogModule.report(logvisor::Fatal, "unable to read WBFS head");
         unsigned hd_sector_size = 1 << tmpHead.hd_sec_sz_s;
         unsigned num_hd_sector = SBig(tmpHead.n_hd_sec);
 
@@ -105,7 +105,7 @@ public:
         WBFSHead* head = (WBFSHead*)wbfsHead.get();
         rs->seek(0, SEEK_SET);
         if (rs->read(head, hd_sector_size) != hd_sector_size)
-            LogModule.report(LogVisor::FatalError, "unable to read WBFS head");
+            LogModule.report(logvisor::Fatal, "unable to read WBFS head");
 
         //constants, but put here for consistancy
         p->wii_sec_sz = 0x8000;
@@ -115,10 +115,10 @@ public:
         p->part_lba = 0;
         _wbfsReadSector(*rs, p->part_lba, 1, head);
         if (hd_sector_size && head->hd_sec_sz_s !=  size_to_shift(hd_sector_size)) {
-            LogModule.report(LogVisor::FatalError, "hd sector size doesn't match");
+            LogModule.report(logvisor::Fatal, "hd sector size doesn't match");
         }
         if (num_hd_sector && head->n_hd_sec != SBig(num_hd_sector)) {
-            LogModule.report(LogVisor::FatalError, "hd num sector doesn't match");
+            LogModule.report(logvisor::Fatal, "hd num sector doesn't match");
         }
         p->hd_sec_sz = 1<<head->hd_sec_sz_s;
         p->hd_sec_sz_s = head->hd_sec_sz_s;
@@ -146,7 +146,7 @@ public:
         {
             wbfsDiscInfo.reset(new uint8_t[p->disc_info_sz]);
             if (!wbfsDiscInfo)
-                LogModule.report(LogVisor::FatalError, "allocating memory");
+                LogModule.report(logvisor::Fatal, "allocating memory");
             _wbfsReadSector(*rs, p->part_lba+1, disc_info_sz_lba, wbfsDiscInfo.get());
             p->n_disc_open++;
             //for(i=0;i<p->n_wbfs_sec_per_disc;i++)

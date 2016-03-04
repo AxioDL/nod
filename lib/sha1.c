@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "NOD/sha1.h"
+#include "nod/sha1.h"
 
 #ifdef __BIG_ENDIAN__
 # define SHA_BIG_ENDIAN

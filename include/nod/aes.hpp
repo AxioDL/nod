@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <memory>
 
-namespace NOD
+namespace nod
 {
 
 class IAES

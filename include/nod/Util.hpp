@@ -25,7 +25,7 @@
 #include <string>
 #include <cstring>
 #include <algorithm>
-#include <LogVisor/LogVisor.hpp>
+#include "logvisor/logvisor.hpp"
 #ifdef _MSC_VER
 #pragma warning(disable : 4996)
 
@@ -47,7 +47,7 @@
 #undef min
 #undef max
 
-namespace NOD
+namespace nod
 {
 /* define our own min/max to avoid MSVC BS */
 template<typename T>
@@ -56,7 +56,7 @@ template<typename T>
 inline T max(T a, T b) { return a > b ? a : b; }
 
 /* Log Module */
-extern LogVisor::LogModule LogModule;
+extern logvisor::Module LogModule;
 
 /* filesystem char type */
 #if _WIN32 && UNICODE
@@ -272,7 +272,7 @@ static inline FILE* Fopen(const SystemChar* path, const SystemChar* mode, FileLo
         LockFileEx((HANDLE)(uintptr_t)_fileno(fp), (lock == FileLockType::Write) ? LOCKFILE_EXCLUSIVE_LOCK : 0, 0, 0, 1, &ov);
 #else
         if (flock(fileno(fp), ((lock == FileLockType::Write) ? LOCK_EX : LOCK_SH) | LOCK_NB))
-            LogModule.report(LogVisor::Error, "flock %s: %s", path, strerror(errno));
+            LogModule.report(logvisor::Error, "flock %s: %s", path, strerror(errno));
 #endif
     }
 
@@ -309,16 +309,16 @@ static inline bool CheckFreeSpace(const SystemChar* path, size_t reqSz)
     wchar_t* end;
     DWORD ret = GetFullPathNameW(path, 1024, buf, &end);
     if (!ret || ret > 1024)
-        LogModule.report(LogVisor::FatalError, _S("GetFullPathNameW %s"), path);
+        LogModule.report(logvisor::Fatal, _S("GetFullPathNameW %s"), path);
     if (end)
         end[0] = L'\0';
     if (!GetDiskFreeSpaceExW(buf, &freeBytes, nullptr, nullptr))
-        LogModule.report(LogVisor::FatalError, _S("GetDiskFreeSpaceExW %s: %d"), path, GetLastError());
+        LogModule.report(logvisor::Fatal, _S("GetDiskFreeSpaceExW %s: %d"), path, GetLastError());
     return reqSz < freeBytes.QuadPart;
 #else
     struct statvfs svfs;
     if (statvfs(path, &svfs))
-        LogModule.report(LogVisor::FatalError, "statvfs %s: %s", path, strerror(errno));
+        LogModule.report(logvisor::Fatal, "statvfs %s: %s", path, strerror(errno));
     return reqSz < svfs.f_frsize * svfs.f_bavail;
 #endif
 }

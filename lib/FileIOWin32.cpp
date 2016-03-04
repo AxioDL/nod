@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
-#include "NOD/Util.hpp"
-#include "NOD/IFileIO.hpp"
+#include "nod/Util.hpp"
+#include "nod/IFileIO.hpp"
 
-namespace NOD
+namespace nod
 {
 
 class FileIOWin32 : public IFileIO
@@ -53,7 +53,7 @@ public:
             fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
                              nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
-                LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for writing"), path.c_str());
+                LogModule.report(logvisor::Fatal, _S("unable to open '%s' for writing"), path.c_str());
         }
         WriteStream(const SystemString& path, uint64_t offset, int64_t maxWriteSize)
         : m_maxWriteSize(maxWriteSize)
@@ -61,7 +61,7 @@ public:
             fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
-                LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for writing"), path.c_str());
+                LogModule.report(logvisor::Fatal, _S("unable to open '%s' for writing"), path.c_str());
             LARGE_INTEGER lioffset;
             lioffset.QuadPart = offset;
             SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
@@ -78,7 +78,7 @@ public:
                 LARGE_INTEGER res;
                 SetFilePointerEx(fp, li, &res, FILE_CURRENT);
                 if (res.QuadPart + int64_t(length) > m_maxWriteSize)
-                    LogModule.report(LogVisor::FatalError, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+                    LogModule.report(logvisor::Fatal, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
             }
 
             DWORD ret = 0;
@@ -91,16 +91,16 @@ public:
             uint8_t buf[0x7c00];
             while (length)
             {
-                uint64_t thisSz = NOD::min(uint64_t(0x7c00), length);
+                uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
                 uint64_t readSz = discio.read(buf, thisSz);
                 if (thisSz != readSz)
                 {
-                    LogModule.report(LogVisor::FatalError, "unable to read enough from disc");
+                    LogModule.report(logvisor::Fatal, "unable to read enough from disc");
                     return read;
                 }
                 if (write(buf, readSz) != readSz)
                 {
-                    LogModule.report(LogVisor::FatalError, "unable to write in file");
+                    LogModule.report(logvisor::Fatal, "unable to write in file");
                     return read;
                 }
                 length -= thisSz;
@@ -126,7 +126,7 @@ public:
             fp = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
-                LogModule.report(LogVisor::FatalError, _S("unable to open '%s' for reading"), path.c_str());
+                LogModule.report(logvisor::Fatal, _S("unable to open '%s' for reading"), path.c_str());
         }
         ReadStream(const SystemString& path, uint64_t offset)
         : ReadStream(path)
@@ -164,15 +164,15 @@ public:
             uint8_t buf[0x7c00];
             while (length)
             {
-                uint64_t thisSz = NOD::min(uint64_t(0x7c00), length);
+                uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
                 if (read(buf, thisSz) != thisSz)
                 {
-                    LogModule.report(LogVisor::FatalError, "unable to read enough from file");
+                    LogModule.report(logvisor::Fatal, "unable to read enough from file");
                     return written;
                 }
                 if (discio.write(buf, thisSz) != thisSz)
                 {
-                    LogModule.report(LogVisor::FatalError, "unable to write enough to disc");
+                    LogModule.report(logvisor::Fatal, "unable to write enough to disc");
                     return written;
                 }
                 length -= thisSz;

@@ -6,7 +6,7 @@
 #include "IDiscIO.hpp"
 #include "Util.hpp"
 
-namespace NOD
+namespace nod
 {
 
 class IFileIO

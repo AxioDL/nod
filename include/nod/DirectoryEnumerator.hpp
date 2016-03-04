@@ -3,7 +3,7 @@
 
 #include "Util.hpp"
 
-namespace NOD
+namespace nod
 {
 
 struct CaseInsensitiveCompare

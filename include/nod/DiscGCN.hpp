@@ -3,7 +3,7 @@
 
 #include "DiscBase.hpp"
 
-namespace NOD
+namespace nod
 {
 
 class DiscGCN : public DiscBase

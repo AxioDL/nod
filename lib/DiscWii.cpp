@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <string.h>
-#include "NOD/DiscWii.hpp"
-#include "NOD/aes.hpp"
-#include "NOD/sha1.h"
+#include "nod/DiscWii.hpp"
+#include "nod/aes.hpp"
+#include "nod/sha1.h"
 
-namespace NOD
+namespace nod
 {
 
 static const uint8_t COMMON_KEYS[2][16] =
@@ -348,7 +348,7 @@ public:
             std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset + 0x2B4);
             uint32_t h3;
             if (rs->read(&h3, 4) != 4)
-                LogModule.report(LogVisor::FatalError, _S("unable to read H3 offset from %s"), pathOut);
+                LogModule.report(logvisor::Fatal, _S("unable to read H3 offset from %s"), pathOut);
             h3 = SBig(h3);
             h3Off = uint64_t(h3) << 2;
         }
@@ -358,7 +358,7 @@ public:
         std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset);
         while (rem)
         {
-            size_t rdSz = NOD::min(rem, size_t(8192ul));
+            size_t rdSz = nod::min(rem, size_t(8192ul));
             rs->read(buf, rdSz);
             ws->write(buf, rdSz);
             rem -= rdSz;
@@ -410,7 +410,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
             kind = part.partType;
             break;
         default:
-            LogModule.report(LogVisor::FatalError, "invalid partition type %d", part.partType);
+            LogModule.report(logvisor::Fatal, "invalid partition type %d", part.partType);
         }
         m_partitions.emplace_back(new PartitionWii(*this, kind, part.partDataOff << 2));
     }
@@ -512,7 +512,7 @@ public:
             }
 
             if (m_fio->write(m_buf, 0x200000) != 0x200000)
-                LogModule.report(LogVisor::FatalError, "unable to write full disc group");
+                LogModule.report(logvisor::Fatal, "unable to write full disc group");
         }
 
     public:
@@ -520,7 +520,7 @@ public:
         : m_parent(parent), m_baseOffset(baseOffset), m_offset(offset)
         {
             if (offset % 0x1F0000)
-                LogModule.report(LogVisor::FatalError, "partition write stream MUST begin on 0x1F0000-aligned boundary");
+                LogModule.report(logvisor::Fatal, "partition write stream MUST begin on 0x1F0000-aligned boundary");
             size_t group = m_offset / 0x1F0000;
             m_fio = m_parent.m_parent.getFileIO().beginWriteStream(m_baseOffset + group * 0x200000);
             m_curGroup = group;
@@ -597,14 +597,14 @@ public:
         reqSz = ROUND_UP_32(reqSz);
         if (m_curUser + reqSz >= 0x1FB450000)
         {
-            LogModule.report(LogVisor::FatalError, "partition exceeds maximum single-partition capacity");
+            LogModule.report(logvisor::Fatal, "partition exceeds maximum single-partition capacity");
             return -1;
         }
         uint64_t ret = m_curUser;
         PartWriteStream& cws = static_cast<PartWriteStream&>(ws);
         if (cws.m_offset > ret)
         {
-            LogModule.report(LogVisor::FatalError, "partition overwrite error");
+            LogModule.report(logvisor::Fatal, "partition overwrite error");
             return -1;
         }
         while (cws.m_offset < ret)
@@ -634,27 +634,27 @@ public:
         uint8_t tkey[16];
         {
             if (ph->beginReadStream(0x1BF)->read(tkey, 16) != 16)
-                LogModule.report(LogVisor::FatalError, _S("unable to read title key from %s"), partHeadIn);
+                LogModule.report(logvisor::Fatal, _S("unable to read title key from %s"), partHeadIn);
         }
 
         uint8_t tkeyiv[16] = {};
         {
             if (ph->beginReadStream(0x1DC)->read(tkeyiv, 8) != 8)
-                LogModule.report(LogVisor::FatalError, _S("unable to read title key IV from %s"), partHeadIn);
+                LogModule.report(logvisor::Fatal, _S("unable to read title key IV from %s"), partHeadIn);
         }
 
         uint8_t ccIdx;
         {
             if (ph->beginReadStream(0x1F1)->read(&ccIdx, 1) != 1)
-                LogModule.report(LogVisor::FatalError, _S("unable to read common key index from %s"), partHeadIn);
+                LogModule.report(logvisor::Fatal, _S("unable to read common key index from %s"), partHeadIn);
             if (ccIdx > 1)
-                LogModule.report(LogVisor::FatalError, _S("common key index may only be 0 or 1"));
+                LogModule.report(logvisor::Fatal, _S("common key index may only be 0 or 1"));
         }
 
         uint32_t tmdSz;
         {
             if (ph->beginReadStream(0x2A4)->read(&tmdSz, 4) != 4)
-                LogModule.report(LogVisor::FatalError, _S("unable to read TMD size from %s"), partHeadIn);
+                LogModule.report(logvisor::Fatal, _S("unable to read TMD size from %s"), partHeadIn);
             tmdSz = SBig(tmdSz);
         }
 
@@ -662,7 +662,7 @@ public:
         {
             uint32_t h3Ptr;
             if (ph->beginReadStream(0x2B4)->read(&h3Ptr, 4) != 4)
-                LogModule.report(LogVisor::FatalError, _S("unable to read H3 pointer from %s"), partHeadIn);
+                LogModule.report(logvisor::Fatal, _S("unable to read H3 pointer from %s"), partHeadIn);
             h3Off = uint64_t(SBig(h3Ptr)) << 2;
         }
 
@@ -670,14 +670,14 @@ public:
         {
             uint32_t dataPtr;
             if (ph->beginReadStream(0x2B8)->read(&dataPtr, 4) != 4)
-                LogModule.report(LogVisor::FatalError, _S("unable to read data pointer from %s"), partHeadIn);
+                LogModule.report(logvisor::Fatal, _S("unable to read data pointer from %s"), partHeadIn);
             dataOff = uint64_t(SBig(dataPtr)) << 2;
         }
         m_userOffset = dataOff;
 
         std::unique_ptr<uint8_t[]> tmdData(new uint8_t[tmdSz]);
         if (ph->beginReadStream(0x2C0)->read(tmdData.get(), tmdSz) != tmdSz)
-            LogModule.report(LogVisor::FatalError, _S("unable to read TMD from %s"), partHeadIn);
+            LogModule.report(logvisor::Fatal, _S("unable to read TMD from %s"), partHeadIn);
 
         /* Copy partition head up to H3 table */
         std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(m_baseOffset);
@@ -732,7 +732,7 @@ public:
             /* Get Apploader Size */
             Sstat theStat;
             if (Stat(apploaderIn, &theStat))
-                LogModule.report(LogVisor::FatalError, _S("unable to stat %s"), apploaderIn);
+                LogModule.report(logvisor::Fatal, _S("unable to stat %s"), apploaderIn);
 
             /* Compute boot table members and write */
             size_t fstOff = 0x2440 + ROUND_UP_32(theStat.st_size);
@@ -741,7 +741,7 @@ public:
             fstSz = ROUND_UP_32(fstSz);
 
             if (fstOff + fstSz >= 0x1F0000)
-                LogModule.report(LogVisor::FatalError,
+                LogModule.report(logvisor::Fatal,
                                  "FST flows into user area (one or the other is too big)");
 
             cws->write(nullptr, 0x420 - sizeof(Header));
@@ -767,14 +767,14 @@ public:
                 cws->write(buf, rdSz);
                 xferSz += rdSz;
                 if (0x2440 + xferSz >= 0x1F0000)
-                    LogModule.report(LogVisor::FatalError,
+                    LogModule.report(logvisor::Fatal,
                                      "apploader flows into user area (one or the other is too big)");
                 m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
             }
 
             size_t fstOffRel = fstOff - 0x2440;
             if (xferSz > fstOffRel)
-                LogModule.report(LogVisor::FatalError, "apploader unexpectedly flows into FST");
+                LogModule.report(logvisor::Fatal, "apploader unexpectedly flows into FST");
             for (size_t i=0 ; i<fstOffRel-xferSz ; ++i)
                 cws->write("\xff", 1);
 
@@ -856,7 +856,7 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
 
     if (!CheckFreeSpace(m_outPath, m_discCapacity))
     {
-        LogModule.report(LogVisor::Error, _S("not enough free disk space for %s"), m_outPath);
+        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_outPath);
         return false;
     }
     ++m_progressIdx;
@@ -867,7 +867,7 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     filledSz = pb.buildFromDirectory(dirIn, dolIn, apploaderIn, partHeadIn);
     if (filledSz >= m_discCapacity)
     {
-        LogModule.report(LogVisor::FatalError, "data partition exceeds disc capacity");
+        LogModule.report(logvisor::Fatal, "data partition exceeds disc capacity");
         return false;
     }
 

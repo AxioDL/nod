@@ -1,4 +1,4 @@
-#include "NOD/aes.hpp"
+#include "nod/aes.hpp"
 #include <stdio.h>
 #include <string.h>
 
@@ -8,7 +8,7 @@
 #include <cpuid.h>
 #endif
 
-namespace NOD
+namespace nod
 {
 
 /* rotates x one bit to the left */

@@ -1,7 +1,7 @@
-#include "NOD/DiscBase.hpp"
-#include "NOD/IFileIO.hpp"
-#include "NOD/DirectoryEnumerator.hpp"
-#include "NOD/NOD.hpp"
+#include "nod/DiscBase.hpp"
+#include "nod/IFileIO.hpp"
+#include "nod/DirectoryEnumerator.hpp"
+#include "nod/nod.hpp"
 
 #include <stdio.h>
 #include <errno.h>
@@ -35,7 +35,7 @@ static void* memmem(const void *haystack, size_t hlen, const void *needle, size_
 
 #include <algorithm>
 
-namespace NOD
+namespace nod
 {
 
 void DiscBase::IPartition::parseFST(IPartReadStream& s)
@@ -101,7 +101,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
             ctx.progressCB(getName());
         if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
         {
-            LogModule.report(LogVisor::Error, _S("unable to mkdir '%s'"), path.c_str());
+            LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), path.c_str());
             return false;
         }
         for (Node& subnode : *this)
@@ -130,7 +130,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     Sstat theStat;
     if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
     {
-        LogModule.report(LogVisor::Error, _S("unable to mkdir '%s'"), path.c_str());
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), path.c_str());
         return false;
     }
 
@@ -158,7 +158,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     SystemString fsPath = path + _S("/fsroot");
     if (Mkdir(fsPath.c_str(), 0755) && errno != EEXIST)
     {
-        LogModule.report(LogVisor::Error, _S("unable to mkdir '%s'"), fsPath.c_str());
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), fsPath.c_str());
         return false;
     }
 
@@ -177,17 +177,17 @@ static uint64_t GetInode(const SystemChar* path)
                             FILE_ATTRIBUTE_NORMAL,
                             nullptr);
     if (!fp)
-        LogModule.report(LogVisor::FatalError, _S("unable to open %s"), path);
+        LogModule.report(logvisor::Fatal, _S("unable to open %s"), path);
     BY_HANDLE_FILE_INFORMATION info;
     if (!GetFileInformationByHandle(fp, &info))
-        LogModule.report(LogVisor::FatalError, _S("unable to GetFileInformationByHandle %s"), path);
+        LogModule.report(logvisor::Fatal, _S("unable to GetFileInformationByHandle %s"), path);
     inode = uint64_t(info.nFileIndexHigh) << 32;
     inode |= uint64_t(info.nFileIndexLow);
     CloseHandle(fp);
 #else
     struct stat st;
     if (stat(path, &st))
-        LogModule.report(LogVisor::FatalError, _S("unable to stat %s"), path);
+        LogModule.report(logvisor::Fatal, _S("unable to stat %s"), path);
     inode = uint64_t(st.st_ino);
 #endif
     return inode;
@@ -277,7 +277,7 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
                 ++m_parent.m_progressIdx;
                 while (xferSz < e.m_fileSz)
                 {
-                    size_t rdSz = rs->read(buf, NOD::min(size_t(0x8000ul), e.m_fileSz - xferSz));
+                    size_t rdSz = rs->read(buf, nod::min(size_t(0x8000ul), e.m_fileSz - xferSz));
                     if (!rdSz)
                         break;
                     ws.write(buf, rdSz);
@@ -329,7 +329,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
                                                                const SystemChar* apploaderIn)
 {
     if (!dirIn || !dolIn || !apploaderIn)
-        LogModule.report(LogVisor::FatalError, _S("all arguments must be supplied to buildFromDirectory()"));
+        LogModule.report(logvisor::Fatal, _S("all arguments must be supplied to buildFromDirectory()"));
 
     /* Clear file */
     ++m_parent.m_progressIdx;
@@ -343,7 +343,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
     {
         Sstat dolStat;
         if (Stat(dolIn, &dolStat))
-            LogModule.report(LogVisor::FatalError, _S("unable to stat %s"), dolIn);
+            LogModule.report(logvisor::Fatal, _S("unable to stat %s"), dolIn);
         size_t fileSz = ROUND_UP_32(dolStat.st_size);
         uint64_t fileOff = userAllocate(fileSz, ws);
         m_dolOffset = fileOff;

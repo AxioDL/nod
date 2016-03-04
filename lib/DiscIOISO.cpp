@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include "NOD/Util.hpp"
-#include "NOD/IDiscIO.hpp"
-#include "NOD/IFileIO.hpp"
+#include "nod/Util.hpp"
+#include "nod/IDiscIO.hpp"
+#include "nod/IFileIO.hpp"
 
-namespace NOD
+namespace nod
 {
 
 class DiscIOISO : public IDiscIO

@@ -7,9 +7,9 @@
 
 #include <map>
 
-#include "NOD/DirectoryEnumerator.hpp"
+#include "nod/DirectoryEnumerator.hpp"
 
-namespace NOD
+namespace nod
 {
 
 DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,

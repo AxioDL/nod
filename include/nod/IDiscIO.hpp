@@ -7,11 +7,11 @@
 #include <stdint.h>
 
 #if NOD_ATHENA
-#include <Athena/IStreamReader.hpp>
-#include <Athena/IStreamWriter.hpp>
+#include <athena/IStreamReader.hpp>
+#include <athena/IStreamWriter.hpp>
 #endif
 
-namespace NOD
+namespace nod
 {
 
 class IDiscIO
@@ -54,17 +54,17 @@ struct IPartWriteStream
 
 #if NOD_ATHENA
 
-class AthenaPartReadStream : public Athena::io::IStreamReader
+class AthenaPartReadStream : public athena::io::IStreamReader
 {
     std::unique_ptr<IPartReadStream> m_rs;
 public:
     AthenaPartReadStream(std::unique_ptr<IPartReadStream>&& rs) : m_rs(std::move(rs)) {}
 
-    inline void seek(atInt64 off, Athena::SeekOrigin origin)
+    inline void seek(atInt64 off, athena::SeekOrigin origin)
     {
-        if (origin == Athena::Begin)
+        if (origin == athena::Begin)
             m_rs->seek(off, SEEK_SET);
-        else if (origin == Athena::Current)
+        else if (origin == athena::Current)
             m_rs->seek(off, SEEK_CUR);
     }
     inline atUint64 position()    const {return m_rs->position();}
