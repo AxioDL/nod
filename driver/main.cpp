@@ -33,6 +33,7 @@ int main(int argc, char* argv[])
     }
 
     /* Enable logging to console */
+    logvisor::RegisterStandardExceptions();
     logvisor::RegisterConsoleLogger();
 
     nod::ExtractionContext ctx = { true, true, [&](const std::string& str){
