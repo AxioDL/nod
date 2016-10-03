@@ -11,7 +11,7 @@ class DiscIOISO : public IDiscIO
     std::unique_ptr<IFileIO> m_fio;
 public:
     DiscIOISO(const SystemString& fpin)
-    : m_fio(std::move(NewFileIO(fpin))) {}
+    : m_fio(NewFileIO(fpin)) {}
 
     class ReadStream : public IReadStream
     {
@@ -30,7 +30,7 @@ public:
 
     std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
-        return std::unique_ptr<IReadStream>(new ReadStream(std::move(m_fio->beginReadStream(offset))));
+        return std::unique_ptr<IReadStream>(new ReadStream(m_fio->beginReadStream(offset)));
     }
 
     class WriteStream : public IWriteStream
@@ -48,7 +48,7 @@ public:
 
     std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
-        return std::unique_ptr<IWriteStream>(new WriteStream(std::move(m_fio->beginWriteStream(offset))));
+        return std::unique_ptr<IWriteStream>(new WriteStream(m_fio->beginWriteStream(offset)));
     }
 };
 

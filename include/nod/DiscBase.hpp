@@ -363,7 +363,7 @@ public:
     virtual ~DiscBuilderBase() {}
     DiscBuilderBase(const SystemChar* outPath, int64_t discCapacity,
                     std::function<void(size_t idx, const SystemString&, size_t)> progressCB)
-    : m_outPath(outPath), m_fileIO(std::move(NewFileIO(outPath, discCapacity))),
+    : m_outPath(outPath), m_fileIO(NewFileIO(outPath, discCapacity)),
       m_discCapacity(discCapacity), m_progressCB(progressCB) {}
 
     IFileIO& getFileIO() {return *m_fileIO;}
