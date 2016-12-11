@@ -865,7 +865,7 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
 
     /* Assemble image */
     filledSz = pb.buildFromDirectory(dirIn, dolIn, apploaderIn, partHeadIn);
-    if (filledSz >= m_discCapacity)
+    if (filledSz >= uint64_t(m_discCapacity))
     {
         LogModule.report(logvisor::Fatal, "data partition exceeds disc capacity");
         return false;
