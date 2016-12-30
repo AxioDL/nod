@@ -73,6 +73,7 @@ DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,
             sort.emplace(std::make_pair(d.cFileName, Entry(std::move(fp), d.cFileName, 0, true)));
         } while (FindNextFileW(dir, &d));
 
+        m_entries.reserve(sort.size());
         if (reverse)
             for (auto it=sort.crbegin() ; it != sort.crend() ; ++it)
                 m_entries.push_back(std::move(it->second));
@@ -108,6 +109,7 @@ DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,
                 sort.emplace(std::make_pair(st.st_size, Entry(std::move(fp), d.cFileName, st.st_size, false)));
             } while (FindNextFileW(dir, &d));
 
+            m_entries.reserve(sort.size());
             if (reverse)
                 for (auto it=sort.crbegin() ; it != sort.crend() ; ++it)
                     m_entries.push_back(std::move(it->second));
@@ -133,6 +135,7 @@ DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,
                 sort.emplace(std::make_pair(d.cFileName, Entry(std::move(fp), d.cFileName, st.st_size, false)));
             } while (FindNextFileW(dir, &d));
 
+            m_entries.reserve(sort.size());
             if (reverse)
                 for (auto it=sort.crbegin() ; it != sort.crend() ; ++it)
                     m_entries.push_back(std::move(it->second));
@@ -199,6 +202,7 @@ DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,
             sort.emplace(std::make_pair(d->d_name, Entry(std::move(fp), d->d_name, 0, true)));
         }
 
+        m_entries.reserve(sort.size());
         if (reverse)
             for (auto it=sort.crbegin() ; it != sort.crend() ; ++it)
                 m_entries.push_back(std::move(it->second));
@@ -233,6 +237,7 @@ DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,
                 sort.emplace(std::make_pair(st.st_size, Entry(std::move(fp), d->d_name, st.st_size, false)));
             }
 
+            m_entries.reserve(sort.size());
             if (reverse)
                 for (auto it=sort.crbegin() ; it != sort.crend() ; ++it)
                     m_entries.push_back(std::move(it->second));
@@ -258,6 +263,7 @@ DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,
                 sort.emplace(std::make_pair(d->d_name, Entry(std::move(fp), d->d_name, st.st_size, false)));
             }
 
+            m_entries.reserve(sort.size());
             if (reverse)
                 for (auto it=sort.crbegin() ; it != sort.crend() ; ++it)
                     m_entries.push_back(std::move(it->second));
