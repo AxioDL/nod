@@ -150,8 +150,10 @@ public:
             }
         }
         ReadStream(const SystemString& path, uint64_t offset, bool& err)
-        : ReadStream(path)
+        : ReadStream(path, err)
         {
+            if (err)
+                return;
             LARGE_INTEGER lioffset;
             lioffset.QuadPart = offset;
             SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
