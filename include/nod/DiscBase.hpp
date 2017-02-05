@@ -15,6 +15,8 @@
 namespace nod
 {
 
+using FProgress = std::function<void(size_t, const SystemString&, size_t)>;
+
 class FSTNode
 {
     uint32_t typeAndNameOffset;
@@ -53,9 +55,14 @@ struct Header
     uint32_t m_gcnMagic;
     char m_gameTitle[64];
 
-    Header(IDiscIO& dio)
+    Header(IDiscIO& dio, bool& err)
     {
         std::unique_ptr<IDiscIO::IReadStream> s = dio.beginReadStream(0);
+        if (!s)
+        {
+            err = true;
+            return;
+        }
         s->read(this, sizeof(*this));
         m_wiiMagic = SBig(m_wiiMagic);
         m_gcnMagic = SBig(m_gcnMagic);
@@ -212,6 +219,7 @@ public:
         uint64_t m_dolOff;
         uint64_t m_fstOff;
         uint64_t m_fstSz;
+        uint64_t m_fstMemoryAddr;
         uint64_t m_apploaderSz;
         std::vector<Node> m_nodes;
         void parseFST(IPartReadStream& s);
@@ -260,6 +268,8 @@ public:
             return buf;
         }
 
+        inline uint64_t getFSTMemoryAddr() const {return m_fstMemoryAddr;}
+
         inline uint64_t getApploaderSize() const {return m_apploaderSz;}
         inline std::unique_ptr<uint8_t[]> getApploaderBuf() const
         {
@@ -274,8 +284,8 @@ protected:
     Header m_header;
     std::vector<std::unique_ptr<IPartition>> m_partitions;
 public:
-    DiscBase(std::unique_ptr<IDiscIO>&& dio)
-    : m_discIO(std::move(dio)), m_header(*m_discIO) {}
+    DiscBase(std::unique_ptr<IDiscIO>&& dio, bool& err)
+    : m_discIO(std::move(dio)), m_header(*m_discIO, err) {}
 
     inline const Header& getHeader() const {return m_header;}
     inline const IDiscIO& getDiscIO() const {return *m_discIO;}
@@ -302,6 +312,7 @@ public:
 
 class DiscBuilderBase
 {
+    friend class DiscMergerWii;
 public:
     class PartitionBuilderBase
     {
@@ -320,9 +331,18 @@ public:
         size_t m_buildNameOff = 0;
         virtual uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws)=0;
         virtual uint32_t packOffset(uint64_t offset) const=0;
-        void recursiveBuildNodes(IPartWriteStream& ws, bool system, const SystemChar* dirIn, uint64_t dolInode);
-        void recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
+        bool recursiveBuildNodes(IPartWriteStream& ws, bool system, const SystemChar* dirIn, uint64_t dolInode);
+        bool recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
                                std::function<void(void)> incParents);
+        bool recursiveMergeNodes(IPartWriteStream& ws, bool system,
+                                 const DiscBase::IPartition::Node* nodeIn, const SystemChar* dirIn,
+                                 const SystemString& keyPath);
+        bool recursiveMergeFST(const DiscBase::IPartition::Node* nodeIn,
+                               const SystemChar* dirIn, std::function<void(void)> incParents,
+                               const SystemString& keyPath);
+        static bool RecursiveCalculateTotalSize(uint64_t& totalSz,
+                                                const DiscBase::IPartition::Node* nodeIn,
+                                                const SystemChar* dirIn);
         void addBuildName(const SystemString& str)
         {
             SystemUTF8View utf8View(str);
@@ -348,23 +368,32 @@ public:
         bool buildFromDirectory(IPartWriteStream& ws,
                                 const SystemChar* dirIn, const SystemChar* dolIn,
                                 const SystemChar* apploaderIn);
+        static uint64_t CalculateTotalSizeBuild(const SystemChar* dolIn,
+                                                const SystemChar* dirIn);
+        bool mergeFromDirectory(IPartWriteStream& ws,
+                                const DiscBase::IPartition* partIn,
+                                const SystemChar* dirIn);
+        static uint64_t CalculateTotalSizeMerge(const DiscBase::IPartition* partIn,
+                                                const SystemChar* dirIn);
 
         const char* getGameID() const {return m_gameID;}
         const std::string& getGameTitle() const {return m_gameTitle;}
     };
 protected:
-    const SystemChar* m_outPath;
+    SystemString m_outPath;
     std::unique_ptr<IFileIO> m_fileIO;
     std::vector<std::unique_ptr<PartitionBuilderBase>> m_partitions;
     int64_t m_discCapacity;
 public:
     std::function<void(size_t idx, const SystemString&, size_t)> m_progressCB;
     size_t m_progressIdx = 0;
-    virtual ~DiscBuilderBase() {}
+    virtual ~DiscBuilderBase() = default;
     DiscBuilderBase(const SystemChar* outPath, int64_t discCapacity,
                     std::function<void(size_t idx, const SystemString&, size_t)> progressCB)
     : m_outPath(outPath), m_fileIO(NewFileIO(outPath, discCapacity)),
       m_discCapacity(discCapacity), m_progressCB(progressCB) {}
+    DiscBuilderBase(DiscBuilderBase&&) = default;
+    DiscBuilderBase& operator=(DiscBuilderBase&&) = default;
 
     IFileIO& getFileIO() {return *m_fileIO;}
 };

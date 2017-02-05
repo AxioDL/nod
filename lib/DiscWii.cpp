@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <string.h>
+#include <cstdlib>
+#include <inttypes.h>
 #include "nod/DiscWii.hpp"
 #include "nod/aes.hpp"
 #include "nod/sha1.h"
@@ -191,10 +193,16 @@ class PartitionWii : public DiscBase::IPartition
     uint8_t m_decKey[16];
 
 public:
-    PartitionWii(const DiscWii& parent, Kind kind, uint64_t offset)
+    PartitionWii(const DiscWii& parent, Kind kind, uint64_t offset, bool& err)
     : IPartition(parent, kind, offset)
     {
         std::unique_ptr<IDiscIO::IReadStream> s = parent.getDiscIO().beginReadStream(offset);
+        if (!s)
+        {
+            err = true;
+            return;
+        }
+
         m_ticket.read(*s);
 
         uint32_t tmdSize;
@@ -240,6 +248,12 @@ public:
 
         /* Wii-specific header reads (now using title key to decrypt) */
         std::unique_ptr<IPartReadStream> ds = beginReadStream(0x420);
+        if (!ds)
+        {
+            err = true;
+            return;
+        }
+
         uint32_t vals[3];
         ds->read(vals, 12);
         m_dolOff = SBig(vals[0]) << 2;
@@ -275,12 +289,17 @@ public:
             m_aes->decrypt(&m_encBuf[0x3d0], &m_encBuf[0x400], m_decBuf, 0x7c00);
         }
     public:
-        PartReadStream(const PartitionWii& parent, uint64_t baseOffset, uint64_t offset)
+        PartReadStream(const PartitionWii& parent, uint64_t baseOffset, uint64_t offset, bool& err)
         : m_aes(NewAES()), m_parent(parent), m_baseOffset(baseOffset), m_offset(offset)
         {
             m_aes->setKey(parent.m_decKey);
             size_t block = m_offset / 0x7c00;
             m_dio = m_parent.m_parent.getDiscIO().beginReadStream(m_baseOffset + block * 0x8000);
+            if (!m_dio)
+            {
+                err = true;
+                return;
+            }
             decryptBlock();
             m_curBlock = block;
         }
@@ -335,20 +354,59 @@ public:
 
     std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const
     {
-        return std::unique_ptr<IPartReadStream>(new PartReadStream(*this, m_dataOff, offset));
+        bool Err = false;
+        auto ret = std::unique_ptr<IPartReadStream>(new PartReadStream(*this, m_dataOff, offset, Err));
+        if (Err)
+            return {};
+        return ret;
     }
 
     uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset << 2;}
 
-    void writeOutPartitionHeader(const SystemChar* pathOut) const
+    std::unique_ptr<uint8_t[]> readPartitionHeaderBuf(size_t& szOut) const
+    {
+        {
+            std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset + 0x2B4);
+            if (!rs)
+                return {};
+
+            uint32_t h3;
+            if (rs->read(&h3, 4) != 4)
+            {
+                LogModule.report(logvisor::Error, _S("unable to read H3 offset apploader"));
+                return {};
+            }
+            h3 = SBig(h3);
+            szOut = uint64_t(h3) << 2;
+        }
+
+        std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset);
+        if (!rs)
+            return {};
+
+        std::unique_ptr<uint8_t[]> buf(new uint8_t[szOut]);
+        rs->read(buf.get(), szOut);
+
+        return buf;
+    }
+
+    bool writeOutPartitionHeader(const SystemChar* pathOut) const
     {
         std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(pathOut)->beginWriteStream();
+        if (!ws)
+            return false;
         uint64_t h3Off;
         {
             std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset + 0x2B4);
+            if (!rs)
+                return false;
+
             uint32_t h3;
             if (rs->read(&h3, 4) != 4)
-                LogModule.report(logvisor::Fatal, _S("unable to read H3 offset from %s"), pathOut);
+            {
+                LogModule.report(logvisor::Error, _S("unable to read H3 offset to %s"), pathOut);
+                return false;
+            }
             h3 = SBig(h3);
             h3Off = uint64_t(h3) << 2;
         }
@@ -356,6 +414,9 @@ public:
         char buf[8192];
         size_t rem = h3Off;
         std::unique_ptr<IDiscIO::IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset);
+        if (!rs)
+            return false;
+
         while (rem)
         {
             size_t rdSz = nod::min(rem, size_t(8192ul));
@@ -363,12 +424,17 @@ public:
             ws->write(buf, rdSz);
             rem -= rdSz;
         }
+
+        return true;
     }
 };
 
-DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
-: DiscBase(std::move(dio))
+DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err)
+: DiscBase(std::move(dio), err)
 {
+    if (err)
+        return;
+
     /* Read partition info */
     struct PartInfo
     {
@@ -379,9 +445,15 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
             uint32_t partDataOff;
             IPartition::Kind partType;
         } parts[4];
-        PartInfo(IDiscIO& dio)
+        PartInfo(IDiscIO& dio, bool& err)
         {
             std::unique_ptr<IDiscIO::IReadStream> s = dio.beginReadStream(0x40000);
+            if (!s)
+            {
+                err = true;
+                return;
+            }
+
             s->read(this, 32);
             partCount = SBig(partCount);
             partInfoOff = SBig(partInfoOff);
@@ -394,7 +466,9 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
                 parts[p].partType = IPartition::Kind(SBig(uint32_t(parts[p].partType)));
             }
         }
-    } partInfo(*m_discIO);
+    } partInfo(*m_discIO, err);
+    if (err)
+        return;
 
     /* Iterate for data partition */
     m_partitions.reserve(partInfo.partCount);
@@ -410,22 +484,32 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio)
             kind = part.partType;
             break;
         default:
-            LogModule.report(logvisor::Fatal, "invalid partition type %d", part.partType);
+            LogModule.report(logvisor::Error, "invalid partition type %d", part.partType);
+            err = true;
+            return;
         }
-        m_partitions.emplace_back(new PartitionWii(*this, kind, part.partDataOff << 2));
+        m_partitions.emplace_back(new PartitionWii(*this, kind, part.partDataOff << 2, err));
+        if (err)
+            return;
     }
 }
 
-void DiscWii::writeOutDataPartitionHeader(const SystemChar* pathOut) const
+DiscBuilderWii DiscWii::makeMergeBuilder(const SystemChar* outPath, bool dualLayer, FProgress progressCB)
+{
+    return DiscBuilderWii(outPath, m_header.m_gameID, m_header.m_gameTitle,
+                          dualLayer, progressCB);
+}
+
+bool DiscWii::writeOutDataPartitionHeader(const SystemChar* pathOut) const
 {
     for (const std::unique_ptr<IPartition>& part : m_partitions)
     {
         if (part->getKind() == IPartition::Kind::Data)
         {
-            static_cast<PartitionWii&>(*part).writeOutPartitionHeader(pathOut);
-            break;
+            return static_cast<PartitionWii&>(*part).writeOutPartitionHeader(pathOut);
         }
     }
+    return false;
 }
 
 static const uint8_t ZEROIV[16] = {0};
@@ -433,6 +517,8 @@ static const uint8_t ZEROIV[16] = {0};
 class PartitionBuilderWii : public DiscBuilderBase::PartitionBuilderBase
 {
     friend class DiscBuilderWii;
+    friend class DiscMergerWii;
+
     uint64_t m_baseOffset;
     uint64_t m_userOffset = 0;
     uint64_t m_curUser = 0x1F0000;
@@ -512,17 +598,26 @@ public:
             }
 
             if (m_fio->write(m_buf, 0x200000) != 0x200000)
-                LogModule.report(logvisor::Fatal, "unable to write full disc group");
+            {
+                LogModule.report(logvisor::Error, "unable to write full disc group");
+                return;
+            }
         }
 
     public:
-        PartWriteStream(PartitionBuilderWii& parent, uint64_t baseOffset, uint64_t offset)
+        PartWriteStream(PartitionBuilderWii& parent, uint64_t baseOffset, uint64_t offset, bool& err)
         : m_parent(parent), m_baseOffset(baseOffset), m_offset(offset)
         {
             if (offset % 0x1F0000)
-                LogModule.report(logvisor::Fatal, "partition write stream MUST begin on 0x1F0000-aligned boundary");
+            {
+                LogModule.report(logvisor::Error, "partition write stream MUST begin on 0x1F0000-aligned boundary");
+                err = true;
+                return;
+            }
             size_t group = m_offset / 0x1F0000;
             m_fio = m_parent.m_parent.getFileIO().beginWriteStream(m_baseOffset + group * 0x200000);
+            if (!m_fio)
+                err = true;
             m_curGroup = group;
         }
         ~PartWriteStream() {close();}
@@ -597,14 +692,14 @@ public:
         reqSz = ROUND_UP_32(reqSz);
         if (m_curUser + reqSz >= 0x1FB450000)
         {
-            LogModule.report(logvisor::Fatal, "partition exceeds maximum single-partition capacity");
+            LogModule.report(logvisor::Error, "partition exceeds maximum single-partition capacity");
             return -1;
         }
         uint64_t ret = m_curUser;
         PartWriteStream& cws = static_cast<PartWriteStream&>(ws);
         if (cws.m_offset > ret)
         {
-            LogModule.report(logvisor::Fatal, "partition overwrite error");
+            LogModule.report(logvisor::Error, "partition overwrite error");
             return -1;
         }
         while (cws.m_offset < ret)
@@ -620,86 +715,109 @@ public:
 
     std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset)
     {
-        return std::make_unique<PartWriteStream>(*this, m_baseOffset + m_userOffset, offset);
+        bool Err = false;
+        std::unique_ptr<IPartWriteStream> ret =
+            std::make_unique<PartWriteStream>(*this, m_baseOffset + m_userOffset, offset, Err);
+        if (Err)
+            return {};
+        return ret;
     }
 
-    uint64_t buildFromDirectory(const SystemChar* dirIn,
-                                const SystemChar* dolIn,
-                                const SystemChar* apploaderIn,
-                                const SystemChar* partHeadIn)
+    uint64_t _build(const std::function<bool(IPartWriteStream&)>& contentFunc,
+                    const std::function<bool(IPartWriteStream&, size_t&)>& apploaderFunc,
+                    const uint8_t* phBuf, size_t phSz, size_t apploaderSz)
     {
         /* Read head and validate key members */
-        std::unique_ptr<IFileIO> ph = NewFileIO(partHeadIn);
-
         uint8_t tkey[16];
         {
-            if (ph->beginReadStream(0x1BF)->read(tkey, 16) != 16)
-                LogModule.report(logvisor::Fatal, _S("unable to read title key from %s"), partHeadIn);
+            if (0x1BF + 16 > phSz)
+            {
+                LogModule.report(logvisor::Error, _S("unable to read title key"));
+                return -1;
+            }
+            memmove(tkey, phBuf + 0x1BF, 16);
         }
 
         uint8_t tkeyiv[16] = {};
         {
-            if (ph->beginReadStream(0x1DC)->read(tkeyiv, 8) != 8)
-                LogModule.report(logvisor::Fatal, _S("unable to read title key IV from %s"), partHeadIn);
+            if (0x1DC + 8 > phSz)
+            {
+                LogModule.report(logvisor::Error, _S("unable to read title key IV"));
+                return -1;
+            }
+            memmove(tkeyiv, phBuf + 0x1DC, 8);
         }
 
         uint8_t ccIdx;
         {
-            if (ph->beginReadStream(0x1F1)->read(&ccIdx, 1) != 1)
-                LogModule.report(logvisor::Fatal, _S("unable to read common key index from %s"), partHeadIn);
+            if (0x1F1 + 1 > phSz)
+            {
+                LogModule.report(logvisor::Error, _S("unable to read common key index"));
+                return -1;
+            }
+            memmove(&ccIdx, phBuf + 0x1F1, 1);
             if (ccIdx > 1)
-                LogModule.report(logvisor::Fatal, _S("common key index may only be 0 or 1"));
+            {
+                LogModule.report(logvisor::Error, _S("common key index may only be 0 or 1"));
+                return -1;
+            }
         }
 
         uint32_t tmdSz;
         {
-            if (ph->beginReadStream(0x2A4)->read(&tmdSz, 4) != 4)
-                LogModule.report(logvisor::Fatal, _S("unable to read TMD size from %s"), partHeadIn);
+            if (0x2A4 + 4 > phSz)
+            {
+                LogModule.report(logvisor::Error, _S("unable to read TMD size"));
+                return -1;
+            }
+            memmove(&tmdSz, phBuf + 0x2A4, 4);
             tmdSz = SBig(tmdSz);
         }
 
         uint64_t h3Off;
         {
             uint32_t h3Ptr;
-            if (ph->beginReadStream(0x2B4)->read(&h3Ptr, 4) != 4)
-                LogModule.report(logvisor::Fatal, _S("unable to read H3 pointer from %s"), partHeadIn);
+            if (0x2B4 + 4 > phSz)
+            {
+                LogModule.report(logvisor::Error, _S("unable to read H3 pointer"));
+                return -1;
+            }
+            memmove(&h3Ptr, phBuf + 0x2B4, 4);
             h3Off = uint64_t(SBig(h3Ptr)) << 2;
         }
 
         uint64_t dataOff;
         {
             uint32_t dataPtr;
-            if (ph->beginReadStream(0x2B8)->read(&dataPtr, 4) != 4)
-                LogModule.report(logvisor::Fatal, _S("unable to read data pointer from %s"), partHeadIn);
+            if (0x2B8 + 4 > phSz)
+            {
+                LogModule.report(logvisor::Error, _S("unable to read data pointer"));
+                return -1;
+            }
+            memmove(&dataPtr, phBuf + 0x2B8, 4);
             dataOff = uint64_t(SBig(dataPtr)) << 2;
         }
         m_userOffset = dataOff;
 
         std::unique_ptr<uint8_t[]> tmdData(new uint8_t[tmdSz]);
-        if (ph->beginReadStream(0x2C0)->read(tmdData.get(), tmdSz) != tmdSz)
-            LogModule.report(logvisor::Fatal, _S("unable to read TMD from %s"), partHeadIn);
+        {
+            if (0x2C0 + tmdSz > phSz)
+            {
+                LogModule.report(logvisor::Error, _S("unable to read TMD"));
+                return -1;
+            }
+            memmove(tmdData.get(), phBuf + 0x2C0, tmdSz);
+        }
 
         /* Copy partition head up to H3 table */
         std::unique_ptr<IFileIO::IWriteStream> ws = m_parent.getFileIO().beginWriteStream(m_baseOffset);
-        {
-            uint64_t remCopy = h3Off;
-
-            uint8_t copyBuf[8192];
-            std::unique_ptr<IFileIO::IReadStream> rs = ph->beginReadStream();
-            while (remCopy)
-            {
-                size_t rdBytes = rs->read(copyBuf, std::min(size_t(8192), size_t(remCopy)));
-                if (rdBytes)
-                {
-                    ws->write(copyBuf, rdBytes);
-                    remCopy -= rdBytes;
-                    continue;
-                }
-                for (size_t i=0 ; i<remCopy ; ++i)
-                    ws->write("", 1);
-                break;
-            }
-        }
+        if (!ws)
+            return -1;
+        size_t copySz = std::min(phSz, size_t(h3Off));
+        ws->write(phBuf, copySz);
+        size_t remCopy = (h3Off > phSz) ? (h3Off - copySz) : 0;
+        for (size_t i=0 ; i<remCopy ; ++i)
+            ws->write("", 1);
 
         /* Prepare crypto pass */
         m_aes->setKey(COMMON_KEYS[ccIdx]);
@@ -709,9 +827,10 @@ public:
         {
             /* Assemble partition data */
             std::unique_ptr<IPartWriteStream> cws = beginWriteStream(0x1F0000);
-            bool result = DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(*cws, dirIn, dolIn, apploaderIn);
-            if (!result)
-                return 0;
+            if (!cws)
+                return -1;
+            if (!contentFunc(*cws))
+                return -1;
 
             /* Pad out user area to nearest cleartext sector */
             m_curUser = cws->position();
@@ -726,23 +845,23 @@ public:
 
             /* Begin crypto write and add content header */
             cws = beginWriteStream(0);
+            if (!cws)
+                return -1;
             Header header(m_gameID, m_gameTitle.c_str(), true, 0, 0, 0);
             header.write(*cws);
 
-            /* Get Apploader Size */
-            Sstat theStat;
-            if (Stat(apploaderIn, &theStat))
-                LogModule.report(logvisor::Fatal, _S("unable to stat %s"), apploaderIn);
-
             /* Compute boot table members and write */
-            size_t fstOff = 0x2440 + ROUND_UP_32(theStat.st_size);
+            size_t fstOff = 0x2440 + ROUND_UP_32(apploaderSz);
             size_t fstSz = sizeof(FSTNode) * m_buildNodes.size();
             fstSz += m_buildNameOff;
             fstSz = ROUND_UP_32(fstSz);
 
             if (fstOff + fstSz >= 0x1F0000)
-                LogModule.report(logvisor::Fatal,
+            {
+                LogModule.report(logvisor::Error,
                                  "FST flows into user area (one or the other is too big)");
+                return -1;
+            }
 
             cws->write(nullptr, 0x420 - sizeof(Header));
             uint32_t vals[4];
@@ -752,29 +871,16 @@ public:
             vals[3] = SBig(uint32_t(fstSz));
             cws->write(vals, 16);
 
-            /* Write Apploader */
-            cws->write(nullptr, 0x2440 - 0x430);
-            std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(apploaderIn)->beginReadStream();
-            char buf[8192];
             size_t xferSz = 0;
-            SystemString apploaderName(apploaderIn);
-            ++m_parent.m_progressIdx;
-            while (true)
-            {
-                size_t rdSz = rs->read(buf, 8192);
-                if (!rdSz)
-                    break;
-                cws->write(buf, rdSz);
-                xferSz += rdSz;
-                if (0x2440 + xferSz >= 0x1F0000)
-                    LogModule.report(logvisor::Fatal,
-                                     "apploader flows into user area (one or the other is too big)");
-                m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
-            }
+            if (!apploaderFunc(*cws, xferSz))
+                return -1;
 
             size_t fstOffRel = fstOff - 0x2440;
             if (xferSz > fstOffRel)
-                LogModule.report(logvisor::Fatal, "apploader unexpectedly flows into FST");
+            {
+                LogModule.report(logvisor::Error, "apploader unexpectedly flows into FST");
+                return -1;
+            }
             for (size_t i=0 ; i<fstOffRel-xferSz ; ++i)
                 cws->write("\xff", 1);
 
@@ -789,22 +895,26 @@ public:
         uint64_t cryptContentSize = (groupCount * 0x200000) >> uint64_t(2);
         uint32_t cryptContentSizeBig = SBig(uint32_t(cryptContentSize));
         ws = m_parent.getFileIO().beginWriteStream(m_baseOffset + 0x2BC);
+        if (!ws)
+            return -1;
         ws->write(&cryptContentSizeBig, 0x4);
 
         /* Write new H3 */
         ws = m_parent.getFileIO().beginWriteStream(m_baseOffset + h3Off);
+        if (!ws)
+            return -1;
         ws->write(m_h3, 0x18000);
 
         /* Compute content hash and replace in TMD */
         sha1nfo sha;
         sha1_init(&sha);
         sha1_write(&sha, (char*)m_h3, 0x18000);
-        memcpy(tmdData.get() + 0x1F4, sha1_result(&sha), 20);
+        memmove(tmdData.get() + 0x1F4, sha1_result(&sha), 20);
 
         /* Same for content size */
         uint64_t contentSize = groupCount * 0x1F0000;
         uint64_t contentSizeBig = SBig(contentSize);
-        memcpy(tmdData.get() + 0x1EC, &contentSizeBig, 8);
+        memmove(tmdData.get() + 0x1EC, &contentSizeBig, 8);
 
         /* Zero-out TMD signature to simplify brute-force */
         memset(tmdData.get() + 0x4, 0, 0x100);
@@ -841,9 +951,97 @@ public:
         m_parent.m_progressCB(m_parent.m_progressIdx, bfName, attempts);
 
         ws = m_parent.getFileIO().beginWriteStream(m_baseOffset + 0x2C0);
+        if (!ws)
+            return -1;
         ws->write(tmdData.get(), tmdSz);
 
         return m_baseOffset + dataOff + groupCount * 0x200000;
+    }
+
+    uint64_t buildFromDirectory(const SystemChar* dirIn,
+                                const SystemChar* dolIn,
+                                const SystemChar* apploaderIn,
+                                const SystemChar* partHeadIn)
+    {
+        std::unique_ptr<IFileIO> ph = NewFileIO(partHeadIn);
+        size_t phSz = ph->size();
+        std::unique_ptr<uint8_t[]> phBuf(new uint8_t[phSz]);
+        {
+            auto rs = ph->beginReadStream();
+            if (!rs)
+                return -1;
+            rs->read(phBuf.get(), phSz);
+        }
+
+        /* Get Apploader Size */
+        Sstat theStat;
+        if (Stat(apploaderIn, &theStat))
+        {
+            LogModule.report(logvisor::Error, _S("unable to stat %s"), apploaderIn);
+            return -1;
+        }
+
+        return _build(
+        [this, dirIn, dolIn, apploaderIn](IPartWriteStream& cws) -> bool
+        {
+            return DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(cws, dirIn, dolIn, apploaderIn);
+        },
+        [this, apploaderIn](IPartWriteStream& cws, size_t& xferSz) -> bool
+        {
+            cws.write(nullptr, 0x2440 - 0x430);
+            std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(apploaderIn)->beginReadStream();
+            if (!rs)
+                return false;
+            char buf[8192];
+            SystemString apploaderName(apploaderIn);
+            ++m_parent.m_progressIdx;
+            while (true)
+            {
+                size_t rdSz = rs->read(buf, 8192);
+                if (!rdSz)
+                    break;
+                cws.write(buf, rdSz);
+                xferSz += rdSz;
+                if (0x2440 + xferSz >= 0x1F0000)
+                {
+                    LogModule.report(logvisor::Error,
+                                     "apploader flows into user area (one or the other is too big)");
+                    return false;
+                }
+                m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
+            }
+            return true;
+        }, phBuf.get(), phSz, theStat.st_size);
+    }
+
+    bool mergeFromDirectory(const PartitionWii* partIn, const SystemChar* dirIn)
+    {
+        size_t phSz;
+        std::unique_ptr<uint8_t[]> phBuf = partIn->readPartitionHeaderBuf(phSz);
+
+        return _build(
+        [this, partIn, dirIn](IPartWriteStream& cws) -> bool
+        {
+            return DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(cws, partIn, dirIn);
+        },
+        [this, partIn](IPartWriteStream& cws, size_t& xferSz) -> bool
+        {
+            cws.write(nullptr, 0x2440 - 0x430);
+            std::unique_ptr<uint8_t[]> apploaderBuf = partIn->getApploaderBuf();
+            size_t apploaderSz = partIn->getApploaderSize();
+            SystemString apploaderName(_S("<apploader>"));
+            ++m_parent.m_progressIdx;
+            cws.write(apploaderBuf.get(), apploaderSz);
+            xferSz += apploaderSz;
+            if (0x2440 + xferSz >= 0x1F0000)
+            {
+                LogModule.report(logvisor::Error,
+                                 "apploader flows into user area (one or the other is too big)");
+                return false;
+            }
+            m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
+            return true;
+        }, phBuf.get(), phSz, partIn->getApploaderSize());
     }
 };
 
@@ -852,22 +1050,28 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
 {
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_partitions[0]);
     uint64_t filledSz = pb.m_baseOffset;
-    m_fileIO->beginWriteStream();
+    if (!m_fileIO->beginWriteStream())
+        return false;
 
-    if (!CheckFreeSpace(m_outPath, m_discCapacity))
+    if (!CheckFreeSpace(m_outPath.c_str(), m_discCapacity))
     {
-        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_outPath);
+        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_outPath.c_str());
         return false;
     }
     ++m_progressIdx;
     m_progressCB(m_progressIdx, _S("Preallocating image"), -1);
-    m_fileIO->beginWriteStream(m_discCapacity - 1)->write("", 1);
+    std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(m_discCapacity - 1);
+    if (!ws)
+        return false;
+    ws->write("", 1);
 
     /* Assemble image */
     filledSz = pb.buildFromDirectory(dirIn, dolIn, apploaderIn, partHeadIn);
-    if (filledSz >= uint64_t(m_discCapacity))
+    if (filledSz == -1)
+        return false;
+    else if (filledSz >= uint64_t(m_discCapacity))
     {
-        LogModule.report(logvisor::Fatal, "data partition exceeds disc capacity");
+        LogModule.report(logvisor::Error, "data partition exceeds disc capacity");
         return false;
     }
 
@@ -875,21 +1079,29 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     m_progressCB(m_progressIdx, _S("Finishing Disc"), -1);
 
     /* Populate disc header */
-    std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(0);
+    ws = m_fileIO->beginWriteStream(0);
+    if (!ws)
+        return false;
     Header header(pb.getGameID(), pb.getGameTitle().c_str(), true, 0, 0, 0);
     header.write(*ws);
 
     /* Populate partition info */
     ws = m_fileIO->beginWriteStream(0x40000);
+    if (!ws)
+        return false;
     uint32_t vals[2] = {SBig(uint32_t(1)), SBig(uint32_t(0x40020 >> uint64_t(2)))};
     ws->write(vals, 8);
 
     ws = m_fileIO->beginWriteStream(0x40020);
+    if (!ws)
+        return false;
     vals[0] = SBig(uint32_t(pb.m_baseOffset >> uint64_t(2)));
     ws->write(vals, 4);
 
     /* Populate region info */
     ws = m_fileIO->beginWriteStream(0x4E000);
+    if (!ws)
+        return false;
     const char* gameID = pb.getGameID();
     if (gameID[3] == 'P')
         vals[0] = SBig(uint32_t(2));
@@ -901,11 +1113,15 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
 
     /* Make disc unrated */
     ws = m_fileIO->beginWriteStream(0x4E010);
+    if (!ws)
+        return false;
     for (int i=0 ; i<16 ; ++i)
         ws->write("\x80", 1);
 
     /* Fill image to end */
     ws = m_fileIO->beginWriteStream(filledSz);
+    if (!ws)
+        return false;
     uint8_t fillBuf[512];
     memset(fillBuf, 0xff, 512);
     for (size_t i=m_discCapacity-filledSz ; i>0 ;)
@@ -923,13 +1139,149 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     return true;
 }
 
-DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, const char gameID[6], const char* gameTitle, bool dualLayer,
-                               std::function<void(size_t, const SystemString&, size_t)> progressCB)
+uint64_t DiscBuilderWii::CalculateTotalSizeRequired(const SystemChar* dirIn, const SystemChar* dolIn,
+                                                    bool& dualLayer)
+{
+    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dolIn, dirIn);
+    if (sz == -1)
+        return -1;
+    auto szDiv = std::lldiv(sz, 0x1F0000);
+    if (szDiv.rem) ++szDiv.quot;
+    sz = szDiv.quot * 0x200000;
+    sz += 0x200000;
+    dualLayer = (sz > 0x118240000);
+    if (sz > 0x1FB4E0000)
+    {
+        LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
+        return -1;
+    }
+    return sz;
+}
+
+DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, const char gameID[6], const char* gameTitle,
+                               bool dualLayer, FProgress progressCB)
 : DiscBuilderBase(outPath, dualLayer ? 0x1FB4E0000 : 0x118240000, progressCB), m_dualLayer(dualLayer)
 {
     PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionBuilderBase::Kind::Data,
                                                                gameID, gameTitle, 0x200000);
     m_partitions.emplace_back(partBuilder);
+}
+
+DiscMergerWii::DiscMergerWii(const SystemChar* outPath, DiscWii& sourceDisc,
+                             bool dualLayer, FProgress progressCB)
+: m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, dualLayer, progressCB))
+{}
+
+bool DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
+{
+    PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_builder.m_partitions[0]);
+    uint64_t filledSz = pb.m_baseOffset;
+    if (!m_builder.m_fileIO->beginWriteStream())
+        return false;
+
+    if (!CheckFreeSpace(m_builder.m_outPath.c_str(), m_builder.m_discCapacity))
+    {
+        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_builder.m_outPath.c_str());
+        return false;
+    }
+    ++m_builder.m_progressIdx;
+    m_builder.m_progressCB(m_builder.m_progressIdx, _S("Preallocating image"), -1);
+    std::unique_ptr<IFileIO::IWriteStream> ws = m_builder.m_fileIO->beginWriteStream(m_builder.m_discCapacity - 1);
+    if (!ws)
+        return false;
+    ws->write("", 1);
+
+    /* Assemble image */
+    filledSz = pb.mergeFromDirectory(static_cast<PartitionWii*>(m_sourceDisc.getDataPartition()), dirIn);
+    if (filledSz == -1)
+        return false;
+    else if (filledSz >= uint64_t(m_builder.m_discCapacity))
+    {
+        LogModule.report(logvisor::Error, "data partition exceeds disc capacity");
+        return false;
+    }
+
+    ++m_builder.m_progressIdx;
+    m_builder.m_progressCB(m_builder.m_progressIdx, _S("Finishing Disc"), -1);
+
+    /* Populate disc header */
+    ws = m_builder.m_fileIO->beginWriteStream(0);
+    if (!ws)
+        return false;
+    m_sourceDisc.getHeader().write(*ws);
+
+    /* Populate partition info */
+    ws = m_builder.m_fileIO->beginWriteStream(0x40000);
+    if (!ws)
+        return false;
+    uint32_t vals[2] = {SBig(uint32_t(1)), SBig(uint32_t(0x40020 >> uint64_t(2)))};
+    ws->write(vals, 8);
+
+    ws = m_builder.m_fileIO->beginWriteStream(0x40020);
+    if (!ws)
+        return false;
+    vals[0] = SBig(uint32_t(pb.m_baseOffset >> uint64_t(2)));
+    ws->write(vals, 4);
+
+    /* Populate region info */
+    ws = m_builder.m_fileIO->beginWriteStream(0x4E000);
+    if (!ws)
+        return false;
+    const char* gameID = pb.getGameID();
+    if (gameID[3] == 'P')
+        vals[0] = SBig(uint32_t(2));
+    else if (gameID[3] == 'J')
+        vals[0] = SBig(uint32_t(0));
+    else
+        vals[0] = SBig(uint32_t(1));
+    ws->write(vals, 4);
+
+    /* Make disc unrated */
+    ws = m_builder.m_fileIO->beginWriteStream(0x4E010);
+    if (!ws)
+        return false;
+    for (int i=0 ; i<16 ; ++i)
+        ws->write("\x80", 1);
+
+    /* Fill image to end */
+    ws = m_builder.m_fileIO->beginWriteStream(filledSz);
+    if (!ws)
+        return false;
+    uint8_t fillBuf[512];
+    memset(fillBuf, 0xff, 512);
+    for (size_t i=m_builder.m_discCapacity-filledSz ; i>0 ;)
+    {
+        if (i >= 512)
+        {
+            ws->write(fillBuf, 512);
+            i -= 512;
+            continue;
+        }
+        ws->write(fillBuf, i);
+        break;
+    }
+
+    return true;
+}
+
+uint64_t DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc,
+                                                   const SystemChar* dirIn, bool& dualLayer)
+{
+    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(
+                  sourceDisc.getDataPartition(), dirIn);
+    if (sz == -1)
+        return -1;
+    auto szDiv = std::lldiv(sz, 0x1F0000);
+    if (szDiv.rem) ++szDiv.quot;
+    sz = szDiv.quot * 0x200000;
+    sz += 0x200000;
+    dualLayer = (sz > 0x118240000);
+    if (sz > 0x1FB4E0000)
+    {
+        LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
+        return -1;
+    }
+    return sz;
 }
 
 }

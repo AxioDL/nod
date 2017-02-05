@@ -80,7 +80,7 @@ class DiscIOWBFS : public IDiscIO
         rs.seek(off, SEEK_SET);
         if (rs.read(buf, count*512ULL) != count*512ULL)
         {
-            LogModule.report(logvisor::Fatal, "error reading disc");
+            LogModule.report(logvisor::Error, "error reading disc");
             return 1;
         }
         return 0;
@@ -93,19 +93,25 @@ public:
         /* Temporary file handle to read LBA table */
         std::unique_ptr<IFileIO> fio = NewFileIO(filepath);
         std::unique_ptr<IFileIO::IReadStream> rs = fio->beginReadStream();
+        if (!rs)
+            return;
 
         WBFS* p = &wbfs;
         WBFSHead tmpHead;
-        if (rs->read(&tmpHead, sizeof(tmpHead)) != sizeof(tmpHead))
-            LogModule.report(logvisor::Fatal, "unable to read WBFS head");
+        if (rs->read(&tmpHead, sizeof(tmpHead)) != sizeof(tmpHead)) {
+            LogModule.report(logvisor::Error, "unable to read WBFS head");
+            return;
+        }
         unsigned hd_sector_size = 1 << tmpHead.hd_sec_sz_s;
         unsigned num_hd_sector = SBig(tmpHead.n_hd_sec);
 
         wbfsHead.reset(new uint8_t[hd_sector_size]);
         WBFSHead* head = (WBFSHead*)wbfsHead.get();
         rs->seek(0, SEEK_SET);
-        if (rs->read(head, hd_sector_size) != hd_sector_size)
-            LogModule.report(logvisor::Fatal, "unable to read WBFS head");
+        if (rs->read(head, hd_sector_size) != hd_sector_size) {
+            LogModule.report(logvisor::Error, "unable to read WBFS head");
+            return;
+        }
 
         //constants, but put here for consistancy
         p->wii_sec_sz = 0x8000;
@@ -113,12 +119,15 @@ public:
         p->n_wii_sec = (num_hd_sector/0x8000)*hd_sector_size;
         p->n_wii_sec_per_disc = 143432*2;//support for double layers discs..
         p->part_lba = 0;
-        _wbfsReadSector(*rs, p->part_lba, 1, head);
+        if (_wbfsReadSector(*rs, p->part_lba, 1, head))
+            return;
         if (hd_sector_size && head->hd_sec_sz_s !=  size_to_shift(hd_sector_size)) {
-            LogModule.report(logvisor::Fatal, "hd sector size doesn't match");
+            LogModule.report(logvisor::Error, "hd sector size doesn't match");
+            return;
         }
         if (num_hd_sector && head->n_hd_sec != SBig(num_hd_sector)) {
-            LogModule.report(logvisor::Fatal, "hd num sector doesn't match");
+            LogModule.report(logvisor::Error, "hd num sector doesn't match");
+            return;
         }
         p->hd_sec_sz = 1<<head->hd_sec_sz_s;
         p->hd_sec_sz_s = head->hd_sec_sz_s;
@@ -145,9 +154,12 @@ public:
         if (head->disc_table[0])
         {
             wbfsDiscInfo.reset(new uint8_t[p->disc_info_sz]);
-            if (!wbfsDiscInfo)
-                LogModule.report(logvisor::Fatal, "allocating memory");
-            _wbfsReadSector(*rs, p->part_lba+1, disc_info_sz_lba, wbfsDiscInfo.get());
+            if (!wbfsDiscInfo) {
+                LogModule.report(logvisor::Error, "allocating memory");
+                return;
+            }
+            if (_wbfsReadSector(*rs, p->part_lba+1, disc_info_sz_lba, wbfsDiscInfo.get()))
+                return;
             p->n_disc_open++;
             //for(i=0;i<p->n_wbfs_sec_per_disc;i++)
             //    printf("%d,",wbfs_ntohs(d->header->wlba_table[i]));
@@ -162,11 +174,11 @@ public:
         uint64_t m_offset;
         std::unique_ptr<uint8_t[]> m_tmpBuffer;
 
-        ReadStream(const DiscIOWBFS& parent, std::unique_ptr<IFileIO::IReadStream>&& fpin, uint64_t offset)
+        ReadStream(const DiscIOWBFS& parent, std::unique_ptr<IFileIO::IReadStream>&& fpin, uint64_t offset, bool& err)
         : m_parent(parent),
           fp(std::move(fpin)),
           m_offset(offset),
-          m_tmpBuffer(new uint8_t[parent.wbfs.hd_sec_sz]) {}
+          m_tmpBuffer(new uint8_t[parent.wbfs.hd_sec_sz]) { if (!fp) err = true; }
 
         int wbfsReadSector(uint32_t lba, uint32_t count, void* buf)
         {return DiscIOWBFS::_wbfsReadSector(*fp, lba, count, buf);}
@@ -271,7 +283,11 @@ public:
 
     std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
-        return std::unique_ptr<IReadStream>(new ReadStream(*this, NewFileIO(filepath)->beginReadStream(), offset));
+        bool Err = false;
+        auto ret = std::unique_ptr<IReadStream>(new ReadStream(*this, NewFileIO(filepath)->beginReadStream(), offset, Err));
+        if (Err)
+            return {};
+        return ret;
     }
 
     std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const

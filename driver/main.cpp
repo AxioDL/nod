@@ -8,7 +8,9 @@ static void printHelp()
     fprintf(stderr, "Usage:\n"
                     "  nodtool extract [-f] <image-in> [<dir-out>]\n"
                     "  nodtool makegcn <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> [<image-out>]\n"
-                    "  nodtool makewii(sl|dl) <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> <parthead-in> [<image-out>]\n");
+                    "  nodtool makewii <gameid> <game-title> <fsroot-in> <dol-in> <apploader-in> <parthead-in> [<image-out>]\n"
+                    "  nodtool mergegcn <fsroot-in> <image-in> [<image-out>]\n"
+                    "  nodtool mergewii <fsroot-in> <image-in> [<image-out>]\n");
 }
 
 #if NOD_UCS2
@@ -25,8 +27,9 @@ int main(int argc, char* argv[])
 {
     if (argc < 3 ||
         (!strcasecmp(argv[1], _S("makegcn")) && argc < 7) ||
-        (!strcasecmp(argv[1], _S("makewiisl")) && argc < 8) ||
-        (!strcasecmp(argv[1], _S("makewiidl")) && argc < 8))
+        (!strcasecmp(argv[1], _S("makewii")) && argc < 8) ||
+        (!strcasecmp(argv[1], _S("mergegcn")) && argc < 4) ||
+        (!strcasecmp(argv[1], _S("mergewii")) && argc < 4))
     {
         printHelp();
         return 1;
@@ -55,6 +58,21 @@ int main(int argc, char* argv[])
             outDir = argv[a];
     }
 
+    size_t lastIdx = -1;
+    auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
+    {
+        if (idx != lastIdx)
+        {
+            lastIdx = idx;
+            printf("\n");
+        }
+        if (bytes != -1)
+            nod::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
+        else
+            nod::Printf(_S("\r%s"), name.c_str());
+        fflush(stdout);
+    };
+
     if (!strcasecmp(argv[1], _S("extract")))
     {
         bool isWii;
@@ -79,39 +97,43 @@ int main(int argc, char* argv[])
     {
 #if NOD_UCS2
         if (wcslen(argv[2]) < 6)
-            nod::LogModule.report(logvisor::Fatal, _S("game-id is not at least 6 characters"));
+        {
+            nod::LogModule.report(logvisor::Error, _S("game-id is not at least 6 characters"));
+            return 1;
+        }
 #else
         if (strlen(argv[2]) < 6)
-            nod::LogModule.report(logvisor::Fatal, _S("game-id is not at least 6 characters"));
+        {
+            nod::LogModule.report(logvisor::Error, _S("game-id is not at least 6 characters"));
+            return 1;
+        }
 #endif
 
         /* Pre-validate paths */
         nod::Sstat theStat;
         if (nod::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
-            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as directory"), argv[4]);
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as directory"), argv[4]);
+            return 1;
+        }
         if (nod::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
-            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as file"), argv[5]);
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as file"), argv[5]);
+            return 1;
+        }
         if (nod::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
-            nod::LogModule.report(logvisor::Fatal, "unable to stat %s as file", argv[6]);
+        {
+            nod::LogModule.report(logvisor::Error, "unable to stat %s as file", argv[6]);
+            return 1;
+        }
 
         nod::SystemString gameIdSys(argv[2]);
         nod::SystemUTF8View gameId(gameIdSys);
         nod::SystemString gameTitleSys(argv[3]);
         nod::SystemUTF8View gameTitle(gameTitleSys);
-        size_t lastIdx = -1;
-        auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
-        {
-            if (idx != lastIdx)
-            {
-                lastIdx = idx;
-                printf("\n");
-            }
-            if (bytes != -1)
-                nod::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
-            else
-                nod::Printf(_S("\r%s"), name.c_str());
-            fflush(stdout);
-        };
+
+        if (nod::DiscBuilderGCN::CalculateTotalSizeRequired(argv[4], argv[5]) == -1)
+            return 1;
 
         bool ret;
 
@@ -132,47 +154,54 @@ int main(int argc, char* argv[])
         if (!ret)
             return 1;
     }
-    else if (!strcasecmp(argv[1], _S("makewiisl")) || !strcasecmp(argv[1], _S("makewiidl")))
+    else if (!strcasecmp(argv[1], _S("makewii")))
     {
 #if NOD_UCS2
         if (wcslen(argv[2]) < 6)
-            nod::LogModule.report(logvisor::Fatal, _S("game-id is not at least 6 characters"));
+        {
+            nod::LogModule.report(logvisor::Error, _S("game-id is not at least 6 characters"));
+            return 1;
+        }
 #else
         if (strlen(argv[2]) < 6)
-            nod::LogModule.report(logvisor::Fatal, _S("game-id is not at least 6 characters"));
+        {
+            nod::LogModule.report(logvisor::Error, _S("game-id is not at least 6 characters"));
+            return 1;
+        }
 #endif
 
         /* Pre-validate paths */
         nod::Sstat theStat;
         if (nod::Stat(argv[4], &theStat) || !S_ISDIR(theStat.st_mode))
-            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as directory"), argv[4]);
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as directory"), argv[4]);
+            return 1;
+        }
         if (nod::Stat(argv[5], &theStat) || !S_ISREG(theStat.st_mode))
-            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as file"), argv[5]);
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as file"), argv[5]);
+            return 1;
+        }
         if (nod::Stat(argv[6], &theStat) || !S_ISREG(theStat.st_mode))
-            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as file"), argv[6]);
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as file"), argv[6]);
+            return 1;
+        }
         if (nod::Stat(argv[7], &theStat) || !S_ISREG(theStat.st_mode))
-            nod::LogModule.report(logvisor::Fatal, _S("unable to stat %s as file"), argv[7]);
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as file"), argv[7]);
+            return 1;
+        }
 
         nod::SystemString gameIdSys(argv[2]);
         nod::SystemUTF8View gameId(gameIdSys);
         nod::SystemString gameTitleSys(argv[3]);
         nod::SystemUTF8View gameTitle(gameTitleSys);
-        size_t lastIdx = -1;
-        auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
-        {
-            if (idx != lastIdx)
-            {
-                lastIdx = idx;
-                printf("\n");
-            }
-            if (bytes != -1)
-                nod::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
-            else
-                nod::Printf(_S("\r%s"), name.c_str());
-            fflush(stdout);
-        };
 
-        bool dual = (argv[1][7] == _S('d') || argv[1][7] == _S('D'));
+        bool dual = false;
+        if (nod::DiscBuilderWii::CalculateTotalSizeRequired(argv[4], argv[5], dual) == -1)
+            return 1;
+
         bool ret;
 
         if (argc < 9)
@@ -192,12 +221,114 @@ int main(int argc, char* argv[])
         if (!ret)
             return 1;
     }
+    else if (!strcasecmp(argv[1], _S("mergegcn")))
+    {
+        /* Pre-validate paths */
+        nod::Sstat theStat;
+        if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode))
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as directory"), argv[2]);
+            return 1;
+        }
+        if (nod::Stat(argv[3], &theStat) || !S_ISREG(theStat.st_mode))
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as file"), argv[3]);
+            return 1;
+        }
+
+        bool isWii;
+        std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(argv[3], isWii);
+        if (!disc)
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to open image %s"), argv[3]);
+            return 1;
+        }
+        if (isWii)
+        {
+            nod::LogModule.report(logvisor::Error, _S("Wii images should be merged with 'mergewii'"));
+            return 1;
+        }
+
+        if (nod::DiscMergerGCN::CalculateTotalSizeRequired(static_cast<nod::DiscGCN&>(*disc), argv[2]) == -1)
+            return 1;
+
+        bool ret;
+
+        if (argc < 5)
+        {
+            nod::SystemString outPath(argv[2]);
+            outPath.append(_S(".iso"));
+            nod::DiscMergerGCN b(outPath.c_str(), static_cast<nod::DiscGCN&>(*disc), progFunc);
+            ret = b.mergeFromDirectory(argv[2]);
+        }
+        else
+        {
+            nod::DiscMergerGCN b(argv[4], static_cast<nod::DiscGCN&>(*disc), progFunc);
+            ret = b.mergeFromDirectory(argv[2]);
+        }
+
+        printf("\n");
+        if (!ret)
+            return 1;
+    }
+    else if (!strcasecmp(argv[1], _S("mergewii")))
+    {
+        /* Pre-validate paths */
+        nod::Sstat theStat;
+        if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode))
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as directory"), argv[2]);
+            return 1;
+        }
+        if (nod::Stat(argv[3], &theStat) || !S_ISREG(theStat.st_mode))
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as file"), argv[3]);
+            return 1;
+        }
+
+        bool isWii;
+        std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(argv[3], isWii);
+        if (!disc)
+        {
+            nod::LogModule.report(logvisor::Error, _S("unable to open image %s"), argv[3]);
+            return 1;
+        }
+        if (!isWii)
+        {
+            nod::LogModule.report(logvisor::Error, _S("GameCube images should be merged with 'mergegcn'"));
+            return 1;
+        }
+
+        bool dual = false;
+        if (nod::DiscMergerWii::CalculateTotalSizeRequired(static_cast<nod::DiscWii&>(*disc), argv[2], dual) == -1)
+            return 1;
+
+        bool ret;
+
+        if (argc < 5)
+        {
+            nod::SystemString outPath(argv[2]);
+            outPath.append(_S(".iso"));
+            nod::DiscMergerWii b(outPath.c_str(), static_cast<nod::DiscWii&>(*disc), dual, progFunc);
+            ret = b.mergeFromDirectory(argv[2]);
+        }
+        else
+        {
+            nod::DiscMergerWii b(argv[4], static_cast<nod::DiscWii&>(*disc), dual, progFunc);
+            ret = b.mergeFromDirectory(argv[2]);
+        }
+
+        printf("\n");
+        if (!ret)
+            return 1;
+    }
     else
     {
         printHelp();
         return 1;
     }
 
+    nod::LogModule.report(logvisor::Info, _S("Success!"));
     return 0;
 }
 

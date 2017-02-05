@@ -309,16 +309,25 @@ static inline bool CheckFreeSpace(const SystemChar* path, size_t reqSz)
     wchar_t* end;
     DWORD ret = GetFullPathNameW(path, 1024, buf, &end);
     if (!ret || ret > 1024)
-        LogModule.report(logvisor::Fatal, _S("GetFullPathNameW %s"), path);
+    {
+        LogModule.report(logvisor::Error, _S("GetFullPathNameW %s"), path);
+        return false;
+    }
     if (end)
         end[0] = L'\0';
     if (!GetDiskFreeSpaceExW(buf, &freeBytes, nullptr, nullptr))
-        LogModule.report(logvisor::Fatal, _S("GetDiskFreeSpaceExW %s: %d"), path, GetLastError());
+    {
+        LogModule.report(logvisor::Error, _S("GetDiskFreeSpaceExW %s: %d"), path, GetLastError());
+        return false;
+    }
     return reqSz < freeBytes.QuadPart;
 #else
     struct statvfs svfs;
     if (statvfs(path, &svfs))
-        LogModule.report(logvisor::Fatal, "statvfs %s: %s", path, strerror(errno));
+    {
+        LogModule.report(logvisor::Error, "statvfs %s: %s", path, strerror(errno));
+        return false;
+    }
     return reqSz < svfs.f_frsize * svfs.f_bavail;
 #endif
 }

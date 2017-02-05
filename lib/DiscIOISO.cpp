@@ -17,8 +17,8 @@ public:
     {
         friend class DiscIOISO;
         std::unique_ptr<IFileIO::IReadStream> fp;
-        ReadStream(std::unique_ptr<IFileIO::IReadStream>&& fpin)
-        : fp(std::move(fpin)) {}
+        ReadStream(std::unique_ptr<IFileIO::IReadStream>&& fpin, bool& err)
+        : fp(std::move(fpin)) { if (!fp) err = true; }
     public:
         uint64_t read(void* buf, uint64_t length)
         {return fp->read(buf, length);}
@@ -30,15 +30,19 @@ public:
 
     std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
-        return std::unique_ptr<IReadStream>(new ReadStream(m_fio->beginReadStream(offset)));
+        bool Err = false;
+        auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_fio->beginReadStream(offset), Err));
+        if (Err)
+            return {};
+        return ret;
     }
 
     class WriteStream : public IWriteStream
     {
         friend class DiscIOISO;
         std::unique_ptr<IFileIO::IWriteStream> fp;
-        WriteStream(std::unique_ptr<IFileIO::IWriteStream>&& fpin)
-        : fp(std::move(fpin)) {}
+        WriteStream(std::unique_ptr<IFileIO::IWriteStream>&& fpin, bool& err)
+        : fp(std::move(fpin)) { if (!fp) err = true; }
     public:
         uint64_t write(const void* buf, uint64_t length)
         {
@@ -48,7 +52,11 @@ public:
 
     std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
-        return std::unique_ptr<IWriteStream>(new WriteStream(m_fio->beginWriteStream(offset)));
+        bool Err = false;
+        auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_fio->beginWriteStream(offset), Err));
+        if (Err)
+            return {};
+        return ret;
     }
 };
 

@@ -17,15 +17,20 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path, bool& isWii)
     if (!fio->exists())
     {
         LogModule.report(logvisor::Error, _S("Unable to open '%s'"), path);
-        return std::unique_ptr<DiscBase>();
+        return {};
     }
     std::unique_ptr<IFileIO::IReadStream> rs = fio->beginReadStream();
+    if (!rs)
+        return {};
 
     isWii = false;
     std::unique_ptr<IDiscIO> discIO;
     uint32_t magic = 0;
     if (rs->read(&magic, 4) != 4)
-        LogModule.report(logvisor::Fatal, _S("Unable to read magic from '%s'"), path);
+    {
+        LogModule.report(logvisor::Error, _S("Unable to read magic from '%s'"), path);
+        return {};
+    }
 
     if (magic == nod::SBig((uint32_t)'WBFS'))
     {
@@ -54,14 +59,23 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path, bool& isWii)
     if (!discIO)
     {
         LogModule.report(logvisor::Error, _S("'%s' is not a valid image"), path);
-        return std::unique_ptr<DiscBase>();
+        return {};
     }
 
+    bool Err = false;
+    std::unique_ptr<DiscBase> ret;
     if (isWii)
-        return std::unique_ptr<DiscBase>(new DiscWii(std::move(discIO)));
+    {
+        ret = std::unique_ptr<DiscBase>(new DiscWii(std::move(discIO), Err));
+        if (Err)
+            return {};
+        return ret;
+    }
 
-    return std::unique_ptr<DiscBase>(new DiscGCN(std::move(discIO)));
-
+    ret = std::unique_ptr<DiscBase>(new DiscGCN(std::move(discIO), Err));
+    if (Err)
+        return {};
+    return ret;
 }
 
 std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path)

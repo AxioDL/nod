@@ -118,6 +118,8 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
         {
             std::unique_ptr<IPartReadStream> rs = beginReadStream();
             std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path)->beginWriteStream();
+            if (!rs || !ws)
+                return false;
             ws->copyFromDisc(*rs, m_discLength);
         }
     }
@@ -141,7 +143,10 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         if (ctx.verbose && ctx.progressCB)
             ctx.progressCB("apploader.bin");
         std::unique_ptr<uint8_t[]> buf = getApploaderBuf();
-        NewFileIO(apploaderPath)->beginWriteStream()->write(buf.get(), m_apploaderSz);
+        auto ws = NewFileIO(apploaderPath)->beginWriteStream();
+        if (!ws)
+            return false;
+        ws->write(buf.get(), m_apploaderSz);
     }
 
     /* Extract Dol */
@@ -151,7 +156,10 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         if (ctx.verbose && ctx.progressCB)
             ctx.progressCB("boot.dol");
         std::unique_ptr<uint8_t[]> buf = getDOLBuf();
-        NewFileIO(dolPath)->beginWriteStream()->write(buf.get(), m_dolSz);
+        auto ws = NewFileIO(dolPath)->beginWriteStream();
+        if (!ws)
+            return false;
+        ws->write(buf.get(), m_dolSz);
     }
 
     /* Extract Filesystem */
@@ -177,17 +185,26 @@ static uint64_t GetInode(const SystemChar* path)
                             FILE_ATTRIBUTE_NORMAL,
                             nullptr);
     if (!fp)
-        LogModule.report(logvisor::Fatal, _S("unable to open %s"), path);
+    {
+        LogModule.report(logvisor::Error, _S("unable to open %s"), path);
+        return 0;
+    }
     BY_HANDLE_FILE_INFORMATION info;
     if (!GetFileInformationByHandle(fp, &info))
-        LogModule.report(logvisor::Fatal, _S("unable to GetFileInformationByHandle %s"), path);
+    {
+        LogModule.report(logvisor::Error, _S("unable to GetFileInformationByHandle %s"), path);
+        return 0;
+    }
     inode = uint64_t(info.nFileIndexHigh) << 32;
     inode |= uint64_t(info.nFileIndexLow);
     CloseHandle(fp);
 #else
     struct stat st;
     if (stat(path, &st))
-        LogModule.report(logvisor::Fatal, _S("unable to stat %s"), path);
+    {
+        LogModule.report(logvisor::Error, _S("unable to stat %s"), path);
+        return 0;
+    }
     inode = uint64_t(st.st_ino);
 #endif
     return inode;
@@ -222,11 +239,9 @@ static bool IsSystemFile(const SystemString& name, bool& isDol)
 
 /** Patches out pesky #001 integrity check performed by game's OSInit.
  *  This is required for multi-DOL games, but doesn't harm functionality otherwise */
-static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t sz, bool& patched)
+static void PatchDOL(std::unique_ptr<uint8_t[]>& buf, size_t sz, bool& patched)
 {
     patched = false;
-    std::unique_ptr<uint8_t[]> buf(new uint8_t[sz]);
-    sz = in.read(buf.get(), sz);
     uint8_t* found = static_cast<uint8_t*>(memmem(buf.get(), sz,
                             "\x3C\x03\xF8\x00\x28\x00\x00\x00\x40\x82\x00\x0C"
                             "\x38\x60\x00\x01\x48\x00\x02\x44\x38\x61\x00\x18\x48", 25));
@@ -235,10 +250,17 @@ static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t s
         found[11] = '\x04';
         patched = true;
     }
+}
+
+static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t sz, bool& patched)
+{
+    std::unique_ptr<uint8_t[]> buf(new uint8_t[sz]);
+    sz = in.read(buf.get(), sz);
+    PatchDOL(buf, sz, patched);
     return out.write(buf.get(), sz);
 }
 
-void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream& ws,
+bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream& ws,
                                                                 bool system,
                                                                 const SystemChar* dirIn,
                                                                 uint64_t dolInode)
@@ -248,7 +270,8 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
     {
         if (e.m_isDir)
         {
-            recursiveBuildNodes(ws, system, e.m_path.c_str(), dolInode);
+            if (!recursiveBuildNodes(ws, system, e.m_path.c_str(), dolInode))
+                return false;
         }
         else
         {
@@ -262,8 +285,12 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
 
             size_t fileSz = ROUND_UP_32(e.m_fileSz);
             uint64_t fileOff = userAllocate(fileSz, ws);
+            if (fileOff == -1)
+                return false;
             m_fileOffsetsSizes[e.m_path] = std::make_pair(fileOff, fileSz);
             std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(e.m_path)->beginReadStream();
+            if (!rs)
+                return false;
             size_t xferSz = 0;
             if (isDol)
             {
@@ -289,9 +316,11 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
                 ws.write("\xff", 1);
         }
     }
+
+    return true;
 }
 
-void DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
+bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
                                                               std::function<void(void)> incParents)
 {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
@@ -303,7 +332,8 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* 
             m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx+1);
             addBuildName(e.m_name);
             incParents();
-            recursiveBuildFST(e.m_path.c_str(), dolInode, [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();});
+            if (!recursiveBuildFST(e.m_path.c_str(), dolInode, [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();}))
+                return false;
         }
         else
         {
@@ -321,6 +351,328 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* 
             incParents();
         }
     }
+
+    return true;
+}
+
+bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream& ws,
+                                                                bool system,
+                                                                const DiscBase::IPartition::Node* nodeIn,
+                                                                const SystemChar* dirIn,
+                                                                const SystemString& keyPath)
+{
+    /* Build map of existing nodes to write-through later */
+    std::unordered_map<std::string, const Partition::Node*> fileNodes;
+    std::unordered_map<std::string, const Partition::Node*> dirNodes;
+    if (nodeIn)
+    {
+        fileNodes.reserve(nodeIn->size());
+        dirNodes.reserve(nodeIn->size());
+        for (const Partition::Node& ch : *nodeIn)
+        {
+            if (ch.getKind() == Partition::Node::Kind::File)
+                fileNodes.insert(std::make_pair(ch.getName(), &ch));
+            else if (ch.getKind() == Partition::Node::Kind::Directory)
+                dirNodes.insert(std::make_pair(ch.getName(), &ch));
+        }
+    }
+
+    /* Merge this directory's files */
+    if (dirIn)
+    {
+        DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+        for (const DirectoryEnumerator::Entry& e : dEnum)
+        {
+            SystemUTF8View nameView(e.m_name);
+            SystemString chKeyPath = keyPath + _S('/') + e.m_name;
+
+            if (e.m_isDir)
+            {
+                auto search = dirNodes.find(nameView.utf8_str());
+                if (search != dirNodes.cend())
+                {
+                    if (!recursiveMergeNodes(ws, system, search->second, e.m_path.c_str(), chKeyPath))
+                        return false;
+                    dirNodes.erase(search);
+                }
+                else
+                {
+                    if (!recursiveMergeNodes(ws, system, nullptr, e.m_path.c_str(), chKeyPath))
+                        return false;
+                }
+            }
+            else
+            {
+                bool isDol;
+                bool isSys = IsSystemFile(e.m_name, isDol);
+                if (system ^ isSys)
+                    continue;
+
+                fileNodes.erase(nameView.utf8_str());
+
+                size_t fileSz = ROUND_UP_32(e.m_fileSz);
+                uint64_t fileOff = userAllocate(fileSz, ws);
+                if (fileOff == -1)
+                    return false;
+                m_fileOffsetsSizes[chKeyPath] = std::make_pair(fileOff, fileSz);
+                std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(e.m_path)->beginReadStream();
+                if (!rs)
+                    return false;
+                size_t xferSz = 0;
+                if (isDol)
+                {
+                    bool patched;
+                    xferSz = PatchDOL(*rs, ws, e.m_fileSz, patched);
+                    m_parent.m_progressCB(++m_parent.m_progressIdx, e.m_name +
+                                          (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+                }
+                else
+                {
+                    char buf[0x8000];
+                    ++m_parent.m_progressIdx;
+                    while (xferSz < e.m_fileSz)
+                    {
+                        size_t rdSz = rs->read(buf, nod::min(size_t(0x8000ul), e.m_fileSz - xferSz));
+                        if (!rdSz)
+                            break;
+                        ws.write(buf, rdSz);
+                        xferSz += rdSz;
+                        m_parent.m_progressCB(m_parent.m_progressIdx, e.m_name, xferSz);
+                    }
+                }
+                for (size_t i=0 ; i<fileSz-xferSz ; ++i)
+                    ws.write("\xff", 1);
+            }
+        }
+    }
+
+    /* Write-through remaining dir nodes */
+    for (const auto& p : dirNodes)
+    {
+        SystemStringView sysName(p.second->getName());
+        SystemString chKeyPath = keyPath + _S('/') + sysName.sys_str();
+        if (!recursiveMergeNodes(ws, system, p.second, nullptr, chKeyPath))
+            return false;
+    }
+
+    /* Write-through remaining file nodes */
+    for (const auto& p : fileNodes)
+    {
+        const Partition::Node& ch = *p.second;
+        SystemStringView sysName(ch.getName());
+        SystemString chKeyPath = keyPath + _S('/') + sysName.sys_str();
+
+        bool isDol;
+        bool isSys = IsSystemFile(sysName.sys_str(), isDol);
+        if (system ^ isSys)
+            continue;
+
+        size_t fileSz = ROUND_UP_32(ch.size());
+        uint64_t fileOff = userAllocate(fileSz, ws);
+        if (fileOff == -1)
+            return false;
+        m_fileOffsetsSizes[chKeyPath] = std::make_pair(fileOff, fileSz);
+        std::unique_ptr<IPartReadStream> rs = ch.beginReadStream();
+        if (!rs)
+            return false;
+        size_t xferSz = 0;
+        if (isDol)
+        {
+            xferSz = ch.size();
+            std::unique_ptr<uint8_t[]> dolBuf = ch.getBuf();
+            bool patched;
+            PatchDOL(dolBuf, xferSz, patched);
+            ws.write(dolBuf.get(), xferSz);
+            m_parent.m_progressCB(++m_parent.m_progressIdx, sysName.sys_str() +
+                                  (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+        }
+        else
+        {
+            char buf[0x8000];
+            ++m_parent.m_progressIdx;
+            while (xferSz < ch.size())
+            {
+                size_t rdSz = rs->read(buf, nod::min(size_t(0x8000), size_t(ch.size() - xferSz)));
+                if (!rdSz)
+                    break;
+                ws.write(buf, rdSz);
+                xferSz += rdSz;
+                m_parent.m_progressCB(m_parent.m_progressIdx, sysName.sys_str(), xferSz);
+            }
+        }
+        for (size_t i=0 ; i<fileSz-xferSz ; ++i)
+            ws.write("\xff", 1);
+    }
+
+    return true;
+}
+
+bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Partition::Node* nodeIn,
+                                                              const SystemChar* dirIn,
+                                                              std::function<void(void)> incParents,
+                                                              const SystemString& keyPath)
+{
+    /* Build map of existing nodes to write-through later */
+    std::unordered_map<std::string, const Partition::Node*> fileNodes;
+    std::unordered_map<std::string, const Partition::Node*> dirNodes;
+    if (nodeIn)
+    {
+        fileNodes.reserve(nodeIn->size());
+        dirNodes.reserve(nodeIn->size());
+        for (const Partition::Node& ch : *nodeIn)
+        {
+            if (ch.getKind() == Partition::Node::Kind::File)
+                fileNodes.insert(std::make_pair(ch.getName(), &ch));
+            else if (ch.getKind() == Partition::Node::Kind::Directory)
+                dirNodes.insert(std::make_pair(ch.getName(), &ch));
+        }
+    }
+
+    /* Merge this directory's files */
+    if (dirIn)
+    {
+        DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+        for (const DirectoryEnumerator::Entry& e : dEnum)
+        {
+            SystemUTF8View nameView(e.m_name);
+            SystemString chKeyPath = keyPath + _S('/') + e.m_name;
+
+            if (e.m_isDir)
+            {
+                size_t dirNodeIdx = m_buildNodes.size();
+                m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx+1);
+                addBuildName(e.m_name);
+                incParents();
+
+                auto search = dirNodes.find(nameView.utf8_str());
+                if (search != dirNodes.cend())
+                {
+                    if (!recursiveMergeFST(search->second, e.m_path.c_str(),
+                                           [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();},
+                                           chKeyPath))
+                        return false;
+                    dirNodes.erase(search);
+                }
+                else
+                {
+                    if (!recursiveMergeFST(nullptr, e.m_path.c_str(),
+                                           [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();},
+                                           chKeyPath))
+                        return false;
+                }
+            }
+            else
+            {
+                fileNodes.erase(nameView.utf8_str());
+                std::pair<uint64_t,uint64_t> fileOffSz = m_fileOffsetsSizes.at(chKeyPath);
+                m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
+                addBuildName(e.m_name);
+                incParents();
+            }
+        }
+    }
+
+
+    /* Write-through remaining dir nodes */
+    for (const auto& p : dirNodes)
+    {
+        SystemStringView sysName(p.second->getName());
+        SystemString chKeyPath = keyPath + _S('/') + sysName.sys_str();
+
+        size_t dirNodeIdx = m_buildNodes.size();
+        m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx+1);
+        addBuildName(sysName.sys_str());
+        incParents();
+
+        if (!recursiveMergeFST(p.second, nullptr,
+                               [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();},
+                               chKeyPath))
+            return false;
+    }
+
+    /* Write-through remaining file nodes */
+    for (const auto& p : fileNodes)
+    {
+        const Partition::Node& ch = *p.second;
+        SystemStringView sysName(ch.getName());
+        SystemString chKeyPath = keyPath + _S('/') + sysName.sys_str();
+
+        std::pair<uint64_t,uint64_t> fileOffSz = m_fileOffsetsSizes.at(chKeyPath);
+        m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
+        addBuildName(sysName.sys_str());
+        incParents();
+    }
+
+    return true;
+}
+
+bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(
+        uint64_t& totalSz,
+        const DiscBase::IPartition::Node* nodeIn,
+        const SystemChar* dirIn)
+{
+    /* Build map of existing nodes to write-through later */
+    std::unordered_map<std::string, const Partition::Node*> fileNodes;
+    std::unordered_map<std::string, const Partition::Node*> dirNodes;
+    if (nodeIn)
+    {
+        fileNodes.reserve(nodeIn->size());
+        dirNodes.reserve(nodeIn->size());
+        for (const Partition::Node& ch : *nodeIn)
+        {
+            if (ch.getKind() == Partition::Node::Kind::File)
+                fileNodes.insert(std::make_pair(ch.getName(), &ch));
+            else if (ch.getKind() == Partition::Node::Kind::Directory)
+                dirNodes.insert(std::make_pair(ch.getName(), &ch));
+        }
+    }
+
+    /* Merge this directory's files */
+    if (dirIn)
+    {
+        DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+        for (const DirectoryEnumerator::Entry& e : dEnum)
+        {
+            SystemUTF8View nameView(e.m_name);
+
+            if (e.m_isDir)
+            {
+                auto search = dirNodes.find(nameView.utf8_str());
+                if (search != dirNodes.cend())
+                {
+                    if (!RecursiveCalculateTotalSize(totalSz, search->second, e.m_path.c_str()))
+                        return false;
+                    dirNodes.erase(search);
+                }
+                else
+                {
+                    if (!RecursiveCalculateTotalSize(totalSz, nullptr, e.m_path.c_str()))
+                        return false;
+                }
+            }
+            else
+            {
+                fileNodes.erase(nameView.utf8_str());
+                totalSz += ROUND_UP_32(e.m_fileSz);
+            }
+        }
+    }
+
+    /* Write-through remaining dir nodes */
+    for (const auto& p : dirNodes)
+    {
+        if (!RecursiveCalculateTotalSize(totalSz, p.second, nullptr))
+            return false;
+    }
+
+    /* Write-through remaining file nodes */
+    for (const auto& p : fileNodes)
+    {
+        const Partition::Node& ch = *p.second;
+        totalSz += ROUND_UP_32(ch.size());
+    }
+
+    return true;
 }
 
 bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream& ws,
@@ -329,7 +681,10 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
                                                                const SystemChar* apploaderIn)
 {
     if (!dirIn || !dolIn || !apploaderIn)
-        LogModule.report(logvisor::Fatal, _S("all arguments must be supplied to buildFromDirectory()"));
+    {
+        LogModule.report(logvisor::Error, _S("all arguments must be supplied to buildFromDirectory()"));
+        return false;
+    }
 
     /* Clear file */
     ++m_parent.m_progressIdx;
@@ -343,26 +698,110 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
     {
         Sstat dolStat;
         if (Stat(dolIn, &dolStat))
-            LogModule.report(logvisor::Fatal, _S("unable to stat %s"), dolIn);
+        {
+            LogModule.report(logvisor::Error, _S("unable to stat %s"), dolIn);
+            return false;
+        }
         size_t fileSz = ROUND_UP_32(dolStat.st_size);
         uint64_t fileOff = userAllocate(fileSz, ws);
+        if (fileOff == -1)
+            return false;
         m_dolOffset = fileOff;
         m_dolSize = fileSz;
         std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn)->beginReadStream();
+        if (!rs)
+            return false;
         bool patched;
         size_t xferSz = PatchDOL(*rs, ws, dolStat.st_size, patched);
-        m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(dolIn) + (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+        m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(dolIn) +
+                              (patched ? _S(" [PATCHED]") : _S("")), xferSz);
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
             ws.write("\xff", 1);
     }
 
     /* Gather files in root directory */
     uint64_t dolInode = GetInode(dolIn);
-    recursiveBuildNodes(ws, true, dirIn, dolInode);
-    recursiveBuildNodes(ws, false, dirIn, dolInode);
-    recursiveBuildFST(dirIn, dolInode, [&](){m_buildNodes[0].incrementLength();});
+    if (!recursiveBuildNodes(ws, true, dirIn, dolInode))
+        return false;
+    if (!recursiveBuildNodes(ws, false, dirIn, dolInode))
+        return false;
+    if (!recursiveBuildFST(dirIn, dolInode, [&](){m_buildNodes[0].incrementLength();}))
+        return false;
 
     return true;
+}
+
+uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(const SystemChar* dolIn,
+                                                                        const SystemChar* dirIn)
+{
+    Sstat dolStat;
+    if (Stat(dolIn, &dolStat))
+    {
+        LogModule.report(logvisor::Error, _S("unable to stat %s"), dolIn);
+        return -1;
+    }
+    uint64_t totalSz = ROUND_UP_32(dolStat.st_size);
+    if (!RecursiveCalculateTotalSize(totalSz, nullptr, dirIn))
+        return -1;
+    return totalSz;
+}
+
+bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream& ws,
+                                                               const nod::Partition* partIn,
+                                                               const SystemChar* dirIn)
+{
+    if (!dirIn)
+    {
+        LogModule.report(logvisor::Error, _S("all arguments must be supplied to mergeFromDirectory()"));
+        return false;
+    }
+
+    /* Clear file */
+    ++m_parent.m_progressIdx;
+    m_parent.m_progressCB(m_parent.m_progressIdx, _S("Preparing output image"), -1);
+
+    /* Add root node */
+    m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
+    addBuildName(_S("<root>"));
+
+    /* Write Boot DOL first (first thing seeked to after Apploader) */
+    {
+        size_t xferSz = partIn->getDOLSize();
+        size_t fileSz = ROUND_UP_32(xferSz);
+        uint64_t fileOff = userAllocate(fileSz, ws);
+        if (fileOff == -1)
+            return false;
+        m_dolOffset = fileOff;
+        m_dolSize = fileSz;
+        std::unique_ptr<uint8_t[]> dolBuf = partIn->getDOLBuf();
+        bool patched;
+        PatchDOL(dolBuf, xferSz, patched);
+        ws.write(dolBuf.get(), xferSz);
+        m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(_S("<boot-dol>")) +
+                              (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+        for (size_t i=0 ; i<fileSz-xferSz ; ++i)
+            ws.write("\xff", 1);
+    }
+
+    /* Gather files in root directory */
+    SystemString keyPath;
+    if (!recursiveMergeNodes(ws, true, &partIn->getFSTRoot(), dirIn, keyPath))
+        return false;
+    if (!recursiveMergeNodes(ws, false, &partIn->getFSTRoot(), dirIn, keyPath))
+        return false;
+    if (!recursiveMergeFST(&partIn->getFSTRoot(), dirIn, [&](){m_buildNodes[0].incrementLength();}, keyPath))
+        return false;
+
+    return true;
+}
+
+uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const DiscBase::IPartition* partIn,
+                                                                        const SystemChar* dirIn)
+{
+    uint64_t totalSz = ROUND_UP_32(partIn->getDOLSize());
+    if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), dirIn))
+        return -1;
+    return totalSz;
 }
 
 }

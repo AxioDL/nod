@@ -47,21 +47,28 @@ public:
     {
         HANDLE fp;
         int64_t m_maxWriteSize;
-        WriteStream(const SystemString& path, int64_t maxWriteSize)
+        WriteStream(const SystemString& path, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
             fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
                              nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
-                LogModule.report(logvisor::Fatal, _S("unable to open '%s' for writing"), path.c_str());
+            {
+                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+                err = true;
+            }
         }
-        WriteStream(const SystemString& path, uint64_t offset, int64_t maxWriteSize)
+        WriteStream(const SystemString& path, uint64_t offset, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
             fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
-                LogModule.report(logvisor::Fatal, _S("unable to open '%s' for writing"), path.c_str());
+            {
+                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+                err = true;
+                return;
+            }
             LARGE_INTEGER lioffset;
             lioffset.QuadPart = offset;
             SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
@@ -78,7 +85,10 @@ public:
                 LARGE_INTEGER res;
                 SetFilePointerEx(fp, li, &res, FILE_CURRENT);
                 if (res.QuadPart + int64_t(length) > m_maxWriteSize)
-                    LogModule.report(logvisor::Fatal, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+                {
+                    LogModule.report(logvisor::Error, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+                    return 0;
+                }
             }
 
             DWORD ret = 0;
@@ -95,12 +105,12 @@ public:
                 uint64_t readSz = discio.read(buf, thisSz);
                 if (thisSz != readSz)
                 {
-                    LogModule.report(logvisor::Fatal, "unable to read enough from disc");
+                    LogModule.report(logvisor::Error, "unable to read enough from disc");
                     return read;
                 }
                 if (write(buf, readSz) != readSz)
                 {
-                    LogModule.report(logvisor::Fatal, "unable to write in file");
+                    LogModule.report(logvisor::Error, "unable to write in file");
                     return read;
                 }
                 length -= thisSz;
@@ -111,24 +121,35 @@ public:
     };
     std::unique_ptr<IWriteStream> beginWriteStream() const
     {
-        return std::unique_ptr<IWriteStream>(new WriteStream(m_path, m_maxWriteSize));
+        bool Err = false;
+        auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, m_maxWriteSize, Err));
+        if (Err)
+            return {};
+        return ret;
     }
     std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const
     {
-        return std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset, m_maxWriteSize));
+        bool Err = false;
+        auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset, m_maxWriteSize, Err));
+        if (Err)
+            return {};
+        return ret;
     }
 
     struct ReadStream : public IFileIO::IReadStream
     {
         HANDLE fp;
-        ReadStream(const SystemString& path)
+        ReadStream(const SystemString& path, bool& err)
         {
             fp = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
-                LogModule.report(logvisor::Fatal, _S("unable to open '%s' for reading"), path.c_str());
+            {
+                err = true;
+                LogModule.report(logvisor::Error, _S("unable to open '%s' for reading"), path.c_str());
+            }
         }
-        ReadStream(const SystemString& path, uint64_t offset)
+        ReadStream(const SystemString& path, uint64_t offset, bool& err)
         : ReadStream(path)
         {
             LARGE_INTEGER lioffset;
@@ -167,12 +188,12 @@ public:
                 uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
                 if (read(buf, thisSz) != thisSz)
                 {
-                    LogModule.report(logvisor::Fatal, "unable to read enough from file");
+                    LogModule.report(logvisor::Error, "unable to read enough from file");
                     return written;
                 }
                 if (discio.write(buf, thisSz) != thisSz)
                 {
-                    LogModule.report(logvisor::Fatal, "unable to write enough to disc");
+                    LogModule.report(logvisor::Error, "unable to write enough to disc");
                     return written;
                 }
                 length -= thisSz;
@@ -183,11 +204,19 @@ public:
     };
     std::unique_ptr<IReadStream> beginReadStream() const
     {
-        return std::unique_ptr<IReadStream>(new ReadStream(m_path));
+        bool Err = false;
+        auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, Err));
+        if (Err)
+            return {};
+        return ret;
     }
     std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const
     {
-        return std::unique_ptr<IReadStream>(new ReadStream(m_path, offset));
+        bool Err = false;
+        auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, offset, Err));
+        if (Err)
+            return {};
+        return ret;
     }
 };
 
