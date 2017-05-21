@@ -97,8 +97,9 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
 
     if (m_kind == Kind::Directory)
     {
+        ++m_parent.m_curNodeIdx;
         if (ctx.verbose && ctx.progressCB && !getName().empty())
-            ctx.progressCB(getName());
+            ctx.progressCB(getName(), float(m_parent.m_curNodeIdx * 100.f)  / m_parent.getNodeCount());
         if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
         {
             LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), path.c_str());
@@ -111,8 +112,9 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     else if (m_kind == Kind::File)
     {
         Sstat theStat;
+        ++m_parent.m_curNodeIdx;
         if (ctx.verbose && ctx.progressCB)
-            ctx.progressCB(getName());
+            ctx.progressCB(getName(), float(m_parent.m_curNodeIdx * 100.f)  / m_parent.getNodeCount());
 
         if (ctx.force || Stat(path.c_str(), &theStat))
         {
@@ -129,6 +131,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
 bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
                                               const ExtractionContext& ctx)
 {
+    m_curNodeIdx = 0;
     Sstat theStat;
     if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
     {
@@ -141,7 +144,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     if (ctx.force || Stat(apploaderPath.c_str(), &theStat))
     {
         if (ctx.verbose && ctx.progressCB)
-            ctx.progressCB("apploader.bin");
+            ctx.progressCB("apploader.bin", 0.f);
         std::unique_ptr<uint8_t[]> buf = getApploaderBuf();
         auto ws = NewFileIO(apploaderPath)->beginWriteStream();
         if (!ws)
@@ -154,7 +157,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     if (ctx.force || Stat(dolPath.c_str(), &theStat))
     {
         if (ctx.verbose && ctx.progressCB)
-            ctx.progressCB("boot.dol");
+            ctx.progressCB("boot.dol", 0.f);
         std::unique_ptr<uint8_t[]> buf = getDOLBuf();
         auto ws = NewFileIO(dolPath)->beginWriteStream();
         if (!ws)

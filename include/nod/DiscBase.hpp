@@ -236,6 +236,7 @@ public:
         Kind m_kind;
         uint64_t m_offset;
     public:
+        mutable size_t m_curNodeIdx = 0;
         IPartition(const DiscBase& parent, Kind kind, uint64_t offset)
         : m_parent(parent), m_kind(kind), m_offset(offset) {}
         virtual uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset;}

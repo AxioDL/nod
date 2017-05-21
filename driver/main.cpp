@@ -39,8 +39,8 @@ int main(int argc, char* argv[])
     logvisor::RegisterStandardExceptions();
     logvisor::RegisterConsoleLogger();
 
-    nod::ExtractionContext ctx = { true, true, [&](const std::string& str){
-                                       fprintf(stderr, "%s\n", str.c_str());
+    nod::ExtractionContext ctx = { true, true, [&](const std::string& str, float c){
+                                       fprintf(stderr, "Current node: %s, Extraction %g%% Complete\n", str.c_str(), c);
                                    }};
     const nod::SystemChar* inDir = nullptr;
     const nod::SystemChar* outDir = _S(".");
