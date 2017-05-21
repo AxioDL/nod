@@ -277,6 +277,8 @@ public:
             beginApploaderReadStream()->read(buf.get(), m_apploaderSz);
             return buf;
         }
+
+        inline size_t getNodeCount() const { return m_nodes.size(); }
     };
 
 protected:
@@ -289,6 +291,13 @@ public:
 
     inline const Header& getHeader() const {return m_header;}
     inline const IDiscIO& getDiscIO() const {return *m_discIO;}
+    inline size_t getPartitonNodeCount(size_t partition = 0) const
+    {
+        if (partition > m_partitions.size())
+            return -1;
+        return m_partitions[partition]->getNodeCount();
+    }
+
     inline IPartition* getDataPartition()
     {
         for (const std::unique_ptr<IPartition>& part : m_partitions)
@@ -308,6 +317,7 @@ public:
         for (std::unique_ptr<IPartition>& part : m_partitions)
             part->extractToDirectory(path, ctx);
     }
+
 };
 
 class DiscBuilderBase
