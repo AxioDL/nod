@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
 
     auto progFunc = [&](float prog, const nod::SystemString& name, size_t bytes)
     {
-        nod::Printf(_S("\r                                                            "));
+        nod::Printf(_S("\r                                                                      "));
         if (bytes != -1)
             nod::Printf(_S("\r%g%% %s %" PRISize " B"), prog * 100.f, name.c_str(), bytes);
         else
