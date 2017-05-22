@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
     logvisor::RegisterConsoleLogger();
 
     nod::ExtractionContext ctx = { true, true, [&](const std::string& str, float c){
-                                       fprintf(stderr, "Current node: %s, Extraction %g%% Complete\n", str.c_str(), c);
+                                       fprintf(stderr, "Current node: %s, Extraction %g%% Complete\n", str.c_str(), c * 100.f);
                                    }};
     const nod::SystemChar* inDir = nullptr;
     const nod::SystemChar* outDir = _S(".");
@@ -58,18 +58,13 @@ int main(int argc, char* argv[])
             outDir = argv[a];
     }
 
-    size_t lastIdx = -1;
-    auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
+    auto progFunc = [&](float prog, const nod::SystemString& name, size_t bytes)
     {
-        if (idx != lastIdx)
-        {
-            lastIdx = idx;
-            printf("\n");
-        }
+        nod::Printf(_S("\r                                                            "));
         if (bytes != -1)
-            nod::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
+            nod::Printf(_S("\r%g%% %s %" PRISize " B"), prog * 100.f, name.c_str(), bytes);
         else
-            nod::Printf(_S("\r%s"), name.c_str());
+            nod::Printf(_S("\r%g%% %s"), prog * 100.f, name.c_str());
         fflush(stdout);
     };
 
@@ -135,7 +130,7 @@ int main(int argc, char* argv[])
         if (nod::DiscBuilderGCN::CalculateTotalSizeRequired(argv[4], argv[5]) == -1)
             return 1;
 
-        bool ret;
+        nod::EBuildResult ret;
 
         if (argc < 8)
         {
@@ -151,7 +146,7 @@ int main(int argc, char* argv[])
         }
 
         printf("\n");
-        if (!ret)
+        if (ret != nod::EBuildResult::Success)
             return 1;
     }
     else if (!strcasecmp(argv[1], _S("makewii")))
@@ -202,7 +197,7 @@ int main(int argc, char* argv[])
         if (nod::DiscBuilderWii::CalculateTotalSizeRequired(argv[4], argv[5], dual) == -1)
             return 1;
 
-        bool ret;
+        nod::EBuildResult ret;
 
         if (argc < 9)
         {
@@ -218,7 +213,7 @@ int main(int argc, char* argv[])
         }
 
         printf("\n");
-        if (!ret)
+        if (ret != nod::EBuildResult::Success)
             return 1;
     }
     else if (!strcasecmp(argv[1], _S("mergegcn")))
@@ -252,7 +247,7 @@ int main(int argc, char* argv[])
         if (nod::DiscMergerGCN::CalculateTotalSizeRequired(static_cast<nod::DiscGCN&>(*disc), argv[2]) == -1)
             return 1;
 
-        bool ret;
+        nod::EBuildResult ret;
 
         if (argc < 5)
         {
@@ -268,7 +263,7 @@ int main(int argc, char* argv[])
         }
 
         printf("\n");
-        if (!ret)
+        if (ret != nod::EBuildResult::Success)
             return 1;
     }
     else if (!strcasecmp(argv[1], _S("mergewii")))
@@ -303,7 +298,7 @@ int main(int argc, char* argv[])
         if (nod::DiscMergerWii::CalculateTotalSizeRequired(static_cast<nod::DiscWii&>(*disc), argv[2], dual) == -1)
             return 1;
 
-        bool ret;
+        nod::EBuildResult ret;
 
         if (argc < 5)
         {
@@ -319,7 +314,7 @@ int main(int argc, char* argv[])
         }
 
         printf("\n");
-        if (!ret)
+        if (ret != nod::EBuildResult::Success)
             return 1;
     }
     else

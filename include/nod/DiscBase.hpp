@@ -15,7 +15,14 @@
 namespace nod
 {
 
-using FProgress = std::function<void(size_t, const SystemString&, size_t)>;
+using FProgress = std::function<void(float totalProg, const SystemString& fileName, size_t fileBytesXfered)>;
+
+enum class EBuildResult
+{
+    Success,
+    Failed,
+    DiskFull
+};
 
 class FSTNode
 {
@@ -237,6 +244,18 @@ public:
         uint64_t m_offset;
     public:
         mutable size_t m_curNodeIdx = 0;
+        float getProgressFactor() const { return getNodeCount() ? m_curNodeIdx / float(getNodeCount()) : 0.f; }
+        float getProgressFactorMidFile(size_t curByte, size_t totalBytes) const
+        {
+            if (!getNodeCount())
+                return 0.f;
+
+            if (totalBytes)
+                return (m_curNodeIdx + (curByte / float(totalBytes))) / float(getNodeCount());
+            else
+                return m_curNodeIdx / float(getNodeCount());
+        }
+
         IPartition(const DiscBase& parent, Kind kind, uint64_t offset)
         : m_parent(parent), m_kind(kind), m_offset(offset) {}
         virtual uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset;}
@@ -342,18 +361,25 @@ public:
         size_t m_buildNameOff = 0;
         virtual uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws)=0;
         virtual uint32_t packOffset(uint64_t offset) const=0;
+
+        void recursiveBuildNodesPre(const SystemChar* dirIn, uint64_t dolInode);
         bool recursiveBuildNodes(IPartWriteStream& ws, bool system, const SystemChar* dirIn, uint64_t dolInode);
+
         bool recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
                                std::function<void(void)> incParents);
+
+        void recursiveMergeNodesPre(const DiscBase::IPartition::Node* nodeIn, const SystemChar* dirIn);
         bool recursiveMergeNodes(IPartWriteStream& ws, bool system,
                                  const DiscBase::IPartition::Node* nodeIn, const SystemChar* dirIn,
                                  const SystemString& keyPath);
         bool recursiveMergeFST(const DiscBase::IPartition::Node* nodeIn,
                                const SystemChar* dirIn, std::function<void(void)> incParents,
                                const SystemString& keyPath);
+
         static bool RecursiveCalculateTotalSize(uint64_t& totalSz,
                                                 const DiscBase::IPartition::Node* nodeIn,
                                                 const SystemChar* dirIn);
+
         void addBuildName(const SystemString& str)
         {
             SystemUTF8View utf8View(str);
@@ -396,11 +422,26 @@ protected:
     std::vector<std::unique_ptr<PartitionBuilderBase>> m_partitions;
     int64_t m_discCapacity;
 public:
-    std::function<void(size_t idx, const SystemString&, size_t)> m_progressCB;
+    FProgress m_progressCB;
     size_t m_progressIdx = 0;
+    size_t m_progressTotal = 0;
+    float getProgressFactor() const
+    {
+        return m_progressTotal ? std::min(1.f, m_progressIdx / float(m_progressTotal)) : 0.f;
+    }
+    float getProgressFactorMidFile(size_t curByte, size_t totalBytes) const
+    {
+        if (!m_progressTotal)
+            return 0.f;
+
+        if (totalBytes)
+            return (m_progressIdx + (curByte / float(totalBytes))) / float(m_progressTotal);
+        else
+            return m_progressIdx / float(m_progressTotal);
+    }
+
     virtual ~DiscBuilderBase() = default;
-    DiscBuilderBase(const SystemChar* outPath, int64_t discCapacity,
-                    std::function<void(size_t idx, const SystemString&, size_t)> progressCB)
+    DiscBuilderBase(const SystemChar* outPath, int64_t discCapacity, FProgress progressCB)
     : m_outPath(outPath), m_fileIO(NewFileIO(outPath, discCapacity)),
       m_discCapacity(discCapacity), m_progressCB(progressCB) {}
     DiscBuilderBase(DiscBuilderBase&&) = default;

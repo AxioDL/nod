@@ -21,10 +21,10 @@ class DiscBuilderWii : public DiscBuilderBase
 public:
     DiscBuilderWii(const SystemChar* outPath, const char gameID[6], const char* gameTitle,
                    bool dualLayer, FProgress progressCB);
-    bool buildFromDirectory(const SystemChar* dirIn,
-                            const SystemChar* dolIn,
-                            const SystemChar* apploaderIn,
-                            const SystemChar* partHeadIn);
+    EBuildResult buildFromDirectory(const SystemChar* dirIn,
+                                    const SystemChar* dolIn,
+                                    const SystemChar* apploaderIn,
+                                    const SystemChar* partHeadIn);
     static uint64_t CalculateTotalSizeRequired(const SystemChar* dirIn, const SystemChar* dolIn,
                                                bool& dualLayer);
 };
@@ -36,7 +36,7 @@ class DiscMergerWii
 public:
     DiscMergerWii(const SystemChar* outPath, DiscWii& sourceDisc,
                   bool dualLayer, FProgress progressCB);
-    bool mergeFromDirectory(const SystemChar* dirIn);
+    EBuildResult mergeFromDirectory(const SystemChar* dirIn);
     static uint64_t CalculateTotalSizeRequired(DiscWii& sourceDisc, const SystemChar* dirIn,
                                                bool& dualLayer);
 };

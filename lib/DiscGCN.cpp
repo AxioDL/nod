@@ -264,7 +264,6 @@ public:
                 return false;
             char buf[8192];
             SystemString apploaderName(apploaderIn);
-            ++m_parent.m_progressIdx;
             while (true)
             {
                 size_t rdSz = rs->read(buf, 8192);
@@ -278,8 +277,9 @@ public:
                                      "apploader flows into user area (one or the other is too big)");
                     return false;
                 }
-                m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
+                m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderName, xferSz);
             }
+            ++m_parent.m_progressIdx;
             return true;
         });
     }
@@ -298,7 +298,6 @@ public:
             std::unique_ptr<uint8_t[]> apploaderBuf = partIn->getApploaderBuf();
             size_t apploaderSz = partIn->getApploaderSize();
             SystemString apploaderName(_S("<apploader>"));
-            ++m_parent.m_progressIdx;
             ws.write(apploaderBuf.get(), apploaderSz);
             xferSz += apploaderSz;
             if (0x2440 + xferSz >= m_curUser)
@@ -307,31 +306,32 @@ public:
                                  "apploader flows into user area (one or the other is too big)");
                 return false;
             }
-            m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
+            m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderName, xferSz);
+            ++m_parent.m_progressIdx;
             return true;
         });
     }
 };
 
-bool DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
-                                        const SystemChar* apploaderIn)
+EBuildResult DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
+                                                const SystemChar* apploaderIn)
 {
     if (!m_fileIO->beginWriteStream())
-        return false;
+        return EBuildResult::Failed;
     if (!CheckFreeSpace(m_outPath.c_str(), 0x57058000))
     {
         LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_outPath.c_str());
-        return false;
+        return EBuildResult::DiskFull;
     }
+    m_progressCB(getProgressFactor(), _S("Preallocating image"), -1);
     ++m_progressIdx;
-    m_progressCB(m_progressIdx, _S("Preallocating image"), -1);
     auto ws = m_fileIO->beginWriteStream(0x57058000 - 1);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     ws->write("", 1);
 
     PartitionBuilderGCN& pb = static_cast<PartitionBuilderGCN&>(*m_partitions[0]);
-    return pb.buildFromDirectory(dirIn, dolIn, apploaderIn);
+    return pb.buildFromDirectory(dirIn, dolIn, apploaderIn) ? EBuildResult::Success : EBuildResult::Failed;
 }
 
 uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(const SystemChar* dirIn, const SystemChar* dolIn)
@@ -361,24 +361,25 @@ DiscMergerGCN::DiscMergerGCN(const SystemChar* outPath, DiscGCN& sourceDisc, FPr
 : m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, progressCB))
 {}
 
-bool DiscMergerGCN::mergeFromDirectory(const SystemChar* dirIn)
+EBuildResult DiscMergerGCN::mergeFromDirectory(const SystemChar* dirIn)
 {
     if (!m_builder.getFileIO().beginWriteStream())
-        return false;
+        return EBuildResult::Failed;
     if (!CheckFreeSpace(m_builder.m_outPath.c_str(), 0x57058000))
     {
         LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_builder.m_outPath.c_str());
-        return false;
+        return EBuildResult::DiskFull;
     }
+    m_builder.m_progressCB(m_builder.getProgressFactor(), _S("Preallocating image"), -1);
     ++m_builder.m_progressIdx;
-    m_builder.m_progressCB(m_builder.m_progressIdx, _S("Preallocating image"), -1);
     auto ws = m_builder.m_fileIO->beginWriteStream(0x57058000 - 1);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     ws->write("", 1);
 
     PartitionBuilderGCN& pb = static_cast<PartitionBuilderGCN&>(*m_builder.m_partitions[0]);
-    return pb.mergeFromDirectory(static_cast<PartitionGCN*>(m_sourceDisc.getDataPartition()), dirIn);
+    return pb.mergeFromDirectory(static_cast<PartitionGCN*>(m_sourceDisc.getDataPartition()), dirIn) ?
+           EBuildResult::Success : EBuildResult::Failed;
 }
 
 uint64_t DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, const SystemChar* dirIn)

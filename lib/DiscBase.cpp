@@ -99,7 +99,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     {
         ++m_parent.m_curNodeIdx;
         if (ctx.verbose && ctx.progressCB && !getName().empty())
-            ctx.progressCB(getName(), float(m_parent.m_curNodeIdx * 100.f)  / m_parent.getNodeCount());
+            ctx.progressCB(getName(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
         if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
         {
             LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), path.c_str());
@@ -112,9 +112,8 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     else if (m_kind == Kind::File)
     {
         Sstat theStat;
-        ++m_parent.m_curNodeIdx;
         if (ctx.verbose && ctx.progressCB)
-            ctx.progressCB(getName(), float(m_parent.m_curNodeIdx * 100.f)  / m_parent.getNodeCount());
+            ctx.progressCB(getName(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
 
         if (ctx.force || Stat(path.c_str(), &theStat))
         {
@@ -122,8 +121,14 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
             std::unique_ptr<IFileIO::IWriteStream> ws = NewFileIO(path)->beginWriteStream();
             if (!rs || !ws)
                 return false;
-            ws->copyFromDisc(*rs, m_discLength);
+            ws->copyFromDisc(*rs, m_discLength,
+            [&](float prog)
+            {
+                if (ctx.verbose && ctx.progressCB)
+                    ctx.progressCB(getName(), (m_parent.m_curNodeIdx + prog) / float(m_parent.getNodeCount()));
+            });
         }
+        ++m_parent.m_curNodeIdx;
     }
     return true;
 }
@@ -263,6 +268,26 @@ static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t s
     return out.write(buf.get(), sz);
 }
 
+void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodesPre(const SystemChar* dirIn,
+                                                                   uint64_t dolInode)
+{
+    DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+    for (const DirectoryEnumerator::Entry& e : dEnum)
+    {
+        if (e.m_isDir)
+        {
+            recursiveBuildNodesPre(e.m_path.c_str(), dolInode);
+        }
+        else
+        {
+            if (dolInode == GetInode(e.m_path.c_str()))
+                continue;
+
+            ++m_parent.m_progressTotal;
+        }
+    }
+}
+
 bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream& ws,
                                                                 bool system,
                                                                 const SystemChar* dirIn,
@@ -299,12 +324,12 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
             {
                 bool patched;
                 xferSz = PatchDOL(*rs, ws, e.m_fileSz, patched);
-                m_parent.m_progressCB(++m_parent.m_progressIdx, e.m_name + (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+                m_parent.m_progressCB(m_parent.getProgressFactor(), e.m_name + (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+                ++m_parent.m_progressIdx;
             }
             else
             {
                 char buf[0x8000];
-                ++m_parent.m_progressIdx;
                 while (xferSz < e.m_fileSz)
                 {
                     size_t rdSz = rs->read(buf, nod::min(size_t(0x8000ul), e.m_fileSz - xferSz));
@@ -312,8 +337,9 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
                         break;
                     ws.write(buf, rdSz);
                     xferSz += rdSz;
-                    m_parent.m_progressCB(m_parent.m_progressIdx, e.m_name, xferSz);
+                    m_parent.m_progressCB(m_parent.getProgressFactorMidFile(xferSz, e.m_fileSz), e.m_name, xferSz);
                 }
+                ++m_parent.m_progressIdx;
             }
             for (size_t i=0 ; i<fileSz-xferSz ; ++i)
                 ws.write("\xff", 1);
@@ -356,6 +382,64 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* 
     }
 
     return true;
+}
+
+void DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodesPre(const DiscBase::IPartition::Node* nodeIn,
+                                                                   const SystemChar* dirIn)
+{
+    /* Build map of existing nodes to write-through later */
+    std::unordered_map<std::string, const Partition::Node*> fileNodes;
+    std::unordered_map<std::string, const Partition::Node*> dirNodes;
+    if (nodeIn)
+    {
+        fileNodes.reserve(nodeIn->size());
+        dirNodes.reserve(nodeIn->size());
+        for (const Partition::Node& ch : *nodeIn)
+        {
+            if (ch.getKind() == Partition::Node::Kind::File)
+                fileNodes.insert(std::make_pair(ch.getName(), &ch));
+            else if (ch.getKind() == Partition::Node::Kind::Directory)
+                dirNodes.insert(std::make_pair(ch.getName(), &ch));
+        }
+    }
+
+    /* Merge this directory's files */
+    if (dirIn)
+    {
+        DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+        for (const DirectoryEnumerator::Entry& e : dEnum)
+        {
+            SystemUTF8View nameView(e.m_name);
+
+            if (e.m_isDir)
+            {
+                auto search = dirNodes.find(nameView.utf8_str());
+                if (search != dirNodes.cend())
+                {
+                    recursiveMergeNodesPre(search->second, e.m_path.c_str());
+                    dirNodes.erase(search);
+                }
+                else
+                {
+                    recursiveMergeNodesPre(nullptr, e.m_path.c_str());
+                }
+            }
+            else
+            {
+                fileNodes.erase(nameView.utf8_str());
+                ++m_parent.m_progressTotal;
+            }
+        }
+    }
+
+    /* Write-through remaining dir nodes */
+    for (const auto& p : dirNodes)
+    {
+        recursiveMergeNodesPre(p.second, nullptr);
+    }
+
+    /* Write-through remaining file nodes */
+    m_parent.m_progressTotal += fileNodes.size();
 }
 
 bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream& ws,
@@ -426,13 +510,13 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
                 {
                     bool patched;
                     xferSz = PatchDOL(*rs, ws, e.m_fileSz, patched);
-                    m_parent.m_progressCB(++m_parent.m_progressIdx, e.m_name +
+                    m_parent.m_progressCB(m_parent.getProgressFactor(), e.m_name +
                                           (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+                    ++m_parent.m_progressIdx;
                 }
                 else
                 {
                     char buf[0x8000];
-                    ++m_parent.m_progressIdx;
                     while (xferSz < e.m_fileSz)
                     {
                         size_t rdSz = rs->read(buf, nod::min(size_t(0x8000ul), e.m_fileSz - xferSz));
@@ -440,8 +524,9 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
                             break;
                         ws.write(buf, rdSz);
                         xferSz += rdSz;
-                        m_parent.m_progressCB(m_parent.m_progressIdx, e.m_name, xferSz);
+                        m_parent.m_progressCB(m_parent.getProgressFactorMidFile(xferSz, e.m_fileSz), e.m_name, xferSz);
                     }
+                    ++m_parent.m_progressIdx;
                 }
                 for (size_t i=0 ; i<fileSz-xferSz ; ++i)
                     ws.write("\xff", 1);
@@ -486,13 +571,13 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
             bool patched;
             PatchDOL(dolBuf, xferSz, patched);
             ws.write(dolBuf.get(), xferSz);
-            m_parent.m_progressCB(++m_parent.m_progressIdx, sysName.sys_str() +
+            m_parent.m_progressCB(m_parent.getProgressFactor(), sysName.sys_str() +
                                   (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+            ++m_parent.m_progressIdx;
         }
         else
         {
             char buf[0x8000];
-            ++m_parent.m_progressIdx;
             while (xferSz < ch.size())
             {
                 size_t rdSz = rs->read(buf, nod::min(size_t(0x8000), size_t(ch.size() - xferSz)));
@@ -500,8 +585,9 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
                     break;
                 ws.write(buf, rdSz);
                 xferSz += rdSz;
-                m_parent.m_progressCB(m_parent.m_progressIdx, sysName.sys_str(), xferSz);
+                m_parent.m_progressCB(m_parent.getProgressFactorMidFile(xferSz, ch.size()), sysName.sys_str(), xferSz);
             }
+            ++m_parent.m_progressIdx;
         }
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
             ws.write("\xff", 1);
@@ -689,9 +775,14 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
         return false;
     }
 
+    /* 1st pass - Tally up total progress steps */
+    uint64_t dolInode = GetInode(dolIn);
+    m_parent.m_progressTotal += 2; /* Prep and DOL */
+    recursiveBuildNodesPre(dirIn, dolInode);
+
     /* Clear file */
+    m_parent.m_progressCB(m_parent.getProgressFactor(), _S("Preparing output image"), -1);
     ++m_parent.m_progressIdx;
-    m_parent.m_progressCB(m_parent.m_progressIdx, _S("Preparing output image"), -1);
 
     /* Add root node */
     m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
@@ -716,14 +807,14 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
             return false;
         bool patched;
         size_t xferSz = PatchDOL(*rs, ws, dolStat.st_size, patched);
-        m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(dolIn) +
+        m_parent.m_progressCB(m_parent.getProgressFactor(), SystemString(dolIn) +
                               (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+        ++m_parent.m_progressIdx;
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
             ws.write("\xff", 1);
     }
 
     /* Gather files in root directory */
-    uint64_t dolInode = GetInode(dolIn);
     if (!recursiveBuildNodes(ws, true, dirIn, dolInode))
         return false;
     if (!recursiveBuildNodes(ws, false, dirIn, dolInode))
@@ -759,9 +850,13 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
         return false;
     }
 
+    /* 1st pass - Tally up total progress steps */
+    m_parent.m_progressTotal += 2; /* Prep and DOL */
+    recursiveMergeNodesPre(&partIn->getFSTRoot(), dirIn);
+
     /* Clear file */
+    m_parent.m_progressCB(m_parent.getProgressFactor(), _S("Preparing output image"), -1);
     ++m_parent.m_progressIdx;
-    m_parent.m_progressCB(m_parent.m_progressIdx, _S("Preparing output image"), -1);
 
     /* Add root node */
     m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
@@ -780,8 +875,9 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
         bool patched;
         PatchDOL(dolBuf, xferSz, patched);
         ws.write(dolBuf.get(), xferSz);
-        m_parent.m_progressCB(++m_parent.m_progressIdx, SystemString(_S("<boot-dol>")) +
+        m_parent.m_progressCB(m_parent.getProgressFactor(), SystemString(_S("<boot-dol>")) +
                               (patched ? _S(" [PATCHED]") : _S("")), xferSz);
+        ++m_parent.m_progressIdx;
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
             ws.write("\xff", 1);
     }

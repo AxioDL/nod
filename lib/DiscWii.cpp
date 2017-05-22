@@ -928,7 +928,6 @@ public:
         bool good = false;
         uint64_t attempts = 0;
         SystemString bfName(_S("Brute force attempts"));
-        ++m_parent.m_progressIdx;
         for (int w=0 ; w<7 ; ++w)
         {
             for (uint64_t i=0 ; i<UINT64_MAX ; ++i)
@@ -943,12 +942,13 @@ public:
                     good = true;
                     break;
                 }
-                m_parent.m_progressCB(m_parent.m_progressIdx, bfName, attempts);
+                m_parent.m_progressCB(m_parent.getProgressFactor(), bfName, attempts);
             }
             if (good)
                 break;
         }
-        m_parent.m_progressCB(m_parent.m_progressIdx, bfName, attempts);
+        m_parent.m_progressCB(m_parent.getProgressFactor(), bfName, attempts);
+        ++m_parent.m_progressIdx;
 
         ws = m_parent.getFileIO().beginWriteStream(m_baseOffset + 0x2C0);
         if (!ws)
@@ -994,7 +994,6 @@ public:
                 return false;
             char buf[8192];
             SystemString apploaderName(apploaderIn);
-            ++m_parent.m_progressIdx;
             while (true)
             {
                 size_t rdSz = rs->read(buf, 8192);
@@ -1008,8 +1007,9 @@ public:
                                      "apploader flows into user area (one or the other is too big)");
                     return false;
                 }
-                m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
+                m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderName, xferSz);
             }
+            ++m_parent.m_progressIdx;
             return true;
         }, phBuf.get(), phSz, theStat.st_size);
     }
@@ -1030,7 +1030,6 @@ public:
             std::unique_ptr<uint8_t[]> apploaderBuf = partIn->getApploaderBuf();
             size_t apploaderSz = partIn->getApploaderSize();
             SystemString apploaderName(_S("<apploader>"));
-            ++m_parent.m_progressIdx;
             cws.write(apploaderBuf.get(), apploaderSz);
             xferSz += apploaderSz;
             if (0x2440 + xferSz >= 0x1F0000)
@@ -1039,69 +1038,70 @@ public:
                                  "apploader flows into user area (one or the other is too big)");
                 return false;
             }
-            m_parent.m_progressCB(m_parent.m_progressIdx, apploaderName, xferSz);
+            m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderName, xferSz);
+            ++m_parent.m_progressIdx;
             return true;
         }, phBuf.get(), phSz, partIn->getApploaderSize());
     }
 };
 
-bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
-                                        const SystemChar* apploaderIn, const SystemChar* partHeadIn)
+EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
+                                                const SystemChar* apploaderIn, const SystemChar* partHeadIn)
 {
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_partitions[0]);
     uint64_t filledSz = pb.m_baseOffset;
     if (!m_fileIO->beginWriteStream())
-        return false;
+        return EBuildResult::Failed;
 
     if (!CheckFreeSpace(m_outPath.c_str(), m_discCapacity))
     {
         LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_outPath.c_str());
-        return false;
+        return EBuildResult::DiskFull;
     }
+    m_progressCB(getProgressFactor(), _S("Preallocating image"), -1);
     ++m_progressIdx;
-    m_progressCB(m_progressIdx, _S("Preallocating image"), -1);
     std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(m_discCapacity - 1);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     ws->write("", 1);
 
     /* Assemble image */
     filledSz = pb.buildFromDirectory(dirIn, dolIn, apploaderIn, partHeadIn);
     if (filledSz == -1)
-        return false;
+        return EBuildResult::Failed;
     else if (filledSz >= uint64_t(m_discCapacity))
     {
         LogModule.report(logvisor::Error, "data partition exceeds disc capacity");
-        return false;
+        return EBuildResult::Failed;
     }
 
+    m_progressCB(getProgressFactor(), _S("Finishing Disc"), -1);
     ++m_progressIdx;
-    m_progressCB(m_progressIdx, _S("Finishing Disc"), -1);
 
     /* Populate disc header */
     ws = m_fileIO->beginWriteStream(0);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     Header header(pb.getGameID(), pb.getGameTitle().c_str(), true, 0, 0, 0);
     header.write(*ws);
 
     /* Populate partition info */
     ws = m_fileIO->beginWriteStream(0x40000);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     uint32_t vals[2] = {SBig(uint32_t(1)), SBig(uint32_t(0x40020 >> uint64_t(2)))};
     ws->write(vals, 8);
 
     ws = m_fileIO->beginWriteStream(0x40020);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     vals[0] = SBig(uint32_t(pb.m_baseOffset >> uint64_t(2)));
     ws->write(vals, 4);
 
     /* Populate region info */
     ws = m_fileIO->beginWriteStream(0x4E000);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     const char* gameID = pb.getGameID();
     if (gameID[3] == 'P')
         vals[0] = SBig(uint32_t(2));
@@ -1114,14 +1114,14 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
     /* Make disc unrated */
     ws = m_fileIO->beginWriteStream(0x4E010);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     for (int i=0 ; i<16 ; ++i)
         ws->write("\x80", 1);
 
     /* Fill image to end */
     ws = m_fileIO->beginWriteStream(filledSz);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     uint8_t fillBuf[512];
     memset(fillBuf, 0xff, 512);
     for (size_t i=m_discCapacity-filledSz ; i>0 ;)
@@ -1136,7 +1136,7 @@ bool DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn, const SystemCha
         break;
     }
 
-    return true;
+    return EBuildResult::Success;
 }
 
 uint64_t DiscBuilderWii::CalculateTotalSizeRequired(const SystemChar* dirIn, const SystemChar* dolIn,
@@ -1172,61 +1172,61 @@ DiscMergerWii::DiscMergerWii(const SystemChar* outPath, DiscWii& sourceDisc,
 : m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, dualLayer, progressCB))
 {}
 
-bool DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
+EBuildResult DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
 {
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_builder.m_partitions[0]);
     uint64_t filledSz = pb.m_baseOffset;
     if (!m_builder.m_fileIO->beginWriteStream())
-        return false;
+        return EBuildResult::Failed;
 
     if (!CheckFreeSpace(m_builder.m_outPath.c_str(), m_builder.m_discCapacity))
     {
         LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_builder.m_outPath.c_str());
-        return false;
+        return EBuildResult::DiskFull;
     }
+    m_builder.m_progressCB(m_builder.getProgressFactor(), _S("Preallocating image"), -1);
     ++m_builder.m_progressIdx;
-    m_builder.m_progressCB(m_builder.m_progressIdx, _S("Preallocating image"), -1);
     std::unique_ptr<IFileIO::IWriteStream> ws = m_builder.m_fileIO->beginWriteStream(m_builder.m_discCapacity - 1);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     ws->write("", 1);
 
     /* Assemble image */
     filledSz = pb.mergeFromDirectory(static_cast<PartitionWii*>(m_sourceDisc.getDataPartition()), dirIn);
     if (filledSz == -1)
-        return false;
+        return EBuildResult::Failed;
     else if (filledSz >= uint64_t(m_builder.m_discCapacity))
     {
         LogModule.report(logvisor::Error, "data partition exceeds disc capacity");
-        return false;
+        return EBuildResult::Failed;
     }
 
+    m_builder.m_progressCB(m_builder.getProgressFactor(), _S("Finishing Disc"), -1);
     ++m_builder.m_progressIdx;
-    m_builder.m_progressCB(m_builder.m_progressIdx, _S("Finishing Disc"), -1);
 
     /* Populate disc header */
     ws = m_builder.m_fileIO->beginWriteStream(0);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     m_sourceDisc.getHeader().write(*ws);
 
     /* Populate partition info */
     ws = m_builder.m_fileIO->beginWriteStream(0x40000);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     uint32_t vals[2] = {SBig(uint32_t(1)), SBig(uint32_t(0x40020 >> uint64_t(2)))};
     ws->write(vals, 8);
 
     ws = m_builder.m_fileIO->beginWriteStream(0x40020);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     vals[0] = SBig(uint32_t(pb.m_baseOffset >> uint64_t(2)));
     ws->write(vals, 4);
 
     /* Populate region info */
     ws = m_builder.m_fileIO->beginWriteStream(0x4E000);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     const char* gameID = pb.getGameID();
     if (gameID[3] == 'P')
         vals[0] = SBig(uint32_t(2));
@@ -1239,14 +1239,14 @@ bool DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
     /* Make disc unrated */
     ws = m_builder.m_fileIO->beginWriteStream(0x4E010);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     for (int i=0 ; i<16 ; ++i)
         ws->write("\x80", 1);
 
     /* Fill image to end */
     ws = m_builder.m_fileIO->beginWriteStream(filledSz);
     if (!ws)
-        return false;
+        return EBuildResult::Failed;
     uint8_t fillBuf[512];
     memset(fillBuf, 0xff, 512);
     for (size_t i=m_builder.m_discCapacity-filledSz ; i>0 ;)
@@ -1261,7 +1261,7 @@ bool DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
         break;
     }
 
-    return true;
+    return EBuildResult::Success;
 }
 
 uint64_t DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc,

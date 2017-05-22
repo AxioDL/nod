@@ -83,29 +83,6 @@ public:
             }
             return fwrite(buf, 1, length, fp);
         }
-        uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
-        {
-            uint64_t read = 0;
-            uint8_t buf[0x7c00];
-            while (length)
-            {
-                uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
-                uint64_t readSz = discio.read(buf, thisSz);
-                if (thisSz != readSz)
-                {
-                    LogModule.report(logvisor::Error, "unable to read enough from disc");
-                    return read;
-                }
-                if (write(buf, readSz) != readSz)
-                {
-                    LogModule.report(logvisor::Error, "unable to write in file");
-                    return read;
-                }
-                length -= thisSz;
-                read += thisSz;
-            }
-            return read;
-        }
     };
     std::unique_ptr<IWriteStream> beginWriteStream() const
     {

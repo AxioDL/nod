@@ -21,8 +21,8 @@ class DiscBuilderGCN : public DiscBuilderBase
 public:
     DiscBuilderGCN(const SystemChar* outPath, const char gameID[6], const char* gameTitle,
                    uint32_t fstMemoryAddr, FProgress progressCB);
-    bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
-                            const SystemChar* apploaderIn);
+    EBuildResult buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
+                                    const SystemChar* apploaderIn);
     static uint64_t CalculateTotalSizeRequired(const SystemChar* dirIn, const SystemChar* dolIn);
 };
 
@@ -32,7 +32,7 @@ class DiscMergerGCN
     DiscBuilderGCN m_builder;
 public:
     DiscMergerGCN(const SystemChar* outPath, DiscGCN& sourceDisc, FProgress progressCB);
-    bool mergeFromDirectory(const SystemChar* dirIn);
+    EBuildResult mergeFromDirectory(const SystemChar* dirIn);
     static uint64_t CalculateTotalSizeRequired(DiscGCN& sourceDisc, const SystemChar* dirIn);
 };
 
