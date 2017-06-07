@@ -2,6 +2,7 @@
 #define __NOD_IFILE_IO__
 
 #include <memory>
+#include <functional>
 #include <stdlib.h>
 #include "IDiscIO.hpp"
 #include "Util.hpp"
