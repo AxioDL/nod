@@ -144,8 +144,14 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         return false;
     }
 
+    if (Mkdir((path + _S("/sys")).c_str(), 0755) && errno != EEXIST)
+    {
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/sys'"), path.c_str());
+        return false;
+    }
+
     /* Extract Apploader */
-    SystemString apploaderPath = path + _S("/apploader.bin");
+    SystemString apploaderPath = path + _S("/sys/apploader.img");
     if (ctx.force || Stat(apploaderPath.c_str(), &theStat))
     {
         if (ctx.verbose && ctx.progressCB)
@@ -158,11 +164,11 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract Dol */
-    SystemString dolPath = path + _S("/boot.dol");
+    SystemString dolPath = path + _S("/sys/main.dol");
     if (ctx.force || Stat(dolPath.c_str(), &theStat))
     {
         if (ctx.verbose && ctx.progressCB)
-            ctx.progressCB("boot.dol", 0.f);
+            ctx.progressCB("main.dol", 0.f);
         std::unique_ptr<uint8_t[]> buf = getDOLBuf();
         auto ws = NewFileIO(dolPath)->beginWriteStream();
         if (!ws)
@@ -170,8 +176,33 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         ws->write(buf.get(), m_dolSz);
     }
 
+    /* Extract Boot info */
+    SystemString bootPath = path + _S("/sys/boot.bin");
+    if (ctx.force || Stat(bootPath.c_str(), &theStat))
+    {
+        if (ctx.verbose && ctx.progressCB)
+            ctx.progressCB("boot.bin", 0.f);
+        auto ws = NewFileIO(bootPath)->beginWriteStream();
+        if (!ws)
+            return false;
+        getHeader().write(*ws.get());
+    }
+
+    /* Extract BI2 info */
+    SystemString bi2Path = path + _S("/sys/bi2.bin");
+    if (ctx.force || Stat(bi2Path.c_str(), &theStat))
+    {
+        if (ctx.verbose && ctx.progressCB)
+            ctx.progressCB("bi2.bin", 0.f);
+
+        const uint8_t* buf = getBI2Buf();
+        auto ws = NewFileIO(bi2Path)->beginWriteStream();
+        if (!ws)
+            return false;
+        ws->write(buf, sizeof(BI2Header));
+    }
     /* Extract Filesystem */
-    SystemString fsPath = path + _S("/fsroot");
+    SystemString fsPath = path + _S("/files");
     if (Mkdir(fsPath.c_str(), 0755) && errno != EEXIST)
     {
         LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), fsPath.c_str());

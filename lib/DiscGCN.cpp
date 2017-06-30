@@ -18,15 +18,16 @@ public:
             err = true;
             return;
         }
-        uint32_t vals[5];
-        s->read(vals, 5 * 4);
-        m_dolOff = SBig(vals[0]);
-        m_fstOff = SBig(vals[1]);
-        m_fstSz = SBig(vals[2]);
-        m_fstMemoryAddr = SBig(vals[4]);
+
+        s->read(&m_bi2Header, sizeof(BI2Header));
+        m_dolOff = SBig(m_bi2Header.dolOff);
+        m_fstOff = SBig(m_bi2Header.fstOff);
+        m_fstSz = SBig(m_bi2Header.fstSz);
+        m_fstMemoryAddr = SBig(m_bi2Header.fstMemoryAddress);
+        uint32_t vals[2];
         s->seek(0x2440 + 0x14);
         s->read(vals, 8);
-        m_apploaderSz = 32 + SBig(vals[0]) + SBig(vals[1]);
+        m_apploaderSz = ((32 + SBig(vals[0]) + SBig(vals[1])) + 31) & ~31;
 
         /* Yay files!! */
         parseFST(*s);

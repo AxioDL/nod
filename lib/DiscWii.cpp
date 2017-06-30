@@ -254,14 +254,14 @@ public:
             return;
         }
 
-        uint32_t vals[3];
-        ds->read(vals, 12);
-        m_dolOff = SBig(vals[0]) << 2;
-        m_fstOff = SBig(vals[1]) << 2;
-        m_fstSz = SBig(vals[2]) << 2;
+        s->read(&m_bi2Header, sizeof(BI2Header));
+        m_dolOff = SBig(m_bi2Header.dolOff) << 2;
+        m_fstOff = SBig(m_bi2Header.fstOff) << 2;
+        m_fstSz = SBig(m_bi2Header.fstSz) << 2;
         ds->seek(0x2440 + 0x14);
+        uint32_t vals[2];
         ds->read(vals, 8);
-        m_apploaderSz = 32 + SBig(vals[0]) + SBig(vals[1]);
+        m_apploaderSz = ((32 + SBig(vals[0]) + SBig(vals[1])) + 31) & ~31;
 
         /* Yay files!! */
         parseFST(*ds);

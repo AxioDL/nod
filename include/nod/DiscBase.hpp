@@ -57,10 +57,16 @@ struct Header
     char m_discVersion;
     char m_audioStreaming;
     char m_streamBufSz;
-    char m_unk[14];
+    char m_unk1[14];
     uint32_t m_wiiMagic;
     uint32_t m_gcnMagic;
     char m_gameTitle[64];
+    char m_disableHashVerification;
+    char m_disableDiscEnc;
+    char m_unk2[0x39e];
+    uint32_t m_debugMonOff;
+    uint32_t m_debugLoadAddr;
+    char m_unk3[0x18];
 
     Header(IDiscIO& dio, bool& err)
     {
@@ -73,6 +79,8 @@ struct Header
         s->read(this, sizeof(*this));
         m_wiiMagic = SBig(m_wiiMagic);
         m_gcnMagic = SBig(m_gcnMagic);
+        m_debugMonOff = SBig(m_debugMonOff);
+        m_debugLoadAddr = SBig(m_debugLoadAddr);
     }
 
     Header(const char gameID[6], const char* gameTitle, bool wii, char discNum=0, char discVersion=0,
@@ -97,6 +105,8 @@ struct Header
         Header hs(*this);
         hs.m_wiiMagic = SBig(hs.m_wiiMagic);
         hs.m_gcnMagic = SBig(hs.m_gcnMagic);
+        hs.m_debugMonOff = SBig(hs.m_debugMonOff);
+        hs.m_debugLoadAddr = SBig(hs.m_debugLoadAddr);
         ws.write(&hs, sizeof(hs));
     }
 };
@@ -128,6 +138,32 @@ public:
             uint32_t bssStart;
             uint32_t bssSize;
             uint32_t entryPoint;
+        };
+
+        /* Currently only kept for dolphin compatibility*/
+        struct BI2Header
+        {
+            uint32_t dolOff;
+            uint32_t fstOff;
+            uint32_t fstSz;
+            uint32_t fstMaxSz;
+            uint32_t fstMemoryAddress;
+            uint32_t userPosition;
+            uint32_t userSz;
+            uint8_t padding1[4];
+            int32_t debugMonitorSize;
+            int32_t simMemSize;
+            uint32_t argOffset;
+            uint32_t debugFlag;
+            uint32_t trkAddress;
+            uint32_t trkSz;
+            uint32_t countryCode;
+            uint32_t unk1;
+            uint32_t unk2;
+            uint32_t unk3;
+            uint32_t dolLimit;
+            uint32_t unk4;
+            uint8_t padding2[0x1fd0];
         };
 
         class Node
@@ -223,6 +259,7 @@ public:
             bool extractToDirectory(const SystemString& basePath, const ExtractionContext& ctx) const;
         };
     protected:
+        BI2Header m_bi2Header;
         uint64_t m_dolOff;
         uint64_t m_fstOff;
         uint64_t m_fstSz;
@@ -299,6 +336,8 @@ public:
         }
 
         inline size_t getNodeCount() const { return m_nodes.size(); }
+        inline const Header& getHeader() const { return m_parent.getHeader(); }
+        inline const uint8_t* getBI2Buf() const { return reinterpret_cast<const uint8_t*>(&m_bi2Header); }
     };
 
 protected:
