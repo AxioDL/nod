@@ -13,15 +13,12 @@ namespace nod
 class IFileIO
 {
 public:
-    virtual ~IFileIO() {}
+    virtual ~IFileIO() = default;
     virtual bool exists()=0;
     virtual uint64_t size()=0;
 
-    struct IWriteStream
+    struct IWriteStream : nod::IWriteStream
     {
-        virtual ~IWriteStream() {}
-        virtual uint64_t write(const void* buf, uint64_t length)=0;
-
         uint64_t copyFromDisc(IPartReadStream& discio, uint64_t length)
         {
             uint64_t read = 0;
@@ -74,12 +71,8 @@ public:
     virtual std::unique_ptr<IWriteStream> beginWriteStream() const=0;
     virtual std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const=0;
 
-    struct IReadStream
+    struct IReadStream : nod::IReadStream
     {
-        virtual ~IReadStream() {}
-        virtual void seek(int64_t offset, int whence)=0;
-        virtual int64_t position()=0;
-        virtual uint64_t read(void* buf, uint64_t length)=0;
         virtual uint64_t copyToDisc(struct IPartWriteStream& discio, uint64_t length)=0;
     };
     virtual std::unique_ptr<IReadStream> beginReadStream() const=0;

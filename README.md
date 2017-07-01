@@ -51,12 +51,12 @@ auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
 };
 
 /* Making a GCN image */
-nod::DiscBuilderGCN b(isoOutPath, gameID, gameTitle, dolLoadAddress, progFunc);
-ret = b.buildFromDirectory(fsRootDirPath, bootDolPath, apploaderPath);
+nod::DiscBuilderGCN b(isoOutPath, progFunc);
+ret = b.buildFromDirectory(fsRootDirPath);
 
 /* Making a Wii image */
-nod::DiscBuilderWii b(isoOutPath, gameID, gameTitle, dualLayer, progFunc);
-ret = b.buildFromDirectory(fsRootDirPath, bootDolPath, apploaderPath, partitionHeadPath);
+nod::DiscBuilderWii b(isoOutPath, dualLayer, progFunc);
+ret = b.buildFromDirectory(fsRootDirPath);
 ```
 
 Wii images are fakesigned using a commonly-applied [signing bug](http://wiibrew.org/wiki/Signing_bug).
@@ -75,7 +75,6 @@ An extract/repack works like so:
 >$ cd <dir-out>
 
 # Then one of:
->$ nodtool makegcn <gameid> <game-title> fsroot boot.dol apploader.bin [<image-out>]
->$ nodtool makewiisl <gameid> <game-title> fsroot boot.dol apploader.bin partition_head.bin [<image-out>]
->$ nodtool makewiidl <gameid> <game-title> fsroot boot.dol apploader.bin partition_head.bin [<image-out>]
+>$ nodtool makegcn fsroot [<image-out>]
+>$ nodtool makewii fsroot [<image-out>]
 ```

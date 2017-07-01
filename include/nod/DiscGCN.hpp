@@ -13,17 +13,16 @@ class DiscGCN : public DiscBase
     DiscBuilderGCN makeMergeBuilder(const SystemChar* outPath, FProgress progressCB);
 public:
     DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err);
+    bool extractDiscHeaderFiles(const SystemString& path, const ExtractionContext& ctx) const;
 };
 
 class DiscBuilderGCN : public DiscBuilderBase
 {
     friend class DiscMergerGCN;
 public:
-    DiscBuilderGCN(const SystemChar* outPath, const char gameID[6], const char* gameTitle,
-                   uint32_t fstMemoryAddr, FProgress progressCB);
-    EBuildResult buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
-                                    const SystemChar* apploaderIn);
-    static uint64_t CalculateTotalSizeRequired(const SystemChar* dirIn, const SystemChar* dolIn);
+    DiscBuilderGCN(const SystemChar* outPath, FProgress progressCB);
+    EBuildResult buildFromDirectory(const SystemChar* dirIn);
+    static uint64_t CalculateTotalSizeRequired(const SystemChar* dirIn);
 };
 
 class DiscMergerGCN

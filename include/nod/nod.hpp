@@ -13,7 +13,6 @@ class DiscBase;
 
 struct ExtractionContext final
 {
-    bool verbose : 1;
     bool force : 1;
     std::function<void(const std::string&, float)> progressCB;
 };

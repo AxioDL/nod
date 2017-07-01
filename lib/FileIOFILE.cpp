@@ -128,7 +128,7 @@ public:
         {
             FSeek(fp, offset, whence);
         }
-        int64_t position()
+        uint64_t position() const
         {
             return FTell(fp);
         }

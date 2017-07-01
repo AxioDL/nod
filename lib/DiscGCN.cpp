@@ -1,4 +1,5 @@
 #include "nod/DiscGCN.hpp"
+#include "nod/nod.hpp"
 #include <inttypes.h>
 #define BUFFER_SZ 0x8000
 
@@ -12,18 +13,17 @@ public:
     : IPartition(parent, kind, offset)
     {
         /* GCN-specific header reads */
-        std::unique_ptr<IPartReadStream> s = beginReadStream(0x420);
+        std::unique_ptr<IPartReadStream> s = beginReadStream(0x0);
         if (!s)
         {
             err = true;
             return;
         }
-
-        s->read(&m_bi2Header, sizeof(BI2Header));
-        m_dolOff = SBig(m_bi2Header.dolOff);
-        m_fstOff = SBig(m_bi2Header.fstOff);
-        m_fstSz = SBig(m_bi2Header.fstSz);
-        m_fstMemoryAddr = SBig(m_bi2Header.fstMemoryAddress);
+        m_header.read(*s);
+        m_bi2Header.read(*s);
+        m_dolOff = m_header.m_dolOff;
+        m_fstOff = m_header.m_fstOff;
+        m_fstSz = m_header.m_fstSz;
         uint32_t vals[2];
         s->seek(0x2440 + 0x14);
         s->read(vals, 8);
@@ -40,7 +40,7 @@ public:
     class PartReadStream : public IPartReadStream
     {
         const PartitionGCN& m_parent;
-        std::unique_ptr<IDiscIO::IReadStream> m_dio;
+        std::unique_ptr<IReadStream> m_dio;
 
         uint64_t m_offset;
         size_t m_curBlock = SIZE_MAX;
@@ -97,7 +97,7 @@ public:
                 if (cacheSize + cacheOffset > BUFFER_SZ)
                     cacheSize = BUFFER_SZ - cacheOffset;
 
-                memcpy(dst, m_buf + cacheOffset, cacheSize);
+                memmove(dst, m_buf + cacheOffset, cacheSize);
                 dst += cacheSize;
                 rem -= cacheSize;
                 cacheOffset = 0;
@@ -131,15 +131,42 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err)
 
 DiscBuilderGCN DiscGCN::makeMergeBuilder(const SystemChar* outPath, FProgress progressCB)
 {
-    IPartition* dataPart = getDataPartition();
-    return DiscBuilderGCN(outPath, m_header.m_gameID, m_header.m_gameTitle,
-                          dataPart->getFSTMemoryAddr(), progressCB);
+    return DiscBuilderGCN(outPath, progressCB);
+}
+
+bool DiscGCN::extractDiscHeaderFiles(const SystemString& path, const ExtractionContext& ctx) const
+{
+    if (Mkdir((path + _S("/DATA/disc")).c_str(), 0755) && errno != EEXIST)
+    {
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/DATA/disc'"), path.c_str());
+        return false;
+    }
+
+    Sstat theStat;
+
+    /* Extract Header */
+    SystemString headerPath = path + _S("/DATA/disc/header.bin");
+    if (ctx.force || Stat(headerPath.c_str(), &theStat))
+    {
+        if (ctx.progressCB)
+            ctx.progressCB("header.bin", 0.f);
+        std::unique_ptr<IReadStream> rs = getDiscIO().beginReadStream(0x0);
+        if (!rs)
+            return false;
+        Header header;
+        header.read(*rs);
+        auto ws = NewFileIO(headerPath)->beginWriteStream();
+        if (!ws)
+            return false;
+        header.write(*ws);
+    }
+
+    return true;
 }
 
 class PartitionBuilderGCN : public DiscBuilderBase::PartitionBuilderBase
 {
     uint64_t m_curUser = 0x57058000;
-    uint32_t m_fstMemoryAddr;
 
 public:
     class PartWriteStream : public IPartWriteStream
@@ -171,9 +198,8 @@ public:
         }
     };
 
-    PartitionBuilderGCN(DiscBuilderBase& parent, Kind kind,
-                        const char gameID[6], const char* gameTitle, uint32_t fstMemoryAddr)
-    : DiscBuilderBase::PartitionBuilderBase(parent, kind, gameID, gameTitle), m_fstMemoryAddr(fstMemoryAddr) {}
+    PartitionBuilderGCN(DiscBuilderBase& parent)
+    : DiscBuilderBase::PartitionBuilderBase(parent, Kind::Data) {}
 
     uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws)
     {
@@ -202,17 +228,16 @@ public:
         return ret;
     }
 
-    bool _build(const std::function<bool(IPartWriteStream&, size_t&)>& func)
+    bool _build(const std::function<bool(IPartWriteStream&, uint32_t, uint32_t,
+                                         uint32_t, uint32_t, uint32_t)>& headerFunc,
+                const std::function<bool(IPartWriteStream&)>& bi2Func,
+                const std::function<bool(IPartWriteStream&, size_t&)>& apploaderFunc)
     {
-        std::unique_ptr<IPartWriteStream> ws = beginWriteStream(0);
+        std::unique_ptr<IPartWriteStream> ws = beginWriteStream(0x2440);
         if (!ws)
             return false;
-        Header header(m_gameID, m_gameTitle.c_str(), false);
-        header.write(*ws);
-
-        ws = beginWriteStream(0x2440);
         size_t xferSz = 0;
-        if (!func(*ws, xferSz))
+        if (!apploaderFunc(*ws, xferSz))
             return false;
 
         size_t fstOff = ROUND_UP_32(xferSz);
@@ -233,38 +258,89 @@ public:
             return false;
         }
 
-        ws = beginWriteStream(0x420);
+        ws = beginWriteStream(0);
         if (!ws)
             return false;
-        uint32_t vals[7];
-        vals[0] = SBig(uint32_t(m_dolOffset));
-        vals[1] = SBig(uint32_t(fstOff));
-        vals[2] = SBig(uint32_t(fstSz));
-        vals[3] = SBig(uint32_t(fstSz));
-        vals[4] = SBig(uint32_t(m_fstMemoryAddr));
-        vals[5] = SBig(uint32_t(m_curUser));
-        vals[6] = SBig(uint32_t(0x57058000 - m_curUser));
-        ws->write(vals, sizeof(vals));
+        if (!headerFunc(*ws, m_dolOffset, fstOff, fstSz, m_curUser, 0x57058000 - m_curUser))
+            return false;
+        if (!bi2Func(*ws))
+            return false;
 
         return true;
     }
 
-    bool buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn, const SystemChar* apploaderIn)
+    bool buildFromDirectory(const SystemChar* dirIn)
     {
         std::unique_ptr<IPartWriteStream> ws = beginWriteStream(0);
         if (!ws)
             return false;
-        bool result = DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(*ws, dirIn, dolIn, apploaderIn);
+        bool result = DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(*ws, dirIn);
         if (!result)
             return false;
 
-        return _build([this, apploaderIn](IPartWriteStream& ws, size_t& xferSz) -> bool
+        SystemString dirStr(dirIn);
+
+        /* Check Apploader */
+        SystemString apploaderIn = dirStr + _S("/DATA/sys/apploader.img");
+        Sstat apploaderStat;
+        if (Stat(apploaderIn.c_str(), &apploaderStat))
         {
-            std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(apploaderIn)->beginReadStream();
+            LogModule.report(logvisor::Error, _S("unable to stat %s"), apploaderIn.c_str());
+            return -1;
+        }
+
+        /* Check Boot */
+        SystemString bootIn = dirStr + _S("/DATA/sys/boot.bin");
+        Sstat bootStat;
+        if (Stat(bootIn.c_str(), &bootStat))
+        {
+            LogModule.report(logvisor::Error, _S("unable to stat %s"), bootIn.c_str());
+            return -1;
+        }
+
+        /* Check BI2 */
+        SystemString bi2In = dirStr + _S("/DATA/sys/bi2.bin");
+        Sstat bi2Stat;
+        if (Stat(bi2In.c_str(), &bi2Stat))
+        {
+            LogModule.report(logvisor::Error, _S("unable to stat %s"), bi2In.c_str());
+            return -1;
+        }
+
+        return _build(
+        [this, &bootIn](IPartWriteStream& ws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz,
+                        uint32_t userOff, uint32_t userSz) -> bool
+        {
+            std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(bootIn.c_str())->beginReadStream();
+            if (!rs)
+                return false;
+            Header header;
+            header.read(*rs);
+            header.m_dolOff = dolOff;
+            header.m_fstOff = fstOff;
+            header.m_fstSz = fstSz;
+            header.m_fstMaxSz = fstSz;
+            header.m_userPosition = userOff;
+            header.m_userSz = userSz;
+            header.write(ws);
+            return true;
+        },
+        [this, &bi2In](IPartWriteStream& ws) -> bool
+        {
+            std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(bi2In.c_str())->beginReadStream();
+            if (!rs)
+                return false;
+            BI2Header bi2;
+            bi2.read(*rs);
+            bi2.write(ws);
+            return true;
+        },
+        [this, &apploaderIn](IPartWriteStream& ws, size_t& xferSz) -> bool
+        {
+            std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(apploaderIn.c_str())->beginReadStream();
             if (!rs)
                 return false;
             char buf[8192];
-            SystemString apploaderName(apploaderIn);
             while (true)
             {
                 size_t rdSz = rs->read(buf, 8192);
@@ -278,7 +354,7 @@ public:
                                      "apploader flows into user area (one or the other is too big)");
                     return false;
                 }
-                m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderName, xferSz);
+                m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderIn, xferSz);
             }
             ++m_parent.m_progressIdx;
             return true;
@@ -294,7 +370,26 @@ public:
         if (!result)
             return false;
 
-        return _build([this, partIn](IPartWriteStream& ws, size_t& xferSz) -> bool
+        return _build(
+        [this, partIn](IPartWriteStream& ws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz,
+                       uint32_t userOff, uint32_t userSz) -> bool
+        {
+            Header header = partIn->getHeader();
+            header.m_dolOff = dolOff;
+            header.m_fstOff = fstOff;
+            header.m_fstSz = fstSz;
+            header.m_fstMaxSz = fstSz;
+            header.m_userPosition = userOff;
+            header.m_userSz = userSz;
+            header.write(ws);
+            return true;
+        },
+        [this, partIn](IPartWriteStream& ws) -> bool
+        {
+            partIn->getBI2().write(ws);
+            return true;
+        },
+        [this, partIn](IPartWriteStream& ws, size_t& xferSz) -> bool
         {
             std::unique_ptr<uint8_t[]> apploaderBuf = partIn->getApploaderBuf();
             size_t apploaderSz = partIn->getApploaderSize();
@@ -314,8 +409,7 @@ public:
     }
 };
 
-EBuildResult DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const SystemChar* dolIn,
-                                                const SystemChar* apploaderIn)
+EBuildResult DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn)
 {
     if (!m_fileIO->beginWriteStream())
         return EBuildResult::Failed;
@@ -332,12 +426,12 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn, const S
     ws->write("", 1);
 
     PartitionBuilderGCN& pb = static_cast<PartitionBuilderGCN&>(*m_partitions[0]);
-    return pb.buildFromDirectory(dirIn, dolIn, apploaderIn) ? EBuildResult::Success : EBuildResult::Failed;
+    return pb.buildFromDirectory(dirIn) ? EBuildResult::Success : EBuildResult::Failed;
 }
 
-uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(const SystemChar* dirIn, const SystemChar* dolIn)
+uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(const SystemChar* dirIn)
 {
-    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dolIn, dirIn);
+    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn);
     if (sz == -1)
         return -1;
     sz += 0x30000;
@@ -349,12 +443,10 @@ uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(const SystemChar* dirIn, con
     return sz;
 }
 
-DiscBuilderGCN::DiscBuilderGCN(const SystemChar* outPath, const char gameID[6], const char* gameTitle,
-                               uint32_t fstMemoryAddr, FProgress progressCB)
+DiscBuilderGCN::DiscBuilderGCN(const SystemChar* outPath, FProgress progressCB)
 : DiscBuilderBase(outPath, 0x57058000, progressCB)
 {
-    PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this, PartitionBuilderBase::Kind::Data,
-                                                               gameID, gameTitle, fstMemoryAddr);
+    PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this);
     m_partitions.emplace_back(partBuilder);
 }
 

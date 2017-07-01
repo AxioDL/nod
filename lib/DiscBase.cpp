@@ -98,7 +98,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     if (m_kind == Kind::Directory)
     {
         ++m_parent.m_curNodeIdx;
-        if (ctx.verbose && ctx.progressCB && !getName().empty())
+        if (ctx.progressCB && !getName().empty())
             ctx.progressCB(getName(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
         if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
         {
@@ -112,7 +112,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
     else if (m_kind == Kind::File)
     {
         Sstat theStat;
-        if (ctx.verbose && ctx.progressCB)
+        if (ctx.progressCB)
             ctx.progressCB(getName(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
 
         if (ctx.force || Stat(path.c_str(), &theStat))
@@ -124,7 +124,7 @@ bool DiscBase::IPartition::Node::extractToDirectory(const SystemString& basePath
             ws->copyFromDisc(*rs, m_discLength,
             [&](float prog)
             {
-                if (ctx.verbose && ctx.progressCB)
+                if (ctx.progressCB)
                     ctx.progressCB(getName(), (m_parent.m_curNodeIdx + prog) / float(m_parent.getNodeCount()));
             });
         }
@@ -144,17 +144,31 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         return false;
     }
 
-    if (Mkdir((path + _S("/sys")).c_str(), 0755) && errno != EEXIST)
+    if (Mkdir((path + _S("/DATA")).c_str(), 0755) && errno != EEXIST)
     {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/sys'"), path.c_str());
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/DATA'"), path.c_str());
         return false;
     }
 
+    if (Mkdir((path + _S("/DATA/sys")).c_str(), 0755) && errno != EEXIST)
+    {
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/DATA/sys'"), path.c_str());
+        return false;
+    }
+
+    /* Extract Disc Files */
+    if (!m_parent.extractDiscHeaderFiles(path, ctx))
+        return false;
+
+    /* Extract Crypto Files */
+    if (!extractCryptoFiles(path, ctx))
+        return false;
+
     /* Extract Apploader */
-    SystemString apploaderPath = path + _S("/sys/apploader.img");
+    SystemString apploaderPath = path + _S("/DATA/sys/apploader.img");
     if (ctx.force || Stat(apploaderPath.c_str(), &theStat))
     {
-        if (ctx.verbose && ctx.progressCB)
+        if (ctx.progressCB)
             ctx.progressCB("apploader.bin", 0.f);
         std::unique_ptr<uint8_t[]> buf = getApploaderBuf();
         auto ws = NewFileIO(apploaderPath)->beginWriteStream();
@@ -164,10 +178,10 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract Dol */
-    SystemString dolPath = path + _S("/sys/main.dol");
+    SystemString dolPath = path + _S("/DATA/sys/main.dol");
     if (ctx.force || Stat(dolPath.c_str(), &theStat))
     {
-        if (ctx.verbose && ctx.progressCB)
+        if (ctx.progressCB)
             ctx.progressCB("main.dol", 0.f);
         std::unique_ptr<uint8_t[]> buf = getDOLBuf();
         auto ws = NewFileIO(dolPath)->beginWriteStream();
@@ -177,32 +191,32 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract Boot info */
-    SystemString bootPath = path + _S("/sys/boot.bin");
+    SystemString bootPath = path + _S("/DATA/sys/boot.bin");
     if (ctx.force || Stat(bootPath.c_str(), &theStat))
     {
-        if (ctx.verbose && ctx.progressCB)
+        if (ctx.progressCB)
             ctx.progressCB("boot.bin", 0.f);
         auto ws = NewFileIO(bootPath)->beginWriteStream();
         if (!ws)
             return false;
-        getHeader().write(*ws.get());
+        m_header.write(*ws.get());
     }
 
     /* Extract BI2 info */
-    SystemString bi2Path = path + _S("/sys/bi2.bin");
+    SystemString bi2Path = path + _S("/DATA/sys/bi2.bin");
     if (ctx.force || Stat(bi2Path.c_str(), &theStat))
     {
-        if (ctx.verbose && ctx.progressCB)
+        if (ctx.progressCB)
             ctx.progressCB("bi2.bin", 0.f);
 
-        const uint8_t* buf = getBI2Buf();
         auto ws = NewFileIO(bi2Path)->beginWriteStream();
         if (!ws)
             return false;
-        ws->write(buf, sizeof(BI2Header));
+        m_bi2Header.write(*ws);
     }
+
     /* Extract Filesystem */
-    SystemString fsPath = path + _S("/files");
+    SystemString fsPath = path + _S("/DATA/files");
     if (Mkdir(fsPath.c_str(), 0755) && errno != EEXIST)
     {
         LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), fsPath.c_str());
@@ -299,37 +313,28 @@ static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t s
     return out.write(buf.get(), sz);
 }
 
-void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodesPre(const SystemChar* dirIn,
-                                                                   uint64_t dolInode)
+void DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodesPre(const SystemChar* filesIn)
 {
-    DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+    DirectoryEnumerator dEnum(filesIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum)
     {
         if (e.m_isDir)
-        {
-            recursiveBuildNodesPre(e.m_path.c_str(), dolInode);
-        }
+            recursiveBuildNodesPre(e.m_path.c_str());
         else
-        {
-            if (dolInode == GetInode(e.m_path.c_str()))
-                continue;
-
             ++m_parent.m_progressTotal;
-        }
     }
 }
 
 bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream& ws,
                                                                 bool system,
-                                                                const SystemChar* dirIn,
-                                                                uint64_t dolInode)
+                                                                const SystemChar* filesIn)
 {
-    DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+    DirectoryEnumerator dEnum(filesIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum)
     {
         if (e.m_isDir)
         {
-            if (!recursiveBuildNodes(ws, system, e.m_path.c_str(), dolInode))
+            if (!recursiveBuildNodes(ws, system, e.m_path.c_str()))
                 return false;
         }
         else
@@ -337,9 +342,6 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
             bool isDol;
             bool isSys = IsSystemFile(e.m_name, isDol);
             if (system ^ isSys)
-                continue;
-
-            if (dolInode == GetInode(e.m_path.c_str()))
                 continue;
 
             size_t fileSz = ROUND_UP_32(e.m_fileSz);
@@ -380,10 +382,10 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
     return true;
 }
 
-bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* dirIn, uint64_t dolInode,
+bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* filesIn,
                                                               std::function<void(void)> incParents)
 {
-    DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
+    DirectoryEnumerator dEnum(filesIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum)
     {
         if (e.m_isDir)
@@ -392,19 +394,11 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* 
             m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx+1);
             addBuildName(e.m_name);
             incParents();
-            if (!recursiveBuildFST(e.m_path.c_str(), dolInode, [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();}))
+            if (!recursiveBuildFST(e.m_path.c_str(), [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();}))
                 return false;
         }
         else
         {
-            if (dolInode == GetInode(e.m_path.c_str()))
-            {
-                m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(m_dolOffset), m_dolSize);
-                addBuildName(e.m_name);
-                incParents();
-                continue;
-            }
-
             std::pair<uint64_t,uint64_t> fileOffSz = m_fileOffsetsSizes.at(e.m_path);
             m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
             addBuildName(e.m_name);
@@ -796,20 +790,21 @@ bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(
 }
 
 bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream& ws,
-                                                               const SystemChar* dirIn,
-                                                               const SystemChar* dolIn,
-                                                               const SystemChar* apploaderIn)
+                                                               const SystemChar* dirIn)
 {
-    if (!dirIn || !dolIn || !apploaderIn)
+    if (!dirIn)
     {
         LogModule.report(logvisor::Error, _S("all arguments must be supplied to buildFromDirectory()"));
         return false;
     }
 
+    SystemString dirStr(dirIn);
+    SystemString dolIn = dirStr + _S("/DATA/sys/main.dol");
+    SystemString filesIn = dirStr + _S("/DATA/files");
+
     /* 1st pass - Tally up total progress steps */
-    uint64_t dolInode = GetInode(dolIn);
     m_parent.m_progressTotal += 2; /* Prep and DOL */
-    recursiveBuildNodesPre(dirIn, dolInode);
+    recursiveBuildNodesPre(filesIn.c_str());
 
     /* Clear file */
     m_parent.m_progressCB(m_parent.getProgressFactor(), _S("Preparing output image"), -1);
@@ -822,9 +817,9 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
     /* Write Boot DOL first (first thing seeked to after Apploader) */
     {
         Sstat dolStat;
-        if (Stat(dolIn, &dolStat))
+        if (Stat(dolIn.c_str(), &dolStat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), dolIn);
+            LogModule.report(logvisor::Error, _S("unable to stat %s"), dolIn.c_str());
             return false;
         }
         size_t fileSz = ROUND_UP_32(dolStat.st_size);
@@ -833,12 +828,12 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
             return false;
         m_dolOffset = fileOff;
         m_dolSize = fileSz;
-        std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn)->beginReadStream();
+        std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn.c_str())->beginReadStream();
         if (!rs)
             return false;
         bool patched;
         size_t xferSz = PatchDOL(*rs, ws, dolStat.st_size, patched);
-        m_parent.m_progressCB(m_parent.getProgressFactor(), SystemString(dolIn) +
+        m_parent.m_progressCB(m_parent.getProgressFactor(), dolIn +
                               (patched ? _S(" [PATCHED]") : _S("")), xferSz);
         ++m_parent.m_progressIdx;
         for (size_t i=0 ; i<fileSz-xferSz ; ++i)
@@ -846,27 +841,30 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
     }
 
     /* Gather files in root directory */
-    if (!recursiveBuildNodes(ws, true, dirIn, dolInode))
+    if (!recursiveBuildNodes(ws, true, filesIn.c_str()))
         return false;
-    if (!recursiveBuildNodes(ws, false, dirIn, dolInode))
+    if (!recursiveBuildNodes(ws, false, filesIn.c_str()))
         return false;
-    if (!recursiveBuildFST(dirIn, dolInode, [&](){m_buildNodes[0].incrementLength();}))
+    if (!recursiveBuildFST(filesIn.c_str(), [&](){m_buildNodes[0].incrementLength();}))
         return false;
 
     return true;
 }
 
-uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(const SystemChar* dolIn,
-                                                                        const SystemChar* dirIn)
+uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(const SystemChar* dirIn)
 {
+    SystemString dirStr(dirIn);
+    SystemString dolIn = dirStr + _S("/DATA/sys/main.dol");
+    SystemString filesIn = dirStr + _S("/DATA/files");
+
     Sstat dolStat;
-    if (Stat(dolIn, &dolStat))
+    if (Stat(dolIn.c_str(), &dolStat))
     {
-        LogModule.report(logvisor::Error, _S("unable to stat %s"), dolIn);
+        LogModule.report(logvisor::Error, _S("unable to stat %s"), dolIn.c_str());
         return -1;
     }
     uint64_t totalSz = ROUND_UP_32(dolStat.st_size);
-    if (!RecursiveCalculateTotalSize(totalSz, nullptr, dirIn))
+    if (!RecursiveCalculateTotalSize(totalSz, nullptr, filesIn.c_str()))
         return -1;
     return totalSz;
 }
@@ -881,9 +879,12 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
         return false;
     }
 
+    SystemString dirStr(dirIn);
+    SystemString filesIn = dirStr + _S("/DATA/files");
+
     /* 1st pass - Tally up total progress steps */
     m_parent.m_progressTotal += 2; /* Prep and DOL */
-    recursiveMergeNodesPre(&partIn->getFSTRoot(), dirIn);
+    recursiveMergeNodesPre(&partIn->getFSTRoot(), filesIn.c_str());
 
     /* Clear file */
     m_parent.m_progressCB(m_parent.getProgressFactor(), _S("Preparing output image"), -1);
@@ -915,11 +916,11 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
 
     /* Gather files in root directory */
     SystemString keyPath;
-    if (!recursiveMergeNodes(ws, true, &partIn->getFSTRoot(), dirIn, keyPath))
+    if (!recursiveMergeNodes(ws, true, &partIn->getFSTRoot(), filesIn.c_str(), keyPath))
         return false;
-    if (!recursiveMergeNodes(ws, false, &partIn->getFSTRoot(), dirIn, keyPath))
+    if (!recursiveMergeNodes(ws, false, &partIn->getFSTRoot(), filesIn.c_str(), keyPath))
         return false;
-    if (!recursiveMergeFST(&partIn->getFSTRoot(), dirIn, [&](){m_buildNodes[0].incrementLength();}, keyPath))
+    if (!recursiveMergeFST(&partIn->getFSTRoot(), filesIn.c_str(), [&](){m_buildNodes[0].incrementLength();}, keyPath))
         return false;
 
     return true;
@@ -928,8 +929,11 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
 uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const DiscBase::IPartition* partIn,
                                                                         const SystemChar* dirIn)
 {
+    SystemString dirStr(dirIn);
+    SystemString filesIn = dirStr + _S("/DATA/files");
+
     uint64_t totalSz = ROUND_UP_32(partIn->getDOLSize());
-    if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), dirIn))
+    if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), filesIn.c_str()))
         return -1;
     return totalSz;
 }

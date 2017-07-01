@@ -145,7 +145,7 @@ public:
             li.QuadPart = offset;
             SetFilePointerEx(fp, li, nullptr, whence);
         }
-        int64_t position()
+        uint64_t position() const
         {
             LARGE_INTEGER li = {};
             LARGE_INTEGER res;

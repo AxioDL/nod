@@ -11,7 +11,7 @@ namespace nod
 class IAES
 {
 public:
-    virtual ~IAES() {}
+    virtual ~IAES() = default;
     virtual void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)=0;
     virtual void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len)=0;
     virtual void setKey(const uint8_t* key)=0;
