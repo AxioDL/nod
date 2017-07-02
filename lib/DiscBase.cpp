@@ -38,6 +38,21 @@ static void* memmem(const void *haystack, size_t hlen, const void *needle, size_
 namespace nod
 {
 
+const char* getKindString(PartitionKind kind)
+{
+    switch (kind)
+    {
+    case PartitionKind::Data:
+        return "DATA";
+    case PartitionKind::Update:
+        return "UPDATE";
+    case PartitionKind::Channel:
+        return "CHANNEL";
+    default:
+        return nullptr;
+    }
+}
+
 void DiscBase::IPartition::parseFST(IPartReadStream& s)
 {
     std::unique_ptr<uint8_t[]> fst(new uint8_t[m_fstSz]);
@@ -144,20 +159,24 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         return false;
     }
 
-    if (Mkdir((path + _S("/DATA")).c_str(), 0755) && errno != EEXIST)
+    SystemString basePath = m_isWii ? path + _S("/") + getKindString(m_kind) : path;
+    if (m_isWii)
     {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/DATA'"), path.c_str());
-        return false;
+        if (Mkdir(basePath.c_str(), 0755) && errno != EEXIST)
+        {
+            LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), basePath.c_str());
+            return false;
+        }
     }
 
-    if (Mkdir((path + _S("/DATA/sys")).c_str(), 0755) && errno != EEXIST)
+    if (Mkdir((basePath + _S("/sys")).c_str(), 0755) && errno != EEXIST)
     {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/DATA/sys'"), path.c_str());
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/sys'"), basePath.c_str());
         return false;
     }
 
     /* Extract Disc Files */
-    if (!m_parent.extractDiscHeaderFiles(path, ctx))
+    if (!m_parent.extractDiscHeaderFiles(basePath, ctx))
         return false;
 
     /* Extract Crypto Files */
@@ -165,7 +184,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         return false;
 
     /* Extract Apploader */
-    SystemString apploaderPath = path + _S("/DATA/sys/apploader.img");
+    SystemString apploaderPath = basePath + _S("/sys/apploader.img");
     if (ctx.force || Stat(apploaderPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -178,7 +197,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract Dol */
-    SystemString dolPath = path + _S("/DATA/sys/main.dol");
+    SystemString dolPath = basePath + _S("/sys/main.dol");
     if (ctx.force || Stat(dolPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -191,7 +210,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract Boot info */
-    SystemString bootPath = path + _S("/DATA/sys/boot.bin");
+    SystemString bootPath = basePath + _S("/sys/boot.bin");
     if (ctx.force || Stat(bootPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -203,7 +222,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract BI2 info */
-    SystemString bi2Path = path + _S("/DATA/sys/bi2.bin");
+    SystemString bi2Path = basePath + _S("/sys/bi2.bin");
     if (ctx.force || Stat(bi2Path.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -216,7 +235,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     }
 
     /* Extract Filesystem */
-    SystemString fsPath = path + _S("/DATA/files");
+    SystemString fsPath = basePath + _S("/files");
     if (Mkdir(fsPath.c_str(), 0755) && errno != EEXIST)
     {
         LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), fsPath.c_str());
@@ -799,8 +818,9 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
     }
 
     SystemString dirStr(dirIn);
-    SystemString dolIn = dirStr + _S("/DATA/sys/main.dol");
-    SystemString filesIn = dirStr + _S("/DATA/files");
+    SystemString basePath = m_isWii ? dirStr + _S("/") + getKindString(m_kind) : dirStr;
+    SystemString dolIn = basePath + _S("/sys/main.dol");
+    SystemString filesIn = basePath + _S("/files");
 
     /* 1st pass - Tally up total progress steps */
     m_parent.m_progressTotal += 2; /* Prep and DOL */
@@ -851,11 +871,13 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
     return true;
 }
 
-uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(const SystemChar* dirIn)
+uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(const SystemChar* dirIn,
+                                                                        PartitionKind kind, bool isWii)
 {
     SystemString dirStr(dirIn);
-    SystemString dolIn = dirStr + _S("/DATA/sys/main.dol");
-    SystemString filesIn = dirStr + _S("/DATA/files");
+    SystemString basePath = isWii ? dirStr + _S("/") + getKindString(kind) : dirStr;
+    SystemString dolIn = basePath + _S("/sys/main.dol");
+    SystemString filesIn = basePath + _S("/files");
 
     Sstat dolStat;
     if (Stat(dolIn.c_str(), &dolStat))
@@ -880,7 +902,8 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
     }
 
     SystemString dirStr(dirIn);
-    SystemString filesIn = dirStr + _S("/DATA/files");
+    SystemString basePath = m_isWii ? dirStr + _S("/") + getKindString(m_kind) : dirStr;
+    SystemString filesIn = basePath + _S("/files");
 
     /* 1st pass - Tally up total progress steps */
     m_parent.m_progressTotal += 2; /* Prep and DOL */
@@ -930,7 +953,8 @@ uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const Di
                                                                         const SystemChar* dirIn)
 {
     SystemString dirStr(dirIn);
-    SystemString filesIn = dirStr + _S("/DATA/files");
+    SystemString basePath = partIn->isWii() ? dirStr + _S("/") + getKindString(partIn->getKind()) : dirStr;
+    SystemString filesIn = basePath + _S("/files");
 
     uint64_t totalSz = ROUND_UP_32(partIn->getDOLSize());
     if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), filesIn.c_str()))

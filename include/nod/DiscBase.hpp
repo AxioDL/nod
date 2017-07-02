@@ -24,6 +24,14 @@ enum class EBuildResult
     DiskFull
 };
 
+enum class PartitionKind : uint32_t
+{
+    Data,
+    Update,
+    Channel
+};
+const char* getKindString(PartitionKind kind);
+
 class FSTNode
 {
     uint32_t typeAndNameOffset;
@@ -187,12 +195,6 @@ public:
     {
     public:
         virtual ~IPartition() = default;
-        enum class Kind : uint32_t
-        {
-            Data,
-            Update,
-            Channel
-        };
         struct DOLHeader
         {
             uint32_t textOff[7];
@@ -317,8 +319,9 @@ public:
         void parseDOL(IPartReadStream& s);
 
         const DiscBase& m_parent;
-        Kind m_kind;
+        PartitionKind m_kind;
         uint64_t m_offset;
+        bool m_isWii;
     public:
         mutable size_t m_curNodeIdx = 0;
         float getProgressFactor() const { return getNodeCount() ? m_curNodeIdx / float(getNodeCount()) : 0.f; }
@@ -333,10 +336,11 @@ public:
                 return m_curNodeIdx / float(getNodeCount());
         }
 
-        IPartition(const DiscBase& parent, Kind kind, uint64_t offset)
-        : m_parent(parent), m_kind(kind), m_offset(offset) {}
+        IPartition(const DiscBase& parent, PartitionKind kind, bool isWii, uint64_t offset)
+        : m_parent(parent), m_kind(kind), m_offset(offset), m_isWii(isWii) {}
         virtual uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset;}
-        inline Kind getKind() const {return m_kind;}
+        inline PartitionKind getKind() const {return m_kind;}
+        inline bool isWii() const {return m_isWii;}
         inline uint64_t getDiscOffset() const {return m_offset;}
         virtual std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const=0;
         inline std::unique_ptr<IPartReadStream> beginDOLReadStream(uint64_t offset=0) const
@@ -399,7 +403,7 @@ public:
     inline IPartition* getDataPartition()
     {
         for (const std::unique_ptr<IPartition>& part : m_partitions)
-            if (part->getKind() == IPartition::Kind::Data)
+            if (part->getKind() == PartitionKind::Data)
                 return part.get();
         return nullptr;
     }
@@ -407,7 +411,7 @@ public:
     inline IPartition* getUpdatePartition()
     {
         for (const std::unique_ptr<IPartition>& part : m_partitions)
-            if (part->getKind() == IPartition::Kind::Update)
+            if (part->getKind() == PartitionKind::Update)
                 return part.get();
         return nullptr;
     }
@@ -429,12 +433,6 @@ public:
     {
     public:
         virtual ~PartitionBuilderBase() = default;
-        enum class Kind : uint32_t
-        {
-            Data,
-            Update,
-            Channel
-        };
     protected:
         std::unordered_map<SystemString, std::pair<uint64_t,uint64_t>> m_fileOffsetsSizes;
         std::vector<FSTNode> m_buildNodes;
@@ -469,17 +467,19 @@ public:
         }
 
         DiscBuilderBase& m_parent;
-        Kind m_kind;
+        PartitionKind m_kind;
         uint64_t m_dolOffset = 0;
         uint64_t m_dolSize = 0;
+        bool m_isWii;
     public:
-        PartitionBuilderBase(DiscBuilderBase& parent, Kind kind)
-        : m_parent(parent), m_kind(kind)
+        PartitionBuilderBase(DiscBuilderBase& parent, PartitionKind kind, bool isWii)
+        : m_parent(parent), m_kind(kind), m_isWii(isWii)
         {}
         virtual std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset)=0;
         bool buildFromDirectory(IPartWriteStream& ws,
                                 const SystemChar* dirIn);
-        static uint64_t CalculateTotalSizeBuild(const SystemChar* dirIn);
+        static uint64_t CalculateTotalSizeBuild(const SystemChar* dirIn,
+                                                PartitionKind kind, bool isWii);
         bool mergeFromDirectory(IPartWriteStream& ws,
                                 const DiscBase::IPartition* partIn,
                                 const SystemChar* dirIn);

@@ -9,8 +9,8 @@ namespace nod
 class PartitionGCN : public DiscBase::IPartition
 {
 public:
-    PartitionGCN(const DiscGCN& parent, Kind kind, uint64_t offset, bool& err)
-    : IPartition(parent, kind, offset)
+    PartitionGCN(const DiscGCN& parent, uint64_t offset, bool& err)
+    : IPartition(parent, PartitionKind::Data, false, offset)
     {
         /* GCN-specific header reads */
         std::unique_ptr<IPartReadStream> s = beginReadStream(0x0);
@@ -126,7 +126,7 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err)
         return;
 
     /* One lone partition for GCN */
-    m_partitions.emplace_back(new PartitionGCN(*this, IPartition::Kind::Data, 0, err));
+    m_partitions.emplace_back(new PartitionGCN(*this, 0, err));
 }
 
 DiscBuilderGCN DiscGCN::makeMergeBuilder(const SystemChar* outPath, FProgress progressCB)
@@ -136,31 +136,6 @@ DiscBuilderGCN DiscGCN::makeMergeBuilder(const SystemChar* outPath, FProgress pr
 
 bool DiscGCN::extractDiscHeaderFiles(const SystemString& path, const ExtractionContext& ctx) const
 {
-    if (Mkdir((path + _S("/DATA/disc")).c_str(), 0755) && errno != EEXIST)
-    {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/DATA/disc'"), path.c_str());
-        return false;
-    }
-
-    Sstat theStat;
-
-    /* Extract Header */
-    SystemString headerPath = path + _S("/DATA/disc/header.bin");
-    if (ctx.force || Stat(headerPath.c_str(), &theStat))
-    {
-        if (ctx.progressCB)
-            ctx.progressCB("header.bin", 0.f);
-        std::unique_ptr<IReadStream> rs = getDiscIO().beginReadStream(0x0);
-        if (!rs)
-            return false;
-        Header header;
-        header.read(*rs);
-        auto ws = NewFileIO(headerPath)->beginWriteStream();
-        if (!ws)
-            return false;
-        header.write(*ws);
-    }
-
     return true;
 }
 
@@ -199,7 +174,7 @@ public:
     };
 
     PartitionBuilderGCN(DiscBuilderBase& parent)
-    : DiscBuilderBase::PartitionBuilderBase(parent, Kind::Data) {}
+    : DiscBuilderBase::PartitionBuilderBase(parent, PartitionKind::Data, false) {}
 
     uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws)
     {
@@ -281,7 +256,7 @@ public:
         SystemString dirStr(dirIn);
 
         /* Check Apploader */
-        SystemString apploaderIn = dirStr + _S("/DATA/sys/apploader.img");
+        SystemString apploaderIn = dirStr + _S("/sys/apploader.img");
         Sstat apploaderStat;
         if (Stat(apploaderIn.c_str(), &apploaderStat))
         {
@@ -290,7 +265,7 @@ public:
         }
 
         /* Check Boot */
-        SystemString bootIn = dirStr + _S("/DATA/sys/boot.bin");
+        SystemString bootIn = dirStr + _S("/sys/boot.bin");
         Sstat bootStat;
         if (Stat(bootIn.c_str(), &bootStat))
         {
@@ -299,7 +274,7 @@ public:
         }
 
         /* Check BI2 */
-        SystemString bi2In = dirStr + _S("/DATA/sys/bi2.bin");
+        SystemString bi2In = dirStr + _S("/sys/bi2.bin");
         Sstat bi2Stat;
         if (Stat(bi2In.c_str(), &bi2Stat))
         {
@@ -431,7 +406,7 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn)
 
 uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(const SystemChar* dirIn)
 {
-    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn);
+    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
     if (sz == -1)
         return -1;
     sz += 0x30000;

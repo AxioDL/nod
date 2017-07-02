@@ -272,8 +272,8 @@ class PartitionWii : public DiscBase::IPartition
     uint8_t m_decKey[16];
 
 public:
-    PartitionWii(const DiscWii& parent, Kind kind, uint64_t offset, bool& err)
-    : IPartition(parent, kind, offset)
+    PartitionWii(const DiscWii& parent, PartitionKind kind, uint64_t offset, bool& err)
+    : IPartition(parent, kind, true, offset)
     {
         std::unique_ptr<IReadStream> s = parent.getDiscIO().beginReadStream(offset);
         if (!s)
@@ -545,7 +545,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err)
         struct Part
         {
             uint32_t partDataOff;
-            IPartition::Kind partType;
+            PartitionKind partType;
         } parts[4];
         PartInfo(IDiscIO& dio, bool& err)
         {
@@ -565,7 +565,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err)
             {
                 s->read(&parts[p], 8);
                 parts[p].partDataOff = SBig(parts[p].partDataOff);
-                parts[p].partType = IPartition::Kind(SBig(uint32_t(parts[p].partType)));
+                parts[p].partType = PartitionKind(SBig(uint32_t(parts[p].partType)));
             }
         }
     } partInfo(*m_discIO, err);
@@ -577,12 +577,12 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err)
     for (uint32_t p=0 ; p<partInfo.partCount && p<4 ; ++p)
     {
         PartInfo::Part& part = partInfo.parts[p];
-        IPartition::Kind kind;
+        PartitionKind kind;
         switch (part.partType)
         {
-        case IPartition::Kind::Data:
-        case IPartition::Kind::Update:
-        case IPartition::Kind::Channel:
+        case PartitionKind::Data:
+        case PartitionKind::Update:
+        case PartitionKind::Channel:
             kind = part.partType;
             break;
         default:
@@ -601,18 +601,18 @@ DiscBuilderWii DiscWii::makeMergeBuilder(const SystemChar* outPath, bool dualLay
     return DiscBuilderWii(outPath, dualLayer, progressCB);
 }
 
-bool DiscWii::extractDiscHeaderFiles(const SystemString& path, const ExtractionContext& ctx) const
+bool DiscWii::extractDiscHeaderFiles(const SystemString& basePath, const ExtractionContext& ctx) const
 {
-    if (Mkdir((path + _S("/DATA/disc")).c_str(), 0755) && errno != EEXIST)
+    if (Mkdir((basePath + _S("/disc")).c_str(), 0755) && errno != EEXIST)
     {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/DATA/disc'"), path.c_str());
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/disc'"), basePath.c_str());
         return false;
     }
 
     Sstat theStat;
 
     /* Extract Header */
-    SystemString headerPath = path + _S("/DATA/disc/header.bin");
+    SystemString headerPath = basePath + _S("/disc/header.bin");
     if (ctx.force || Stat(headerPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -629,7 +629,7 @@ bool DiscWii::extractDiscHeaderFiles(const SystemString& path, const ExtractionC
     }
 
     /* Extract Region info */
-    SystemString regionPath = path + _S("/DATA/disc/region.bin");
+    SystemString regionPath = basePath + _S("/disc/region.bin");
     if (ctx.force || Stat(regionPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -816,8 +816,8 @@ public:
         }
     };
 
-    PartitionBuilderWii(DiscBuilderBase& parent, Kind kind, uint64_t baseOffset)
-    : DiscBuilderBase::PartitionBuilderBase(parent, kind),
+    PartitionBuilderWii(DiscBuilderBase& parent, PartitionKind kind, uint64_t baseOffset)
+    : DiscBuilderBase::PartitionBuilderBase(parent, kind, true),
       m_baseOffset(baseOffset), m_aes(NewAES()) {}
 
     uint64_t getCurUserEnd() const {return m_curUser;}
@@ -1019,6 +1019,7 @@ public:
     uint64_t buildFromDirectory(const SystemChar* dirIn)
     {
         SystemString dirStr(dirIn);
+        SystemString basePath = dirStr + _S("/") + getKindString(m_kind);
 
         /* Check Ticket */
         SystemString ticketIn = dirStr + _S("/ticket.bin");
@@ -1048,7 +1049,7 @@ public:
         }
 
         /* Check Apploader */
-        SystemString apploaderIn = dirStr + _S("/DATA/sys/apploader.img");
+        SystemString apploaderIn = basePath + _S("/sys/apploader.img");
         Sstat apploaderStat;
         if (Stat(apploaderIn.c_str(), &apploaderStat))
         {
@@ -1057,7 +1058,7 @@ public:
         }
 
         /* Check Boot */
-        SystemString bootIn = dirStr + _S("/DATA/sys/boot.bin");
+        SystemString bootIn = basePath + _S("/sys/boot.bin");
         Sstat bootStat;
         if (Stat(bootIn.c_str(), &bootStat))
         {
@@ -1066,7 +1067,7 @@ public:
         }
 
         /* Check BI2 */
-        SystemString bi2In = dirStr + _S("/DATA/sys/bi2.bin");
+        SystemString bi2In = basePath + _S("/sys/bi2.bin");
         Sstat bi2Stat;
         if (Stat(bi2In.c_str(), &bi2Stat))
         {
@@ -1254,6 +1255,7 @@ public:
 EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn)
 {
     SystemString dirStr(dirIn);
+    SystemString basePath = dirStr + _S("/") + getKindString(PartitionKind::Data);
 
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_partitions[0]);
     uint64_t filledSz = pb.m_baseOffset;
@@ -1289,7 +1291,7 @@ EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn)
     ws = m_fileIO->beginWriteStream(0);
     if (!ws)
         return EBuildResult::Failed;
-    SystemString headerPath = dirStr + _S("/DATA/disc/header.bin");
+    SystemString headerPath = basePath + _S("/disc/header.bin");
     std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(headerPath.c_str())->beginReadStream();
     if (!rs)
         return EBuildResult::Failed;
@@ -1311,7 +1313,7 @@ EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn)
     ws->write(vals, 4);
 
     /* Populate region info */
-    SystemString regionPath = dirStr + _S("/DATA/disc/region.bin");
+    SystemString regionPath = basePath + _S("/disc/region.bin");
     rs = NewFileIO(regionPath.c_str())->beginReadStream();
     if (!rs)
         return EBuildResult::Failed;
@@ -1345,7 +1347,7 @@ EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn)
 
 uint64_t DiscBuilderWii::CalculateTotalSizeRequired(const SystemChar* dirIn, bool& dualLayer)
 {
-    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn);
+    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true);
     if (sz == -1)
         return -1;
     auto szDiv = std::lldiv(sz, 0x1F0000);
@@ -1364,7 +1366,7 @@ uint64_t DiscBuilderWii::CalculateTotalSizeRequired(const SystemChar* dirIn, boo
 DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, bool dualLayer, FProgress progressCB)
 : DiscBuilderBase(outPath, dualLayer ? 0x1FB4E0000 : 0x118240000, progressCB), m_dualLayer(dualLayer)
 {
-    PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionBuilderBase::Kind::Data, 0x200000);
+    PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionKind::Data, 0x200000);
     m_partitions.emplace_back(partBuilder);
 }
 
