@@ -180,7 +180,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         return false;
 
     /* Extract Crypto Files */
-    if (!extractCryptoFiles(path, ctx))
+    if (!extractCryptoFiles(basePath, ctx))
         return false;
 
     /* Extract Apploader */

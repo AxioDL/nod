@@ -344,7 +344,7 @@ public:
         ds->seek(0x2440 + 0x14);
         uint32_t vals[2];
         ds->read(vals, 8);
-        m_apploaderSz = ((32 + SBig(vals[0]) + SBig(vals[1])) + 31) & ~31;
+        m_apploaderSz = 32 + SBig(vals[0]) + SBig(vals[1]);
 
         /* Yay files!! */
         parseFST(*ds);
@@ -473,12 +473,12 @@ public:
         return buf;
     }
 
-    bool extractCryptoFiles(const SystemString& path, const ExtractionContext& ctx) const
+    bool extractCryptoFiles(const SystemString& basePath, const ExtractionContext& ctx) const
     {
         Sstat theStat;
 
         /* Extract Ticket */
-        SystemString ticketPath = path + _S("/ticket.bin");
+        SystemString ticketPath = basePath + _S("/ticket.bin");
         if (ctx.force || Stat(ticketPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -490,7 +490,7 @@ public:
         }
 
         /* Extract TMD */
-        SystemString tmdPath = path + _S("/tmd.bin");
+        SystemString tmdPath = basePath + _S("/tmd.bin");
         if (ctx.force || Stat(tmdPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -502,7 +502,7 @@ public:
         }
 
         /* Extract Certs */
-        SystemString certPath = path + _S("/cert.bin");
+        SystemString certPath = basePath + _S("/cert.bin");
         if (ctx.force || Stat(certPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -516,7 +516,7 @@ public:
         }
 
         /* Extract H3 */
-        SystemString h3Path = path + _S("/h3.bin");
+        SystemString h3Path = basePath + _S("/h3.bin");
         if (ctx.force || Stat(h3Path.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -1022,7 +1022,7 @@ public:
         SystemString basePath = dirStr + _S("/") + getKindString(m_kind);
 
         /* Check Ticket */
-        SystemString ticketIn = dirStr + _S("/ticket.bin");
+        SystemString ticketIn = basePath + _S("/ticket.bin");
         Sstat theStat;
         if (Stat(ticketIn.c_str(), &theStat))
         {
@@ -1031,7 +1031,7 @@ public:
         }
 
         /* Check TMD */
-        SystemString tmdIn = dirStr + _S("/tmd.bin");
+        SystemString tmdIn = basePath + _S("/tmd.bin");
         Sstat tmdStat;
         if (Stat(tmdIn.c_str(), &tmdStat))
         {
@@ -1040,7 +1040,7 @@ public:
         }
 
         /* Check Cert */
-        SystemString certIn = dirStr + _S("/cert.bin");
+        SystemString certIn = basePath + _S("/cert.bin");
         Sstat certStat;
         if (Stat(certIn.c_str(), &certStat))
         {
