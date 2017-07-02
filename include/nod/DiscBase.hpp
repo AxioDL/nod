@@ -30,7 +30,7 @@ enum class PartitionKind : uint32_t
     Update,
     Channel
 };
-const char* getKindString(PartitionKind kind);
+const SystemChar* getKindString(PartitionKind kind);
 
 class FSTNode
 {

@@ -38,16 +38,16 @@ static void* memmem(const void *haystack, size_t hlen, const void *needle, size_
 namespace nod
 {
 
-const char* getKindString(PartitionKind kind)
+const SystemChar* getKindString(PartitionKind kind)
 {
     switch (kind)
     {
     case PartitionKind::Data:
-        return "DATA";
+        return _S("DATA");
     case PartitionKind::Update:
-        return "UPDATE";
+        return _S("UPDATE");
     case PartitionKind::Channel:
-        return "CHANNEL";
+        return _S("CHANNEL");
     default:
         return nullptr;
     }
