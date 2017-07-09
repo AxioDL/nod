@@ -169,12 +169,6 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         }
     }
 
-    if (Mkdir((basePath + _S("/sys")).c_str(), 0755) && errno != EEXIST)
-    {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/sys'"), basePath.c_str());
-        return false;
-    }
-
     /* Extract Disc Files */
     if (!m_parent.extractDiscHeaderFiles(basePath, ctx))
         return false;
@@ -183,6 +177,29 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
     if (!extractCryptoFiles(basePath, ctx))
         return false;
 
+    if (!extractSysFiles(basePath, ctx))
+        return false;
+
+    /* Extract Filesystem */
+    SystemString fsPath = basePath + _S("/files");
+    if (Mkdir(fsPath.c_str(), 0755) && errno != EEXIST)
+    {
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), fsPath.c_str());
+        return false;
+    }
+
+    return m_nodes[0].extractToDirectory(fsPath, ctx);
+}
+
+bool DiscBase::IPartition::extractSysFiles(const SystemString& basePath, const ExtractionContext& ctx) const
+{
+    if (Mkdir((basePath + _S("/sys")).c_str(), 0755) && errno != EEXIST)
+    {
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/sys'"), basePath.c_str());
+        return false;
+    }
+
+    Sstat theStat;
     /* Extract Apploader */
     SystemString apploaderPath = basePath + _S("/sys/apploader.img");
     if (ctx.force || Stat(apploaderPath.c_str(), &theStat))
@@ -234,15 +251,7 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
         m_bi2Header.write(*ws);
     }
 
-    /* Extract Filesystem */
-    SystemString fsPath = basePath + _S("/files");
-    if (Mkdir(fsPath.c_str(), 0755) && errno != EEXIST)
-    {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), fsPath.c_str());
-        return false;
-    }
-
-    return m_nodes[0].extractToDirectory(fsPath, ctx);
+    return true;
 }
 
 static uint64_t GetInode(const SystemChar* path)

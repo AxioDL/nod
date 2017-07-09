@@ -381,6 +381,7 @@ public:
         inline const Header& getHeader() const { return m_header; }
         inline const BI2Header& getBI2() const { return m_bi2Header; }
         virtual bool extractCryptoFiles(const SystemString& path, const ExtractionContext& ctx) const { return true; }
+        bool extractSysFiles(const SystemString& path, const ExtractionContext& ctx) const;
     };
 
 protected:
