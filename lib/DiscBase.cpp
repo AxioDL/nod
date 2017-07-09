@@ -152,7 +152,6 @@ bool DiscBase::IPartition::extractToDirectory(const SystemString& path,
                                               const ExtractionContext& ctx)
 {
     m_curNodeIdx = 0;
-    Sstat theStat;
     if (Mkdir(path.c_str(), 0755) && errno != EEXIST)
     {
         LogModule.report(logvisor::Error, _S("unable to mkdir '%s'"), path.c_str());
