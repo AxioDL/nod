@@ -5,6 +5,12 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
+if (MSVC)
+    # Shaddup MSVC
+    add_definitions(-DUNICODE=1 -D_UNICODE=1 -D__SSE__=1 -D_CRT_SECURE_NO_WARNINGS=1 -DD_SCL_SECURE_NO_WARNINGS=1
+        /IGNORE:4221 /wd4018 /wd4800 /wd4005 /wd4311 /wd4267 /wd4244 /wd4200 /wd4305 /wd4067 /wd4146 ${VS_DEFINES})
+endif()
+
 if (NOT TARGET logvisor)
     add_subdirectory(logvisor)
     set(LOGVISOR_INCLUDE_DIR logvisor/include)
