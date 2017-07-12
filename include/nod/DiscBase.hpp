@@ -446,7 +446,8 @@ public:
         bool recursiveBuildNodes(IPartWriteStream& ws, bool system, const SystemChar* dirIn);
 
         bool recursiveBuildFST(const SystemChar* dirIn,
-                               std::function<void(void)> incParents);
+                               std::function<void(void)> incParents,
+                               size_t parentDirIdx);
 
         void recursiveMergeNodesPre(const DiscBase::IPartition::Node* nodeIn, const SystemChar* dirIn);
         bool recursiveMergeNodes(IPartWriteStream& ws, bool system,

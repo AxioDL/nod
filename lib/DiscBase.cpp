@@ -410,7 +410,8 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
 }
 
 bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* filesIn,
-                                                              std::function<void(void)> incParents)
+                                                              std::function<void(void)> incParents,
+                                                              size_t parentDirIdx)
 {
     DirectoryEnumerator dEnum(filesIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum)
@@ -418,10 +419,12 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(const SystemChar* 
         if (e.m_isDir)
         {
             size_t dirNodeIdx = m_buildNodes.size();
-            m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx+1);
+            m_buildNodes.emplace_back(true, m_buildNameOff, parentDirIdx, dirNodeIdx+1);
             addBuildName(e.m_name);
             incParents();
-            if (!recursiveBuildFST(e.m_path.c_str(), [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();}))
+            if (!recursiveBuildFST(e.m_path.c_str(),
+                                   [&](){m_buildNodes[dirNodeIdx].incrementLength(); incParents();},
+                                   dirNodeIdx))
                 return false;
         }
         else
@@ -873,7 +876,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
         return false;
     if (!recursiveBuildNodes(ws, false, filesIn.c_str()))
         return false;
-    if (!recursiveBuildFST(filesIn.c_str(), [&](){m_buildNodes[0].incrementLength();}))
+    if (!recursiveBuildFST(filesIn.c_str(), [&](){m_buildNodes[0].incrementLength();}, 0))
         return false;
 
     return true;
