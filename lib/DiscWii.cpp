@@ -1186,7 +1186,7 @@ public:
         }, apploaderStat.st_size);
     }
 
-    bool mergeFromDirectory(const PartitionWii* partIn, const SystemChar* dirIn)
+    uint64_t mergeFromDirectory(const PartitionWii* partIn, const SystemChar* dirIn)
     {
         size_t phSz;
         std::unique_ptr<uint8_t[]> phBuf = partIn->readPartitionHeaderBuf(phSz);
