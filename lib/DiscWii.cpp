@@ -1292,7 +1292,7 @@ EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn)
     ++m_progressIdx;
 
     /* Populate disc header */
-    ws = m_fileIO->beginWriteStream(0);
+    std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(0);
     if (!ws)
         return EBuildResult::Failed;
     SystemString headerPath = basePath + _S("/disc/header.bin");
@@ -1416,7 +1416,7 @@ EBuildResult DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
     ++m_builder.m_progressIdx;
 
     /* Populate disc header */
-    ws = m_builder.m_fileIO->beginWriteStream(0);
+    std::unique_ptr<IFileIO::IWriteStream> ws = m_builder.m_fileIO->beginWriteStream(0);
     if (!ws)
         return EBuildResult::Failed;
     m_sourceDisc.getHeader().write(*ws);
