@@ -1269,10 +1269,14 @@ EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn)
     }
     m_progressCB(getProgressFactor(), _S("Preallocating image"), -1);
     ++m_progressIdx;
-    std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(m_discCapacity - 1);
-    if (!ws)
-        return EBuildResult::Failed;
-    ws->write("", 1);
+    {
+        std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(0);
+        if (!ws)
+            return EBuildResult::Failed;
+        char zeroBytes[1024] = {};
+        for (uint64_t i = 0; i < m_discCapacity; i += 1024)
+            ws->write(zeroBytes, 1024);
+    }
 
     /* Assemble image */
     filledSz = pb.buildFromDirectory(dirIn);
@@ -1389,10 +1393,14 @@ EBuildResult DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
     }
     m_builder.m_progressCB(m_builder.getProgressFactor(), _S("Preallocating image"), -1);
     ++m_builder.m_progressIdx;
-    std::unique_ptr<IFileIO::IWriteStream> ws = m_builder.m_fileIO->beginWriteStream(m_builder.m_discCapacity - 1);
-    if (!ws)
-        return EBuildResult::Failed;
-    ws->write("", 1);
+    {
+        std::unique_ptr<IFileIO::IWriteStream> ws = m_builder.m_fileIO->beginWriteStream(0);
+        if (!ws)
+            return EBuildResult::Failed;
+        char zeroBytes[1024] = {};
+        for (uint64_t i = 0; i < m_builder.m_discCapacity; i += 1024)
+            ws->write(zeroBytes, 1024);
+    }
 
     /* Assemble image */
     filledSz = pb.mergeFromDirectory(static_cast<PartitionWii*>(m_sourceDisc.getDataPartition()), dirIn);

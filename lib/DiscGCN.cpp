@@ -395,10 +395,14 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn)
     }
     m_progressCB(getProgressFactor(), _S("Preallocating image"), -1);
     ++m_progressIdx;
-    auto ws = m_fileIO->beginWriteStream(0x57058000 - 1);
-    if (!ws)
-        return EBuildResult::Failed;
-    ws->write("", 1);
+    {
+        auto ws = m_fileIO->beginWriteStream(0);
+        if (!ws)
+            return EBuildResult::Failed;
+        char zeroBytes[1024] = {};
+        for (uint64_t i = 0; i < 0x57058000; i += 1024)
+            ws->write(zeroBytes, 1024);
+    }
 
     PartitionBuilderGCN& pb = static_cast<PartitionBuilderGCN&>(*m_partitions[0]);
     return pb.buildFromDirectory(dirIn) ? EBuildResult::Success : EBuildResult::Failed;
@@ -440,10 +444,14 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(const SystemChar* dirIn)
     }
     m_builder.m_progressCB(m_builder.getProgressFactor(), _S("Preallocating image"), -1);
     ++m_builder.m_progressIdx;
-    auto ws = m_builder.m_fileIO->beginWriteStream(0x57058000 - 1);
-    if (!ws)
-        return EBuildResult::Failed;
-    ws->write("", 1);
+    {
+        auto ws = m_builder.m_fileIO->beginWriteStream(0);
+        if (!ws)
+            return EBuildResult::Failed;
+        char zeroBytes[1024] = {};
+        for (uint64_t i = 0; i < 0x57058000; i += 1024)
+            ws->write(zeroBytes, 1024);
+    }
 
     PartitionBuilderGCN& pb = static_cast<PartitionBuilderGCN&>(*m_builder.m_partitions[0]);
     return pb.mergeFromDirectory(static_cast<PartitionGCN*>(m_sourceDisc.getDataPartition()), dirIn) ?
