@@ -14,7 +14,7 @@ add_library(nod
             DiscWii.cpp
             DirectoryEnumerator.cpp
             nod.cpp
-			${PLAT_SRCS}
+            ${PLAT_SRCS}
             ${NOD_HEADERS})
 if(NOT MSVC)
 set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)
