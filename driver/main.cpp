@@ -61,13 +61,13 @@ int main(int argc, char* argv[])
             outDir = argv[a];
     }
 
-    auto progFunc = [&](float prog, const nod::SystemString& name, size_t bytes)
+    auto progFunc = [&](float prog, nod::SystemStringView name, size_t bytes)
     {
         nod::Printf(_S("\r                                                                      "));
         if (bytes != -1)
-            nod::Printf(_S("\r%g%% %s %" PRISize " B"), prog * 100.f, name.c_str(), bytes);
+            nod::Printf(_S("\r%g%% %s %" PRISize " B"), prog * 100.f, name.data(), bytes);
         else
-            nod::Printf(_S("\r%g%% %s"), prog * 100.f, name.c_str());
+            nod::Printf(_S("\r%g%% %s"), prog * 100.f, name.data());
         fflush(stdout);
     };
 
@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
         {
             nod::SystemString outPath(argv[2]);
             outPath.append(_S(".iso"));
-            nod::DiscBuilderGCN b(outPath.c_str(), progFunc);
+            nod::DiscBuilderGCN b(outPath, progFunc);
             ret = b.buildFromDirectory(argv[2]);
         }
         else
