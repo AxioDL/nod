@@ -87,7 +87,7 @@ class DiscIOWBFS : public IDiscIO
     }
 
 public:
-    DiscIOWBFS(const SystemString& fpin)
+    DiscIOWBFS(SystemStringView fpin)
     : filepath(fpin)
     {
         /* Temporary file handle to read LBA table */
@@ -296,7 +296,7 @@ public:
     }
 };
 
-std::unique_ptr<IDiscIO> NewDiscIOWBFS(const SystemChar* path)
+std::unique_ptr<IDiscIO> NewDiscIOWBFS(SystemStringView path)
 {
     return std::unique_ptr<IDiscIO>(new DiscIOWBFS(path));
 }

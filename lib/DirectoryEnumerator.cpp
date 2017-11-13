@@ -12,11 +12,11 @@
 namespace nod
 {
 
-DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,
+DirectoryEnumerator::DirectoryEnumerator(SystemStringView path, Mode mode,
                                          bool sizeSort, bool reverse, bool noHidden)
 {
     Sstat theStat;
-    if (Stat(path, &theStat) || !S_ISDIR(theStat.st_mode))
+    if (Stat(path.data(), &theStat) || !S_ISDIR(theStat.st_mode))
         return;
 
 #if _WIN32
@@ -151,7 +151,7 @@ DirectoryEnumerator::DirectoryEnumerator(const SystemChar* path, Mode mode,
 
 #else
 
-    DIR* dir = opendir(path);
+    DIR* dir = opendir(path.data());
     if (!dir)
         return;
     const dirent* d;

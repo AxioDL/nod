@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 
 #include <string>
+#include <string_view>
 #include <cstring>
 #include <algorithm>
 #include "logvisor/logvisor.hpp"
@@ -74,34 +75,37 @@ static inline int Stat(const char* path, Sstat* statout) {return stat(path, stat
 #if NOD_UCS2
 typedef wchar_t SystemChar;
 typedef std::wstring SystemString;
+typedef std::wstring_view SystemStringView;
 static inline void ToLower(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), towlower);}
 static inline void ToUpper(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), towupper);}
 static inline size_t StrLen(const SystemChar* str) {return wcslen(str);}
-class SystemUTF8View
+class SystemUTF8Conv
 {
     std::string m_utf8;
 public:
-    explicit SystemUTF8View(const SystemString& str)
+    explicit SystemUTF8Conv(SystemStringView str)
     {
-        int len = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), str.size(), nullptr, 0, nullptr, nullptr);
+        int len = WideCharToMultiByte(CP_UTF8, 0, str.data(), str.size(), nullptr, 0, nullptr, nullptr);
         m_utf8.assign(len, '\0');
-        WideCharToMultiByte(CP_UTF8, 0, str.c_str(), str.size(), &m_utf8[0], len, nullptr, nullptr);
+        WideCharToMultiByte(CP_UTF8, 0, str.data(), str.size(), &m_utf8[0], len, nullptr, nullptr);
     }
-    inline const std::string& utf8_str() {return m_utf8;}
+    inline std::string_view utf8_str() const {return m_utf8;}
+    inline const char* c_str() const {return m_utf8.c_str();}
 };
-class SystemStringView
+class SystemStringConv
 {
     std::wstring m_sys;
 public:
-    explicit SystemStringView(const std::string& str)
+    explicit SystemStringConv(std::string_view str)
     {
-        int len = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), nullptr, 0);
+        int len = MultiByteToWideChar(CP_UTF8, 0, str.data(), str.size(), nullptr, 0);
         m_sys.assign(len, L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), &m_sys[0], len);
+        MultiByteToWideChar(CP_UTF8, 0, str.data(), str.size(), &m_sys[0], len);
     }
-    inline const std::wstring& sys_str() {return m_sys;}
+    inline SystemStringView sys_str() const {return m_sys;}
+    inline const SystemChar* c_str() const {return m_sys.c_str();}
 };
 #ifndef _S
 #define _S(val) L ## val
@@ -109,26 +113,29 @@ public:
 #else
 typedef char SystemChar;
 typedef std::string SystemString;
+typedef std::string_view SystemStringView;
 static inline void ToLower(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), tolower);}
 static inline void ToUpper(SystemString& str)
 {std::transform(str.begin(), str.end(), str.begin(), toupper);}
 static inline size_t StrLen(const SystemChar* str) {return strlen(str);}
-class SystemUTF8View
+class SystemUTF8Conv
 {
-    const std::string& m_utf8;
+    std::string_view m_utf8;
 public:
-    explicit SystemUTF8View(const SystemString& str)
+    explicit SystemUTF8Conv(SystemStringView str)
     : m_utf8(str) {}
-    inline const std::string& utf8_str() {return m_utf8;}
+    inline std::string_view utf8_str() const {return m_utf8;}
+    inline const char* c_str() const {return m_utf8.data();}
 };
-class SystemStringView
+class SystemStringConv
 {
-    const std::string& m_sys;
+    SystemStringView m_sys;
 public:
-    explicit SystemStringView(const std::string& str)
+    explicit SystemStringConv(std::string_view str)
     : m_sys(str) {}
-    inline const std::string& sys_str() {return m_sys;}
+    inline SystemStringView sys_str() const {return m_sys;}
+    inline const SystemChar* c_str() const {return m_sys.data();}
 };
 #ifndef _S
 #define _S(val) val

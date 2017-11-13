@@ -12,9 +12,7 @@ class FileIOWin32 : public IFileIO
     SystemString m_path;
     int64_t m_maxWriteSize;
 public:
-    FileIOWin32(const SystemString& path, int64_t maxWriteSize)
-    : m_path(path), m_maxWriteSize(maxWriteSize) {}
-    FileIOWin32(const SystemChar* path, int64_t maxWriteSize)
+    FileIOWin32(SystemStringView path, int64_t maxWriteSize)
     : m_path(path), m_maxWriteSize(maxWriteSize) {}
 
     bool exists()
@@ -47,25 +45,25 @@ public:
     {
         HANDLE fp;
         int64_t m_maxWriteSize;
-        WriteStream(const SystemString& path, int64_t maxWriteSize, bool& err)
+        WriteStream(SystemStringView path, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
-            fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
+            fp = CreateFileW(path.data(), GENERIC_WRITE, FILE_SHARE_WRITE,
                              nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
             {
-                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
                 err = true;
             }
         }
-        WriteStream(const SystemString& path, uint64_t offset, int64_t maxWriteSize, bool& err)
+        WriteStream(SystemStringView path, uint64_t offset, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
-            fp = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE,
+            fp = CreateFileW(path.data(), GENERIC_WRITE, FILE_SHARE_WRITE,
                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
             {
-                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
                 err = true;
                 return;
             }
@@ -116,7 +114,7 @@ public:
     struct ReadStream : public IFileIO::IReadStream
     {
         HANDLE fp;
-        ReadStream(const SystemString& path, bool& err)
+        ReadStream(SystemStringView path, bool& err)
         {
             fp = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -126,7 +124,7 @@ public:
                 LogModule.report(logvisor::Error, _S("unable to open '%s' for reading"), path.c_str());
             }
         }
-        ReadStream(const SystemString& path, uint64_t offset, bool& err)
+        ReadStream(SystemStringView path, uint64_t offset, bool& err)
         : ReadStream(path, err)
         {
             if (err)
@@ -199,12 +197,7 @@ public:
     }
 };
 
-std::unique_ptr<IFileIO> NewFileIO(const SystemString& path, int64_t maxWriteSize)
-{
-    return std::unique_ptr<IFileIO>(new FileIOWin32(path, maxWriteSize));
-}
-
-std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path, int64_t maxWriteSize)
+std::unique_ptr<IFileIO> NewFileIO(SystemStringView path, int64_t maxWriteSize)
 {
     return std::unique_ptr<IFileIO>(new FileIOWin32(path, maxWriteSize));
 }

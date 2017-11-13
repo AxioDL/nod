@@ -10,19 +10,19 @@ class DiscBuilderGCN;
 class DiscGCN : public DiscBase
 {
     friend class DiscMergerGCN;
-    DiscBuilderGCN makeMergeBuilder(const SystemChar* outPath, FProgress progressCB);
+    DiscBuilderGCN makeMergeBuilder(SystemStringView outPath, FProgress progressCB);
 public:
     DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err);
-    bool extractDiscHeaderFiles(const SystemString& path, const ExtractionContext& ctx) const;
+    bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const;
 };
 
 class DiscBuilderGCN : public DiscBuilderBase
 {
     friend class DiscMergerGCN;
 public:
-    DiscBuilderGCN(const SystemChar* outPath, FProgress progressCB);
-    EBuildResult buildFromDirectory(const SystemChar* dirIn);
-    static uint64_t CalculateTotalSizeRequired(const SystemChar* dirIn);
+    DiscBuilderGCN(SystemStringView outPath, FProgress progressCB);
+    EBuildResult buildFromDirectory(SystemStringView dirIn);
+    static uint64_t CalculateTotalSizeRequired(SystemStringView dirIn);
 };
 
 class DiscMergerGCN
@@ -30,9 +30,9 @@ class DiscMergerGCN
     DiscGCN& m_sourceDisc;
     DiscBuilderGCN m_builder;
 public:
-    DiscMergerGCN(const SystemChar* outPath, DiscGCN& sourceDisc, FProgress progressCB);
-    EBuildResult mergeFromDirectory(const SystemChar* dirIn);
-    static uint64_t CalculateTotalSizeRequired(DiscGCN& sourceDisc, const SystemChar* dirIn);
+    DiscMergerGCN(SystemStringView outPath, DiscGCN& sourceDisc, FProgress progressCB);
+    EBuildResult mergeFromDirectory(SystemStringView dirIn);
+    static uint64_t CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn);
 };
 
 }

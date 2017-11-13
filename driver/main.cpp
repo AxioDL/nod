@@ -41,9 +41,9 @@ int main(int argc, char* argv[])
 
     bool verbose = false;
     nod::ExtractionContext ctx = {true,
-    [&](const std::string& str, float c) {
+    [&](std::string_view str, float c) {
         if (verbose)
-            fprintf(stderr, "Current node: %s, Extraction %g%% Complete\n", str.c_str(), c * 100.f);
+            fprintf(stderr, "Current node: %s, Extraction %g%% Complete\n", str.data(), c * 100.f);
     }};
     const nod::SystemChar* inDir = nullptr;
     const nod::SystemChar* outDir = _S(".");

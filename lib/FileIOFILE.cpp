@@ -12,9 +12,7 @@ class FileIOFILE : public IFileIO
     SystemString m_path;
     int64_t m_maxWriteSize;
 public:
-    FileIOFILE(const SystemString& path, int64_t maxWriteSize)
-    : m_path(path), m_maxWriteSize(maxWriteSize) {}
-    FileIOFILE(const SystemChar* path, int64_t maxWriteSize)
+    FileIOFILE(SystemStringView path, int64_t maxWriteSize)
     : m_path(path), m_maxWriteSize(maxWriteSize) {}
 
     bool exists()
@@ -41,30 +39,30 @@ public:
     {
         FILE* fp;
         int64_t m_maxWriteSize;
-        WriteStream(const SystemString& path, int64_t maxWriteSize, bool& err)
+        WriteStream(SystemStringView path, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
-            fp = fopen(path.c_str(), "wb");
+            fp = fopen(path.data(), "wb");
             if (!fp)
             {
-                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
                 err = true;
             }
         }
-        WriteStream(const SystemString& path, uint64_t offset, int64_t maxWriteSize, bool& err)
+        WriteStream(SystemStringView path, uint64_t offset, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
-            fp = fopen(path.c_str(), "ab");
+            fp = fopen(path.data(), "ab");
             if (!fp)
                 goto FailLoc;
             fclose(fp);
-            fp = fopen(path.c_str(), "r+b");
+            fp = fopen(path.data(), "r+b");
             if (!fp)
                 goto FailLoc;
             FSeek(fp, offset, SEEK_SET);
             return;
         FailLoc:
-            LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.c_str());
+            LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
             err = true;
         }
         ~WriteStream()
@@ -104,16 +102,16 @@ public:
     struct ReadStream : public IFileIO::IReadStream
     {
         FILE* fp;
-        ReadStream(const SystemString& path, bool& err)
+        ReadStream(SystemStringView path, bool& err)
         {
-            fp = fopen(path.c_str(), "rb");
+            fp = fopen(path.data(), "rb");
             if (!fp)
             {
                 err = true;
-                LogModule.report(logvisor::Error, _S("unable to open '%s' for reading"), path.c_str());
+                LogModule.report(logvisor::Error, _S("unable to open '%s' for reading"), path.data());
             }
         }
-        ReadStream(const SystemString& path, uint64_t offset, bool& err)
+        ReadStream(SystemStringView path, uint64_t offset, bool& err)
         : ReadStream(path, err)
         {
             if (err)
@@ -177,12 +175,7 @@ public:
     }
 };
 
-std::unique_ptr<IFileIO> NewFileIO(const SystemString& path, int64_t maxWriteSize)
-{
-    return std::unique_ptr<IFileIO>(new FileIOFILE(path, maxWriteSize));
-}
-
-std::unique_ptr<IFileIO> NewFileIO(const SystemChar* path, int64_t maxWriteSize)
+std::unique_ptr<IFileIO> NewFileIO(SystemStringView path, int64_t maxWriteSize)
 {
     return std::unique_ptr<IFileIO>(new FileIOFILE(path, maxWriteSize));
 }

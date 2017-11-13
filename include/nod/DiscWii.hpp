@@ -11,17 +11,17 @@ class DiscWii : public DiscBase
 {
 public:
     DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err);
-    DiscBuilderWii makeMergeBuilder(const SystemChar* outPath, bool dualLayer, FProgress progressCB);
-    bool extractDiscHeaderFiles(const SystemString& path, const ExtractionContext& ctx) const;
+    DiscBuilderWii makeMergeBuilder(SystemStringView outPath, bool dualLayer, FProgress progressCB);
+    bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const;
 };
 
 class DiscBuilderWii : public DiscBuilderBase
 {
     bool m_dualLayer;
 public:
-    DiscBuilderWii(const SystemChar* outPath, bool dualLayer, FProgress progressCB);
-    EBuildResult buildFromDirectory(const SystemChar* dirIn);
-    static uint64_t CalculateTotalSizeRequired(const SystemChar* dirIn, bool& dualLayer);
+    DiscBuilderWii(SystemStringView outPath, bool dualLayer, FProgress progressCB);
+    EBuildResult buildFromDirectory(SystemStringView dirIn);
+    static uint64_t CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer);
 };
 
 class DiscMergerWii
@@ -29,10 +29,10 @@ class DiscMergerWii
     DiscWii& m_sourceDisc;
     DiscBuilderWii m_builder;
 public:
-    DiscMergerWii(const SystemChar* outPath, DiscWii& sourceDisc,
+    DiscMergerWii(SystemStringView outPath, DiscWii& sourceDisc,
                   bool dualLayer, FProgress progressCB);
-    EBuildResult mergeFromDirectory(const SystemChar* dirIn);
-    static uint64_t CalculateTotalSizeRequired(DiscWii& sourceDisc, const SystemChar* dirIn,
+    EBuildResult mergeFromDirectory(SystemStringView dirIn);
+    static uint64_t CalculateTotalSizeRequired(DiscWii& sourceDisc, SystemStringView dirIn,
                                                bool& dualLayer);
 };
 

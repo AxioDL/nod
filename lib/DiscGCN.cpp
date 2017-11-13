@@ -129,12 +129,12 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err)
     m_partitions.emplace_back(new PartitionGCN(*this, 0, err));
 }
 
-DiscBuilderGCN DiscGCN::makeMergeBuilder(const SystemChar* outPath, FProgress progressCB)
+DiscBuilderGCN DiscGCN::makeMergeBuilder(SystemStringView outPath, FProgress progressCB)
 {
     return DiscBuilderGCN(outPath, progressCB);
 }
 
-bool DiscGCN::extractDiscHeaderFiles(const SystemString& path, const ExtractionContext& ctx) const
+bool DiscGCN::extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const
 {
     return true;
 }
@@ -244,7 +244,7 @@ public:
         return true;
     }
 
-    bool buildFromDirectory(const SystemChar* dirIn)
+    bool buildFromDirectory(SystemStringView dirIn)
     {
         std::unique_ptr<IPartWriteStream> ws = beginWriteStream(0);
         if (!ws)
@@ -336,7 +336,7 @@ public:
         });
     }
 
-    bool mergeFromDirectory(const PartitionGCN* partIn, const SystemChar* dirIn)
+    bool mergeFromDirectory(const PartitionGCN* partIn, SystemStringView dirIn)
     {
         std::unique_ptr<IPartWriteStream> ws = beginWriteStream(0);
         if (!ws)
@@ -384,7 +384,7 @@ public:
     }
 };
 
-EBuildResult DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn)
+EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn)
 {
     if (!m_fileIO->beginWriteStream())
         return EBuildResult::Failed;
@@ -408,7 +408,7 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(const SystemChar* dirIn)
     return pb.buildFromDirectory(dirIn) ? EBuildResult::Success : EBuildResult::Failed;
 }
 
-uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(const SystemChar* dirIn)
+uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn)
 {
     uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
     if (sz == -1)
@@ -422,18 +422,18 @@ uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(const SystemChar* dirIn)
     return sz;
 }
 
-DiscBuilderGCN::DiscBuilderGCN(const SystemChar* outPath, FProgress progressCB)
+DiscBuilderGCN::DiscBuilderGCN(SystemStringView outPath, FProgress progressCB)
 : DiscBuilderBase(outPath, 0x57058000, progressCB)
 {
     PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this);
     m_partitions.emplace_back(partBuilder);
 }
 
-DiscMergerGCN::DiscMergerGCN(const SystemChar* outPath, DiscGCN& sourceDisc, FProgress progressCB)
+DiscMergerGCN::DiscMergerGCN(SystemStringView outPath, DiscGCN& sourceDisc, FProgress progressCB)
 : m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, progressCB))
 {}
 
-EBuildResult DiscMergerGCN::mergeFromDirectory(const SystemChar* dirIn)
+EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn)
 {
     if (!m_builder.getFileIO().beginWriteStream())
         return EBuildResult::Failed;
@@ -458,7 +458,7 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(const SystemChar* dirIn)
            EBuildResult::Success : EBuildResult::Failed;
 }
 
-uint64_t DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, const SystemChar* dirIn)
+uint64_t DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn)
 {
     uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(
                   sourceDisc.getDataPartition(), dirIn);

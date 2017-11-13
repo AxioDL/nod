@@ -15,7 +15,7 @@
 namespace nod
 {
 
-using FProgress = std::function<void(float totalProg, const SystemString& fileName, size_t fileBytesXfered)>;
+using FProgress = std::function<void(float totalProg, SystemStringView fileName, size_t fileBytesXfered)>;
 
 enum class EBuildResult
 {
@@ -229,14 +229,14 @@ public:
             std::vector<Node>::iterator m_childrenEnd;
 
         public:
-            Node(const IPartition& parent, const FSTNode& node, const char* name)
+            Node(const IPartition& parent, const FSTNode& node, std::string_view name)
             : m_parent(parent),
               m_kind(node.isDir() ? Kind::Directory : Kind::File),
               m_discOffset(parent.normalizeOffset(node.getOffset())),
               m_discLength(node.getLength()),
               m_name(name) {}
             inline Kind getKind() const {return m_kind;}
-            inline const std::string& getName() const {return m_name;}
+            inline std::string_view getName() const {return m_name;}
             inline uint64_t size() const {return m_discLength;}
             std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const
             {
@@ -283,7 +283,7 @@ public:
             };
             inline DirectoryIterator begin() const {return DirectoryIterator(m_childrenBegin);}
             inline DirectoryIterator end() const {return DirectoryIterator(m_childrenEnd);}
-            inline DirectoryIterator find(const std::string& name) const
+            inline DirectoryIterator find(std::string_view name) const
             {
                 if (m_kind == Kind::Directory)
                 {
@@ -298,7 +298,7 @@ public:
                 return end();
             }
 
-            bool extractToDirectory(const SystemString& basePath, const ExtractionContext& ctx) const;
+            bool extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx) const;
         };
     protected:
         Header m_header;
@@ -313,7 +313,6 @@ public:
         std::vector<FSTNode> m_buildNodes;
         std::vector<std::string> m_buildNames;
         size_t m_buildNameOff = 0;
-        void recursiveBuildNodes(const SystemChar* dirIn, std::function<void(void)> incParents);
 
         uint64_t m_dolSz;
         void parseDOL(IPartReadStream& s);
@@ -351,7 +350,7 @@ public:
         {return beginReadStream(0x2440 + offset);}
         inline const Node& getFSTRoot() const {return m_nodes[0];}
         inline Node& getFSTRoot() {return m_nodes[0];}
-        bool extractToDirectory(const SystemString& path, const ExtractionContext& ctx);
+        bool extractToDirectory(SystemStringView path, const ExtractionContext& ctx);
 
         inline uint64_t getDOLSize() const {return m_dolSz;}
         inline std::unique_ptr<uint8_t[]> getDOLBuf() const
@@ -380,8 +379,8 @@ public:
         inline size_t getNodeCount() const { return m_nodes.size(); }
         inline const Header& getHeader() const { return m_header; }
         inline const BI2Header& getBI2() const { return m_bi2Header; }
-        virtual bool extractCryptoFiles(const SystemString& path, const ExtractionContext& ctx) const { return true; }
-        bool extractSysFiles(const SystemString& path, const ExtractionContext& ctx) const;
+        virtual bool extractCryptoFiles(SystemStringView path, const ExtractionContext& ctx) const { return true; }
+        bool extractSysFiles(SystemStringView path, const ExtractionContext& ctx) const;
     };
 
 protected:
@@ -417,13 +416,13 @@ public:
         return nullptr;
     }
 
-    inline void extractToDirectory(const SystemString& path, const ExtractionContext& ctx)
+    inline void extractToDirectory(SystemStringView path, const ExtractionContext& ctx)
     {
         for (std::unique_ptr<IPartition>& part : m_partitions)
             part->extractToDirectory(path, ctx);
     }
 
-    virtual bool extractDiscHeaderFiles(const SystemString& path, const ExtractionContext& ctx) const=0;
+    virtual bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const=0;
 };
 
 class DiscBuilderBase
@@ -442,29 +441,29 @@ public:
         virtual uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws)=0;
         virtual uint32_t packOffset(uint64_t offset) const=0;
 
-        void recursiveBuildNodesPre(const SystemChar* dirIn);
-        bool recursiveBuildNodes(IPartWriteStream& ws, bool system, const SystemChar* dirIn);
+        void recursiveBuildNodesPre(SystemStringView dirIn);
+        bool recursiveBuildNodes(IPartWriteStream& ws, bool system, SystemStringView dirIn);
 
-        bool recursiveBuildFST(const SystemChar* dirIn,
+        bool recursiveBuildFST(SystemStringView dirIn,
                                std::function<void(void)> incParents,
                                size_t parentDirIdx);
 
-        void recursiveMergeNodesPre(const DiscBase::IPartition::Node* nodeIn, const SystemChar* dirIn);
+        void recursiveMergeNodesPre(const DiscBase::IPartition::Node* nodeIn, SystemStringView dirIn);
         bool recursiveMergeNodes(IPartWriteStream& ws, bool system,
-                                 const DiscBase::IPartition::Node* nodeIn, const SystemChar* dirIn,
-                                 const SystemString& keyPath);
+                                 const DiscBase::IPartition::Node* nodeIn, SystemStringView dirIn,
+                                 SystemStringView keyPath);
         bool recursiveMergeFST(const DiscBase::IPartition::Node* nodeIn,
-                               const SystemChar* dirIn, std::function<void(void)> incParents,
-                               const SystemString& keyPath);
+                               SystemStringView dirIn, std::function<void(void)> incParents,
+                               SystemStringView keyPath);
 
         static bool RecursiveCalculateTotalSize(uint64_t& totalSz,
                                                 const DiscBase::IPartition::Node* nodeIn,
-                                                const SystemChar* dirIn);
+                                                SystemStringView dirIn);
 
-        void addBuildName(const SystemString& str)
+        void addBuildName(SystemStringView str)
         {
-            SystemUTF8View utf8View(str);
-            m_buildNames.push_back(utf8View.utf8_str());
+            SystemUTF8Conv utf8View(str);
+            m_buildNames.emplace_back(utf8View.utf8_str());
             m_buildNameOff += str.size() + 1;
         }
 
@@ -478,15 +477,10 @@ public:
         : m_parent(parent), m_kind(kind), m_isWii(isWii)
         {}
         virtual std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset)=0;
-        bool buildFromDirectory(IPartWriteStream& ws,
-                                const SystemChar* dirIn);
-        static uint64_t CalculateTotalSizeBuild(const SystemChar* dirIn,
-                                                PartitionKind kind, bool isWii);
-        bool mergeFromDirectory(IPartWriteStream& ws,
-                                const DiscBase::IPartition* partIn,
-                                const SystemChar* dirIn);
-        static uint64_t CalculateTotalSizeMerge(const DiscBase::IPartition* partIn,
-                                                const SystemChar* dirIn);
+        bool buildFromDirectory(IPartWriteStream& ws, SystemStringView dirIn);
+        static uint64_t CalculateTotalSizeBuild(SystemStringView dirIn, PartitionKind kind, bool isWii);
+        bool mergeFromDirectory(IPartWriteStream& ws, const DiscBase::IPartition* partIn, SystemStringView dirIn);
+        static uint64_t CalculateTotalSizeMerge(const DiscBase::IPartition* partIn, SystemStringView dirIn);
     };
 protected:
     SystemString m_outPath;
@@ -513,7 +507,7 @@ public:
     }
 
     virtual ~DiscBuilderBase() = default;
-    DiscBuilderBase(const SystemChar* outPath,
+    DiscBuilderBase(SystemStringView outPath,
                     int64_t discCapacity, FProgress progressCB)
     : m_outPath(outPath), m_fileIO(NewFileIO(outPath, discCapacity)),
       m_discCapacity(discCapacity), m_progressCB(progressCB) {}

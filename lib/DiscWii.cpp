@@ -473,12 +473,13 @@ public:
         return buf;
     }
 
-    bool extractCryptoFiles(const SystemString& basePath, const ExtractionContext& ctx) const
+    bool extractCryptoFiles(SystemStringView basePath, const ExtractionContext& ctx) const
     {
         Sstat theStat;
+        SystemString basePathStr(basePath);
 
         /* Extract Ticket */
-        SystemString ticketPath = basePath + _S("/ticket.bin");
+        SystemString ticketPath = basePathStr + _S("/ticket.bin");
         if (ctx.force || Stat(ticketPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -490,7 +491,7 @@ public:
         }
 
         /* Extract TMD */
-        SystemString tmdPath = basePath + _S("/tmd.bin");
+        SystemString tmdPath = basePathStr + _S("/tmd.bin");
         if (ctx.force || Stat(tmdPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -502,7 +503,7 @@ public:
         }
 
         /* Extract Certs */
-        SystemString certPath = basePath + _S("/cert.bin");
+        SystemString certPath = basePathStr + _S("/cert.bin");
         if (ctx.force || Stat(certPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -516,7 +517,7 @@ public:
         }
 
         /* Extract H3 */
-        SystemString h3Path = basePath + _S("/h3.bin");
+        SystemString h3Path = basePathStr + _S("/h3.bin");
         if (ctx.force || Stat(h3Path.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -596,23 +597,25 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err)
     }
 }
 
-DiscBuilderWii DiscWii::makeMergeBuilder(const SystemChar* outPath, bool dualLayer, FProgress progressCB)
+DiscBuilderWii DiscWii::makeMergeBuilder(SystemStringView outPath, bool dualLayer, FProgress progressCB)
 {
     return DiscBuilderWii(outPath, dualLayer, progressCB);
 }
 
-bool DiscWii::extractDiscHeaderFiles(const SystemString& basePath, const ExtractionContext& ctx) const
+bool DiscWii::extractDiscHeaderFiles(SystemStringView basePath, const ExtractionContext& ctx) const
 {
-    if (Mkdir((basePath + _S("/disc")).c_str(), 0755) && errno != EEXIST)
+    SystemString basePathStr(basePath);
+
+    if (Mkdir((basePathStr + _S("/disc")).c_str(), 0755) && errno != EEXIST)
     {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/disc'"), basePath.c_str());
+        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/disc'"), basePathStr.c_str());
         return false;
     }
 
     Sstat theStat;
 
     /* Extract Header */
-    SystemString headerPath = basePath + _S("/disc/header.bin");
+    SystemString headerPath = basePathStr + _S("/disc/header.bin");
     if (ctx.force || Stat(headerPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -629,7 +632,7 @@ bool DiscWii::extractDiscHeaderFiles(const SystemString& basePath, const Extract
     }
 
     /* Extract Region info */
-    SystemString regionPath = basePath + _S("/disc/region.bin");
+    SystemString regionPath = basePathStr + _S("/disc/region.bin");
     if (ctx.force || Stat(regionPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -1016,7 +1019,7 @@ public:
         return m_baseOffset + dataOff + groupCount * 0x200000;
     }
 
-    uint64_t buildFromDirectory(const SystemChar* dirIn)
+    uint64_t buildFromDirectory(SystemStringView dirIn)
     {
         SystemString dirStr(dirIn);
         SystemString basePath = dirStr + _S("/") + getKindString(m_kind);
@@ -1186,7 +1189,7 @@ public:
         }, apploaderStat.st_size);
     }
 
-    uint64_t mergeFromDirectory(const PartitionWii* partIn, const SystemChar* dirIn)
+    uint64_t mergeFromDirectory(const PartitionWii* partIn, SystemStringView dirIn)
     {
         size_t phSz;
         std::unique_ptr<uint8_t[]> phBuf = partIn->readPartitionHeaderBuf(phSz);
@@ -1252,10 +1255,10 @@ public:
     }
 };
 
-EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn)
+EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn)
 {
     SystemString dirStr(dirIn);
-    SystemString basePath = dirStr + _S("/") + getKindString(PartitionKind::Data);
+    SystemString basePath = SystemString(dirStr) + _S("/") + getKindString(PartitionKind::Data);
 
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_partitions[0]);
     uint64_t filledSz = pb.m_baseOffset;
@@ -1349,7 +1352,7 @@ EBuildResult DiscBuilderWii::buildFromDirectory(const SystemChar* dirIn)
     return EBuildResult::Success;
 }
 
-uint64_t DiscBuilderWii::CalculateTotalSizeRequired(const SystemChar* dirIn, bool& dualLayer)
+uint64_t DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer)
 {
     uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true);
     if (sz == -1)
@@ -1367,19 +1370,19 @@ uint64_t DiscBuilderWii::CalculateTotalSizeRequired(const SystemChar* dirIn, boo
     return sz;
 }
 
-DiscBuilderWii::DiscBuilderWii(const SystemChar* outPath, bool dualLayer, FProgress progressCB)
+DiscBuilderWii::DiscBuilderWii(SystemStringView outPath, bool dualLayer, FProgress progressCB)
 : DiscBuilderBase(outPath, dualLayer ? 0x1FB4E0000 : 0x118240000, progressCB), m_dualLayer(dualLayer)
 {
     PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionKind::Data, 0x200000);
     m_partitions.emplace_back(partBuilder);
 }
 
-DiscMergerWii::DiscMergerWii(const SystemChar* outPath, DiscWii& sourceDisc,
+DiscMergerWii::DiscMergerWii(SystemStringView outPath, DiscWii& sourceDisc,
                              bool dualLayer, FProgress progressCB)
 : m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, dualLayer, progressCB))
 {}
 
-EBuildResult DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
+EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn)
 {
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_builder.m_partitions[0]);
     uint64_t filledSz = pb.m_baseOffset;
@@ -1467,7 +1470,7 @@ EBuildResult DiscMergerWii::mergeFromDirectory(const SystemChar* dirIn)
 }
 
 uint64_t DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc,
-                                                   const SystemChar* dirIn, bool& dualLayer)
+                                                   SystemStringView dirIn, bool& dualLayer)
 {
     uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(
                   sourceDisc.getDataPartition(), dirIn);

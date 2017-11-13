@@ -14,11 +14,11 @@ class DiscBase;
 struct ExtractionContext final
 {
     bool force : 1;
-    std::function<void(const std::string&, float)> progressCB;
+    std::function<void(std::string_view, float)> progressCB;
 };
 
-std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path);
-std::unique_ptr<DiscBase> OpenDiscFromImage(const SystemChar* path, bool& isWii);
+std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path);
+std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii);
 
 }
 

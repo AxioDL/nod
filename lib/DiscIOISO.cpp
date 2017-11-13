@@ -10,7 +10,7 @@ class DiscIOISO : public IDiscIO
 {
     std::unique_ptr<IFileIO> m_fio;
 public:
-    DiscIOISO(const SystemString& fpin)
+    DiscIOISO(SystemStringView fpin)
     : m_fio(NewFileIO(fpin)) {}
 
     class ReadStream : public IReadStream
@@ -60,7 +60,7 @@ public:
     }
 };
 
-std::unique_ptr<IDiscIO> NewDiscIOISO(const SystemChar* path)
+std::unique_ptr<IDiscIO> NewDiscIOISO(SystemStringView path)
 {
     return std::unique_ptr<IDiscIO>(new DiscIOISO(path));
 }
