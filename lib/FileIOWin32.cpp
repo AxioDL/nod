@@ -116,12 +116,12 @@ public:
         HANDLE fp;
         ReadStream(SystemStringView path, bool& err)
         {
-            fp = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+            fp = CreateFileW(path.data(), GENERIC_READ, FILE_SHARE_READ,
                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fp == INVALID_HANDLE_VALUE)
             {
                 err = true;
-                LogModule.report(logvisor::Error, _S("unable to open '%s' for reading"), path.c_str());
+                LogModule.report(logvisor::Error, _S("unable to open '%s' for reading"), path.data());
             }
         }
         ReadStream(SystemStringView path, uint64_t offset, bool& err)
