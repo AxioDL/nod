@@ -11,6 +11,11 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#if defined(WINAPI_FAMILY) && WINAPI_FAMILY != WINAPI_FAMILY_DESKTOP_APP
+#define WINDOWS_STORE 1
+#else
+#define WINDOWS_STORE 0
+#endif
 #else
 #include <ctype.h>
 #include <sys/file.h>

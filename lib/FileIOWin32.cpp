@@ -17,8 +17,12 @@ public:
 
     bool exists()
     {
+#if !WINDOWS_STORE
         HANDLE fp = CreateFileW(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ,
                                 nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+#else
+        HANDLE fp = CreateFile2(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, nullptr);
+#endif
         if (fp == INVALID_HANDLE_VALUE)
             return false;
         CloseHandle(fp);
@@ -27,8 +31,12 @@ public:
 
     uint64_t size()
     {
+#if !WINDOWS_STORE
         HANDLE fp = CreateFileW(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ,
                                 nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+#else
+        HANDLE fp = CreateFile2(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, nullptr);
+#endif
         if (fp == INVALID_HANDLE_VALUE)
             return 0;
         LARGE_INTEGER sz;
@@ -48,8 +56,12 @@ public:
         WriteStream(SystemStringView path, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
+#if !WINDOWS_STORE
             fp = CreateFileW(path.data(), GENERIC_WRITE, FILE_SHARE_WRITE,
                              nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+#else
+            fp = CreateFile2(path.data(), GENERIC_WRITE, FILE_SHARE_WRITE, CREATE_ALWAYS, nullptr);
+#endif
             if (fp == INVALID_HANDLE_VALUE)
             {
                 LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
@@ -59,8 +71,12 @@ public:
         WriteStream(SystemStringView path, uint64_t offset, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
+#if !WINDOWS_STORE
             fp = CreateFileW(path.data(), GENERIC_WRITE, FILE_SHARE_WRITE,
                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+#else
+            fp = CreateFile2(path.data(), GENERIC_WRITE, FILE_SHARE_WRITE, OPEN_ALWAYS, nullptr);
+#endif
             if (fp == INVALID_HANDLE_VALUE)
             {
                 LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
@@ -116,8 +132,12 @@ public:
         HANDLE fp;
         ReadStream(SystemStringView path, bool& err)
         {
+#if !WINDOWS_STORE
             fp = CreateFileW(path.data(), GENERIC_READ, FILE_SHARE_READ,
                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+#else
+            fp = CreateFile2(path.data(), GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, nullptr);
+#endif
             if (fp == INVALID_HANDLE_VALUE)
             {
                 err = true;

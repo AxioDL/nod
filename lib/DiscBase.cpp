@@ -254,43 +254,6 @@ bool DiscBase::IPartition::extractSysFiles(SystemStringView basePath, const Extr
     return true;
 }
 
-static uint64_t GetInode(const SystemChar* path)
-{
-    uint64_t inode;
-#if _WIN32
-    HANDLE fp = CreateFileW(path,
-                            GENERIC_READ | GENERIC_WRITE,
-                            FILE_SHARE_READ | FILE_SHARE_WRITE,
-                            nullptr,
-                            OPEN_EXISTING,
-                            FILE_ATTRIBUTE_NORMAL,
-                            nullptr);
-    if (!fp)
-    {
-        LogModule.report(logvisor::Error, _S("unable to open %s"), path);
-        return 0;
-    }
-    BY_HANDLE_FILE_INFORMATION info;
-    if (!GetFileInformationByHandle(fp, &info))
-    {
-        LogModule.report(logvisor::Error, _S("unable to GetFileInformationByHandle %s"), path);
-        return 0;
-    }
-    inode = uint64_t(info.nFileIndexHigh) << 32;
-    inode |= uint64_t(info.nFileIndexLow);
-    CloseHandle(fp);
-#else
-    struct stat st;
-    if (stat(path, &st))
-    {
-        LogModule.report(logvisor::Error, _S("unable to stat %s"), path);
-        return 0;
-    }
-    inode = uint64_t(st.st_ino);
-#endif
-    return inode;
-}
-
 static bool IsSystemFile(SystemStringView name, bool& isDol)
 {
     isDol = false;
