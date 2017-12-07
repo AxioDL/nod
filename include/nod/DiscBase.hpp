@@ -261,13 +261,19 @@ public:
             inline std::vector<Node>::iterator rawBegin() const {return m_childrenBegin;}
             inline std::vector<Node>::iterator rawEnd() const {return m_childrenEnd;}
 
-            class DirectoryIterator : std::iterator<std::forward_iterator_tag, Node>
+            class DirectoryIterator
             {
                 friend class Node;
                 std::vector<Node>::iterator m_it;
                 DirectoryIterator(const std::vector<Node>::iterator& it)
                 : m_it(it) {}
             public:
+                using iterator_category = std::forward_iterator_tag;
+                using value_type = Node;
+                using difference_type = std::ptrdiff_t;
+                using pointer = Node*;
+                using reference = Node&;
+
                 inline bool operator!=(const DirectoryIterator& other) {return m_it != other.m_it;}
                 inline bool operator==(const DirectoryIterator& other) {return m_it == other.m_it;}
                 inline DirectoryIterator& operator++()
