@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <cstdio>
 #include "nod/nod.hpp"
 #include "nod/DiscBase.hpp"
 

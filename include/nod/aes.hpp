@@ -1,8 +1,8 @@
 #ifndef __AES_HPP__
 #define __AES_HPP__
 
-#include <stdint.h>
-#include <stdlib.h>
+#include <cstdint>
+#include <cstdlib>
 #include <memory>
 
 namespace nod

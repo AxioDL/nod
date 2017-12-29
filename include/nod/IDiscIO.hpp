@@ -2,9 +2,9 @@
 #define __NOD_IDISC_IO__
 
 #include <memory>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
+#include <cstdlib>
+#include <cstdio>
+#include <cstdint>
 
 #if NOD_ATHENA
 #include <athena/IStreamReader.hpp>

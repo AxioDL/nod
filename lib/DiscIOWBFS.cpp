@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <inttypes.h>
+#include <cstdio>
+#include <cinttypes>
 #include "nod/Util.hpp"
 #include "nod/IDiscIO.hpp"
 #include "nod/IFileIO.hpp"

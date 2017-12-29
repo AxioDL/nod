@@ -1,12 +1,12 @@
 #include "nod/DiscGCN.hpp"
 #include "nod/nod.hpp"
-#include <inttypes.h>
+#include <cinttypes>
 #define BUFFER_SZ 0x8000
 
 namespace nod
 {
 
-class PartitionGCN : public DiscBase::IPartition
+class PartitionGCN : public IPartition
 {
 public:
     PartitionGCN(const DiscGCN& parent, uint64_t offset, bool& err)

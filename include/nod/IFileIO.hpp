@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <functional>
-#include <stdlib.h>
+#include <cstdlib>
 #include "IDiscIO.hpp"
 #include "Util.hpp"
 

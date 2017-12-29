@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <cstdio>
 #include "nod/Util.hpp"
 #include "nod/IDiscIO.hpp"
 #include "nod/IFileIO.hpp"

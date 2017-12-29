@@ -1,6 +1,6 @@
 #include "nod/aes.hpp"
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 
 #if _WIN32
 #include <intrin.h>

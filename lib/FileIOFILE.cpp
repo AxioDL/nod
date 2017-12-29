@@ -1,6 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cinttypes>
 #include "nod/Util.hpp"
 #include "nod/IFileIO.hpp"
 

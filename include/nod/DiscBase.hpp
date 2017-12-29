@@ -5,8 +5,8 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <stdio.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstdint>
 #include <functional>
 #include "Util.hpp"
 #include "IDiscIO.hpp"
@@ -186,209 +186,188 @@ struct BI2Header
 };
 
 struct ExtractionContext;
+class IPartition;
+class DiscBase;
+
+class Node
+{
+public:
+    enum class Kind
+    {
+        File,
+        Directory
+    };
+private:
+    friend class IPartition;
+    const IPartition& m_parent;
+    Kind m_kind;
+
+    uint64_t m_discOffset;
+    uint64_t m_discLength;
+    std::string m_name;
+
+    std::vector<Node>::iterator m_childrenBegin;
+    std::vector<Node>::iterator m_childrenEnd;
+
+public:
+    Node(const IPartition& parent, const FSTNode& node, std::string_view name);
+    inline Kind getKind() const {return m_kind;}
+    inline std::string_view getName() const {return m_name;}
+    inline uint64_t size() const {return m_discLength;}
+    std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const;
+    std::unique_ptr<uint8_t[]> getBuf() const;
+    inline std::vector<Node>::iterator rawBegin() const {return m_childrenBegin;}
+    inline std::vector<Node>::iterator rawEnd() const {return m_childrenEnd;}
+
+    class DirectoryIterator
+    {
+        friend class Node;
+        std::vector<Node>::iterator m_it;
+        DirectoryIterator(const std::vector<Node>::iterator& it) : m_it(it) {}
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = Node;
+        using difference_type = std::ptrdiff_t;
+        using pointer = Node*;
+        using reference = Node&;
+
+        inline bool operator!=(const DirectoryIterator& other) {return m_it != other.m_it;}
+        inline bool operator==(const DirectoryIterator& other) {return m_it == other.m_it;}
+        inline DirectoryIterator& operator++()
+        {
+            if (m_it->m_kind == Kind::Directory)
+                m_it = m_it->rawEnd();
+            else
+                ++m_it;
+            return *this;
+        }
+        inline Node& operator*() {return *m_it;}
+        inline Node* operator->() {return &*m_it;}
+    };
+    inline DirectoryIterator begin() const {return DirectoryIterator(m_childrenBegin);}
+    inline DirectoryIterator end() const {return DirectoryIterator(m_childrenEnd);}
+    inline DirectoryIterator find(std::string_view name) const
+    {
+        if (m_kind == Kind::Directory)
+        {
+            DirectoryIterator it=begin();
+            for (; it != end() ; ++it)
+            {
+                if (!it->getName().compare(name))
+                    return it;
+            }
+            return it;
+        }
+        return end();
+    }
+
+    bool extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx) const;
+};
+
+class IPartition
+{
+public:
+    virtual ~IPartition() = default;
+    struct DOLHeader
+    {
+        uint32_t textOff[7];
+        uint32_t dataOff[11];
+        uint32_t textStarts[7];
+        uint32_t dataStarts[11];
+        uint32_t textSizes[7];
+        uint32_t dataSizes[11];
+        uint32_t bssStart;
+        uint32_t bssSize;
+        uint32_t entryPoint;
+    };
+
+protected:
+    Header m_header;
+    BI2Header m_bi2Header;
+    uint64_t m_dolOff;
+    uint64_t m_fstOff;
+    uint64_t m_fstSz;
+    uint64_t m_apploaderSz;
+    std::vector<Node> m_nodes;
+    void parseFST(IPartReadStream& s);
+
+    std::vector<FSTNode> m_buildNodes;
+    std::vector<std::string> m_buildNames;
+    size_t m_buildNameOff = 0;
+
+    uint64_t m_dolSz;
+    void parseDOL(IPartReadStream& s);
+
+    const DiscBase& m_parent;
+    PartitionKind m_kind;
+    uint64_t m_offset;
+    bool m_isWii;
+public:
+    mutable size_t m_curNodeIdx = 0;
+    float getProgressFactor() const { return getNodeCount() ? m_curNodeIdx / float(getNodeCount()) : 0.f; }
+    float getProgressFactorMidFile(size_t curByte, size_t totalBytes) const
+    {
+        if (!getNodeCount())
+            return 0.f;
+
+        if (totalBytes)
+            return (m_curNodeIdx + (curByte / float(totalBytes))) / float(getNodeCount());
+        else
+            return m_curNodeIdx / float(getNodeCount());
+    }
+
+    IPartition(const DiscBase& parent, PartitionKind kind, bool isWii, uint64_t offset)
+    : m_parent(parent), m_kind(kind), m_offset(offset), m_isWii(isWii) {}
+    virtual uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset;}
+    inline PartitionKind getKind() const {return m_kind;}
+    inline bool isWii() const {return m_isWii;}
+    inline uint64_t getDiscOffset() const {return m_offset;}
+    virtual std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const=0;
+    inline std::unique_ptr<IPartReadStream> beginDOLReadStream(uint64_t offset=0) const
+    {return beginReadStream(m_dolOff + offset);}
+    inline std::unique_ptr<IPartReadStream> beginFSTReadStream(uint64_t offset=0) const
+    {return beginReadStream(m_fstOff + offset);}
+    inline std::unique_ptr<IPartReadStream> beginApploaderReadStream(uint64_t offset=0) const
+    {return beginReadStream(0x2440 + offset);}
+    inline const Node& getFSTRoot() const {return m_nodes[0];}
+    inline Node& getFSTRoot() {return m_nodes[0];}
+    bool extractToDirectory(SystemStringView path, const ExtractionContext& ctx);
+
+    inline uint64_t getDOLSize() const {return m_dolSz;}
+    inline std::unique_ptr<uint8_t[]> getDOLBuf() const
+    {
+        std::unique_ptr<uint8_t[]> buf(new uint8_t[m_dolSz]);
+        beginDOLReadStream()->read(buf.get(), m_dolSz);
+        return buf;
+    }
+
+    inline uint64_t getFSTSize() const {return m_fstSz;}
+    inline std::unique_ptr<uint8_t[]> getFSTBuf() const
+    {
+        std::unique_ptr<uint8_t[]> buf(new uint8_t[m_fstSz]);
+        beginFSTReadStream()->read(buf.get(), m_fstSz);
+        return buf;
+    }
+
+    inline uint64_t getApploaderSize() const {return m_apploaderSz;}
+    inline std::unique_ptr<uint8_t[]> getApploaderBuf() const
+    {
+        std::unique_ptr<uint8_t[]> buf(new uint8_t[m_apploaderSz]);
+        beginApploaderReadStream()->read(buf.get(), m_apploaderSz);
+        return buf;
+    }
+
+    inline size_t getNodeCount() const { return m_nodes.size(); }
+    inline const Header& getHeader() const { return m_header; }
+    inline const BI2Header& getBI2() const { return m_bi2Header; }
+    virtual bool extractCryptoFiles(SystemStringView path, const ExtractionContext& ctx) const { return true; }
+    bool extractSysFiles(SystemStringView path, const ExtractionContext& ctx) const;
+};
+
 class DiscBase
 {
 public:
     virtual ~DiscBase() = default;
-
-    class IPartition
-    {
-    public:
-        virtual ~IPartition() = default;
-        struct DOLHeader
-        {
-            uint32_t textOff[7];
-            uint32_t dataOff[11];
-            uint32_t textStarts[7];
-            uint32_t dataStarts[11];
-            uint32_t textSizes[7];
-            uint32_t dataSizes[11];
-            uint32_t bssStart;
-            uint32_t bssSize;
-            uint32_t entryPoint;
-        };
-
-        class Node
-        {
-        public:
-            enum class Kind
-            {
-                File,
-                Directory
-            };
-        private:
-            friend class IPartition;
-            const IPartition& m_parent;
-            Kind m_kind;
-
-            uint64_t m_discOffset;
-            uint64_t m_discLength;
-            std::string m_name;
-
-            std::vector<Node>::iterator m_childrenBegin;
-            std::vector<Node>::iterator m_childrenEnd;
-
-        public:
-            Node(const IPartition& parent, const FSTNode& node, std::string_view name)
-            : m_parent(parent),
-              m_kind(node.isDir() ? Kind::Directory : Kind::File),
-              m_discOffset(parent.normalizeOffset(node.getOffset())),
-              m_discLength(node.getLength()),
-              m_name(name) {}
-            inline Kind getKind() const {return m_kind;}
-            inline std::string_view getName() const {return m_name;}
-            inline uint64_t size() const {return m_discLength;}
-            std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const
-            {
-                if (m_kind != Kind::File)
-                {
-                    LogModule.report(logvisor::Error, "unable to stream a non-file %s", m_name.c_str());
-                    return std::unique_ptr<IPartReadStream>();
-                }
-                return m_parent.beginReadStream(m_discOffset + offset);
-            }
-            std::unique_ptr<uint8_t[]> getBuf() const
-            {
-                if (m_kind != Kind::File)
-                {
-                    LogModule.report(logvisor::Error, "unable to buffer a non-file %s", m_name.c_str());
-                    return std::unique_ptr<uint8_t[]>();
-                }
-                uint8_t* buf = new uint8_t[m_discLength];
-                beginReadStream()->read(buf, m_discLength);
-                return std::unique_ptr<uint8_t[]>(buf);
-            }
-            inline std::vector<Node>::iterator rawBegin() const {return m_childrenBegin;}
-            inline std::vector<Node>::iterator rawEnd() const {return m_childrenEnd;}
-
-            class DirectoryIterator
-            {
-                friend class Node;
-                std::vector<Node>::iterator m_it;
-                DirectoryIterator(const std::vector<Node>::iterator& it)
-                : m_it(it) {}
-            public:
-                using iterator_category = std::forward_iterator_tag;
-                using value_type = Node;
-                using difference_type = std::ptrdiff_t;
-                using pointer = Node*;
-                using reference = Node&;
-
-                inline bool operator!=(const DirectoryIterator& other) {return m_it != other.m_it;}
-                inline bool operator==(const DirectoryIterator& other) {return m_it == other.m_it;}
-                inline DirectoryIterator& operator++()
-                {
-                    if (m_it->m_kind == Kind::Directory)
-                        m_it = m_it->rawEnd();
-                    else
-                        ++m_it;
-                    return *this;
-                }
-                inline Node& operator*() {return *m_it;}
-                inline Node* operator->() {return &*m_it;}
-            };
-            inline DirectoryIterator begin() const {return DirectoryIterator(m_childrenBegin);}
-            inline DirectoryIterator end() const {return DirectoryIterator(m_childrenEnd);}
-            inline DirectoryIterator find(std::string_view name) const
-            {
-                if (m_kind == Kind::Directory)
-                {
-                    DirectoryIterator it=begin();
-                    for (; it != end() ; ++it)
-                    {
-                        if (!it->getName().compare(name))
-                            return it;
-                    }
-                    return it;
-                }
-                return end();
-            }
-
-            bool extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx) const;
-        };
-    protected:
-        Header m_header;
-        BI2Header m_bi2Header;
-        uint64_t m_dolOff;
-        uint64_t m_fstOff;
-        uint64_t m_fstSz;
-        uint64_t m_apploaderSz;
-        std::vector<Node> m_nodes;
-        void parseFST(IPartReadStream& s);
-
-        std::vector<FSTNode> m_buildNodes;
-        std::vector<std::string> m_buildNames;
-        size_t m_buildNameOff = 0;
-
-        uint64_t m_dolSz;
-        void parseDOL(IPartReadStream& s);
-
-        const DiscBase& m_parent;
-        PartitionKind m_kind;
-        uint64_t m_offset;
-        bool m_isWii;
-    public:
-        mutable size_t m_curNodeIdx = 0;
-        float getProgressFactor() const { return getNodeCount() ? m_curNodeIdx / float(getNodeCount()) : 0.f; }
-        float getProgressFactorMidFile(size_t curByte, size_t totalBytes) const
-        {
-            if (!getNodeCount())
-                return 0.f;
-
-            if (totalBytes)
-                return (m_curNodeIdx + (curByte / float(totalBytes))) / float(getNodeCount());
-            else
-                return m_curNodeIdx / float(getNodeCount());
-        }
-
-        IPartition(const DiscBase& parent, PartitionKind kind, bool isWii, uint64_t offset)
-        : m_parent(parent), m_kind(kind), m_offset(offset), m_isWii(isWii) {}
-        virtual uint64_t normalizeOffset(uint64_t anOffset) const {return anOffset;}
-        inline PartitionKind getKind() const {return m_kind;}
-        inline bool isWii() const {return m_isWii;}
-        inline uint64_t getDiscOffset() const {return m_offset;}
-        virtual std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset=0) const=0;
-        inline std::unique_ptr<IPartReadStream> beginDOLReadStream(uint64_t offset=0) const
-        {return beginReadStream(m_dolOff + offset);}
-        inline std::unique_ptr<IPartReadStream> beginFSTReadStream(uint64_t offset=0) const
-        {return beginReadStream(m_fstOff + offset);}
-        inline std::unique_ptr<IPartReadStream> beginApploaderReadStream(uint64_t offset=0) const
-        {return beginReadStream(0x2440 + offset);}
-        inline const Node& getFSTRoot() const {return m_nodes[0];}
-        inline Node& getFSTRoot() {return m_nodes[0];}
-        bool extractToDirectory(SystemStringView path, const ExtractionContext& ctx);
-
-        inline uint64_t getDOLSize() const {return m_dolSz;}
-        inline std::unique_ptr<uint8_t[]> getDOLBuf() const
-        {
-            std::unique_ptr<uint8_t[]> buf(new uint8_t[m_dolSz]);
-            beginDOLReadStream()->read(buf.get(), m_dolSz);
-            return buf;
-        }
-
-        inline uint64_t getFSTSize() const {return m_fstSz;}
-        inline std::unique_ptr<uint8_t[]> getFSTBuf() const
-        {
-            std::unique_ptr<uint8_t[]> buf(new uint8_t[m_fstSz]);
-            beginFSTReadStream()->read(buf.get(), m_fstSz);
-            return buf;
-        }
-
-        inline uint64_t getApploaderSize() const {return m_apploaderSz;}
-        inline std::unique_ptr<uint8_t[]> getApploaderBuf() const
-        {
-            std::unique_ptr<uint8_t[]> buf(new uint8_t[m_apploaderSz]);
-            beginApploaderReadStream()->read(buf.get(), m_apploaderSz);
-            return buf;
-        }
-
-        inline size_t getNodeCount() const { return m_nodes.size(); }
-        inline const Header& getHeader() const { return m_header; }
-        inline const BI2Header& getBI2() const { return m_bi2Header; }
-        virtual bool extractCryptoFiles(SystemStringView path, const ExtractionContext& ctx) const { return true; }
-        bool extractSysFiles(SystemStringView path, const ExtractionContext& ctx) const;
-    };
-
 protected:
     std::unique_ptr<IDiscIO> m_discIO;
     Header m_header;
@@ -454,16 +433,16 @@ public:
                                std::function<void(void)> incParents,
                                size_t parentDirIdx);
 
-        void recursiveMergeNodesPre(const DiscBase::IPartition::Node* nodeIn, SystemStringView dirIn);
+        void recursiveMergeNodesPre(const Node* nodeIn, SystemStringView dirIn);
         bool recursiveMergeNodes(IPartWriteStream& ws, bool system,
-                                 const DiscBase::IPartition::Node* nodeIn, SystemStringView dirIn,
+                                 const Node* nodeIn, SystemStringView dirIn,
                                  SystemStringView keyPath);
-        bool recursiveMergeFST(const DiscBase::IPartition::Node* nodeIn,
+        bool recursiveMergeFST(const Node* nodeIn,
                                SystemStringView dirIn, std::function<void(void)> incParents,
                                SystemStringView keyPath);
 
         static bool RecursiveCalculateTotalSize(uint64_t& totalSz,
-                                                const DiscBase::IPartition::Node* nodeIn,
+                                                const Node* nodeIn,
                                                 SystemStringView dirIn);
 
         void addBuildName(SystemStringView str)
@@ -485,8 +464,8 @@ public:
         virtual std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset)=0;
         bool buildFromDirectory(IPartWriteStream& ws, SystemStringView dirIn);
         static uint64_t CalculateTotalSizeBuild(SystemStringView dirIn, PartitionKind kind, bool isWii);
-        bool mergeFromDirectory(IPartWriteStream& ws, const DiscBase::IPartition* partIn, SystemStringView dirIn);
-        static uint64_t CalculateTotalSizeMerge(const DiscBase::IPartition* partIn, SystemStringView dirIn);
+        bool mergeFromDirectory(IPartWriteStream& ws, const IPartition* partIn, SystemStringView dirIn);
+        static uint64_t CalculateTotalSizeMerge(const IPartition* partIn, SystemStringView dirIn);
     };
 protected:
     SystemString m_outPath;
@@ -522,9 +501,6 @@ public:
 
     IFileIO& getFileIO() { return *m_fileIO; }
 };
-
-using Partition = DiscBase::IPartition;
-using Node = Partition::Node;
 
 }
 

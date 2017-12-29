@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include "logvisor/logvisor.hpp"
 #include "nod/nod.hpp"
 

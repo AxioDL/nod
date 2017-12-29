@@ -1,7 +1,7 @@
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include <cstdlib>
-#include <inttypes.h>
+#include <cinttypes>
 #include "nod/DiscWii.hpp"
 #include "nod/aes.hpp"
 #include "nod/sha1.h"
@@ -24,7 +24,7 @@ static const uint8_t COMMON_KEYS[2][16] =
      0xba, 0x4c, 0x9b, 0x7e}
 };
 
-class PartitionWii : public DiscBase::IPartition
+class PartitionWii : public IPartition
 {
     enum class SigType : uint32_t
     {
