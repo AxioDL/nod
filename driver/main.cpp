@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
 
         nod::Mkdir(outDir, 0755);
 
-        nod::Partition* dataPart = disc->getDataPartition();
+        nod::IPartition* dataPart = disc->getDataPartition();
         if (!dataPart)
             return 1;
 
