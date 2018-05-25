@@ -1135,7 +1135,7 @@ public:
 
             return true;
         },
-        [this, &bootIn](IPartWriteStream& cws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz) -> bool
+        [&bootIn](IPartWriteStream& cws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz) -> bool
         {
             std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(bootIn.c_str())->beginReadStream();
             if (!rs)
@@ -1149,7 +1149,7 @@ public:
             header.write(cws);
             return true;
         },
-        [this, &bi2In](IPartWriteStream& cws) -> bool
+        [&bi2In](IPartWriteStream& cws) -> bool
         {
             std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(bi2In.c_str())->beginReadStream();
             if (!rs)
@@ -1216,7 +1216,7 @@ public:
 
             return true;
         },
-        [this, partIn](IPartWriteStream& cws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz) -> bool
+        [partIn](IPartWriteStream& cws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz) -> bool
         {
             Header header = partIn->getHeader();
             header.m_dolOff = uint32_t(dolOff >> uint64_t(2));
@@ -1226,7 +1226,7 @@ public:
             header.write(cws);
             return true;
         },
-        [this, partIn](IPartWriteStream& cws) -> bool
+        [partIn](IPartWriteStream& cws) -> bool
         {
             partIn->getBI2().write(cws);
             return true;
@@ -1371,7 +1371,7 @@ uint64_t DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool
 }
 
 DiscBuilderWii::DiscBuilderWii(SystemStringView outPath, bool dualLayer, FProgress progressCB)
-: DiscBuilderBase(outPath, dualLayer ? 0x1FB4E0000 : 0x118240000, progressCB), m_dualLayer(dualLayer)
+: DiscBuilderBase(outPath, dualLayer ? 0x1FB4E0000 : 0x118240000, progressCB)
 {
     PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionKind::Data, 0x200000);
     m_partitions.emplace_back(partBuilder);

@@ -283,8 +283,8 @@ public:
         }
 
         return _build(
-        [this, &bootIn](IPartWriteStream& ws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz,
-                        uint32_t userOff, uint32_t userSz) -> bool
+        [&bootIn](IPartWriteStream& ws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz,
+                  uint32_t userOff, uint32_t userSz) -> bool
         {
             std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(bootIn.c_str())->beginReadStream();
             if (!rs)
@@ -300,7 +300,7 @@ public:
             header.write(ws);
             return true;
         },
-        [this, &bi2In](IPartWriteStream& ws) -> bool
+        [&bi2In](IPartWriteStream& ws) -> bool
         {
             std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(bi2In.c_str())->beginReadStream();
             if (!rs)
@@ -346,8 +346,8 @@ public:
             return false;
 
         return _build(
-        [this, partIn](IPartWriteStream& ws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz,
-                       uint32_t userOff, uint32_t userSz) -> bool
+        [partIn](IPartWriteStream& ws, uint32_t dolOff, uint32_t fstOff, uint32_t fstSz,
+                 uint32_t userOff, uint32_t userSz) -> bool
         {
             Header header = partIn->getHeader();
             header.m_dolOff = dolOff;
@@ -359,7 +359,7 @@ public:
             header.write(ws);
             return true;
         },
-        [this, partIn](IPartWriteStream& ws) -> bool
+        [partIn](IPartWriteStream& ws) -> bool
         {
             partIn->getBI2().write(ws);
             return true;

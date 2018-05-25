@@ -17,7 +17,6 @@ public:
 
 class DiscBuilderWii : public DiscBuilderBase
 {
-    bool m_dualLayer;
 public:
     DiscBuilderWii(SystemStringView outPath, bool dualLayer, FProgress progressCB);
     EBuildResult buildFromDirectory(SystemStringView dirIn);
