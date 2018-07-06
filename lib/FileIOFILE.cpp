@@ -17,7 +17,7 @@ public:
 
     bool exists()
     {
-        FILE* fp = fopen(m_path.c_str(), "rb");
+        FILE* fp = Fopen(m_path.c_str(), _S("rb"));
         if (!fp)
             return false;
         fclose(fp);
@@ -26,7 +26,7 @@ public:
 
     uint64_t size()
     {
-        FILE* fp = fopen(m_path.c_str(), "rb");
+        FILE* fp = Fopen(m_path.c_str(), _S("rb"));
         if (!fp)
             return 0;
         FSeek(fp, 0, SEEK_END);
@@ -42,7 +42,7 @@ public:
         WriteStream(SystemStringView path, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
-            fp = fopen(path.data(), "wb");
+            fp = Fopen(path.data(), _S("wb"));
             if (!fp)
             {
                 LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
@@ -52,11 +52,11 @@ public:
         WriteStream(SystemStringView path, uint64_t offset, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
-            fp = fopen(path.data(), "ab");
+            fp = Fopen(path.data(), _S("ab"));
             if (!fp)
                 goto FailLoc;
             fclose(fp);
-            fp = fopen(path.data(), "r+b");
+            fp = Fopen(path.data(), _S("r+b"));
             if (!fp)
                 goto FailLoc;
             FSeek(fp, offset, SEEK_SET);
@@ -104,7 +104,7 @@ public:
         FILE* fp;
         ReadStream(SystemStringView path, bool& err)
         {
-            fp = fopen(path.data(), "rb");
+            fp = Fopen(path.data(), _S("rb"));
             if (!fp)
             {
                 err = true;

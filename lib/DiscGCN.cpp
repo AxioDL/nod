@@ -261,7 +261,7 @@ public:
         if (Stat(apploaderIn.c_str(), &apploaderStat))
         {
             LogModule.report(logvisor::Error, _S("unable to stat %s"), apploaderIn.c_str());
-            return -1;
+            return false;
         }
 
         /* Check Boot */
@@ -270,7 +270,7 @@ public:
         if (Stat(bootIn.c_str(), &bootStat))
         {
             LogModule.report(logvisor::Error, _S("unable to stat %s"), bootIn.c_str());
-            return -1;
+            return false;
         }
 
         /* Check BI2 */
@@ -279,7 +279,7 @@ public:
         if (Stat(bi2In.c_str(), &bi2Stat))
         {
             LogModule.report(logvisor::Error, _S("unable to stat %s"), bi2In.c_str());
-            return -1;
+            return false;
         }
 
         return _build(
