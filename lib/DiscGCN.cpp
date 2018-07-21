@@ -372,14 +372,14 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn) {
   return pb.buildFromDirectory(dirIn) ? EBuildResult::Success : EBuildResult::Failed;
 }
 
-uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn) {
-  uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
-  if (sz == UINT64_MAX)
-    return UINT64_MAX;
-  sz += 0x30000;
+std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn) {
+  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
+  if (!sz)
+    return sz;
+  *sz += 0x30000;
   if (sz > 0x57058000) {
-    LogModule.report(logvisor::Error, fmt(_SYS_STR("disc capacity exceeded [{} / {}]")), sz, 0x57058000);
-    return UINT64_MAX;
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("disc capacity exceeded [{} / {}]")), *sz, 0x57058000);
+    return std::nullopt;
   }
   return sz;
 }
@@ -416,14 +416,14 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn) {
              : EBuildResult::Failed;
 }
 
-uint64_t DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn) {
-  uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
-  if (sz == UINT64_MAX)
-    return UINT64_MAX;
-  sz += 0x30000;
+std::optional<uint64_t> DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn) {
+  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
+  if (!sz)
+    return std::nullopt;
+  *sz += 0x30000;
   if (sz > 0x57058000) {
-    LogModule.report(logvisor::Error, fmt(_SYS_STR("disc capacity exceeded [{} / {}]")), sz, 0x57058000);
-    return -1;
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("disc capacity exceeded [{} / {}]")), *sz, 0x57058000);
+    return std::nullopt;
   }
   return sz;
 }

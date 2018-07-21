@@ -769,8 +769,8 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
   return true;
 }
 
-uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(SystemStringView dirIn, PartitionKind kind,
-                                                                        bool isWii) {
+std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(SystemStringView dirIn,
+                                                                                       PartitionKind kind, bool isWii) {
   SystemString dirStr(dirIn);
   SystemString basePath = isWii ? dirStr + _SYS_STR("/") + getKindString(kind) : dirStr;
   SystemString dolIn = basePath + _SYS_STR("/sys/main.dol");
@@ -779,11 +779,11 @@ uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(SystemSt
   Sstat dolStat;
   if (Stat(dolIn.c_str(), &dolStat)) {
     LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), dolIn);
-    return UINT64_MAX;
+    return std::nullopt;
   }
   uint64_t totalSz = ROUND_UP_32(dolStat.st_size);
   if (!RecursiveCalculateTotalSize(totalSz, nullptr, filesIn.c_str()))
-    return UINT64_MAX;
+    return std::nullopt;
   return totalSz;
 }
 
@@ -843,15 +843,15 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
   return true;
 }
 
-uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const IPartition* partIn,
-                                                                        SystemStringView dirIn) {
+std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const IPartition* partIn,
+                                                                                       SystemStringView dirIn) {
   SystemString dirStr(dirIn);
   SystemString basePath = partIn->isWii() ? dirStr + _SYS_STR("/") + getKindString(partIn->getKind()) : dirStr;
   SystemString filesIn = basePath + _SYS_STR("/files");
 
   uint64_t totalSz = ROUND_UP_32(partIn->getDOLSize());
   if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), filesIn.c_str()))
-    return UINT64_MAX;
+    return std::nullopt;
   return totalSz;
 }
 
