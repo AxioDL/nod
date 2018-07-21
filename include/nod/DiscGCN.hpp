@@ -22,7 +22,7 @@ class DiscBuilderGCN : public DiscBuilderBase
 public:
     DiscBuilderGCN(SystemStringView outPath, FProgress progressCB);
     EBuildResult buildFromDirectory(SystemStringView dirIn);
-    static uint64_t CalculateTotalSizeRequired(SystemStringView dirIn);
+    static std::optional<uint64_t> CalculateTotalSizeRequired(SystemStringView dirIn);
 };
 
 class DiscMergerGCN
@@ -32,7 +32,7 @@ class DiscMergerGCN
 public:
     DiscMergerGCN(SystemStringView outPath, DiscGCN& sourceDisc, FProgress progressCB);
     EBuildResult mergeFromDirectory(SystemStringView dirIn);
-    static uint64_t CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn);
+    static std::optional<uint64_t> CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn);
 };
 
 }

@@ -871,7 +871,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
     return true;
 }
 
-uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(SystemStringView dirIn,
+std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(SystemStringView dirIn,
                                                                         PartitionKind kind, bool isWii)
 {
     SystemString dirStr(dirIn);
@@ -883,11 +883,11 @@ uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(SystemSt
     if (Stat(dolIn.c_str(), &dolStat))
     {
         LogModule.report(logvisor::Error, _S("unable to stat %s"), dolIn.c_str());
-        return -1;
+        return std::nullopt;
     }
     uint64_t totalSz = ROUND_UP_32(dolStat.st_size);
     if (!RecursiveCalculateTotalSize(totalSz, nullptr, filesIn.c_str()))
-        return -1;
+        return std::nullopt;
     return totalSz;
 }
 
@@ -949,7 +949,7 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
     return true;
 }
 
-uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const IPartition* partIn,
+std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const IPartition* partIn,
                                                                         SystemStringView dirIn)
 {
     SystemString dirStr(dirIn);
@@ -958,7 +958,7 @@ uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const IP
 
     uint64_t totalSz = ROUND_UP_32(partIn->getDOLSize());
     if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), filesIn.c_str()))
-        return -1;
+        return std::nullopt;
     return totalSz;
 }
 

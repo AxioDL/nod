@@ -408,16 +408,18 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn)
     return pb.buildFromDirectory(dirIn) ? EBuildResult::Success : EBuildResult::Failed;
 }
 
-uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn)
+std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn)
 {
-    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
-    if (sz == -1)
-        return -1;
-    sz += 0x30000;
+    std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
+    
+    if (!sz)
+        return sz;
+    
+    sz.value() += 0x30000;
     if (sz > 0x57058000)
     {
         LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
-        return -1;
+        return std::nullopt;
     }
     return sz;
 }
@@ -458,17 +460,17 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn)
            EBuildResult::Success : EBuildResult::Failed;
 }
 
-uint64_t DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn)
+std::optional<uint64_t> DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn)
 {
-    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(
+    std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(
                   sourceDisc.getDataPartition(), dirIn);
-    if (sz == -1)
-        return -1;
-    sz += 0x30000;
+    if (!sz)
+        return std::nullopt;
+    sz.value() += 0x30000;
     if (sz > 0x57058000)
     {
         LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
-        return -1;
+        return std::nullopt;
     }
     return sz;
 }

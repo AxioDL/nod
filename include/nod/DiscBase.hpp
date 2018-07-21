@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <optional>
 #include <cstdio>
 #include <cstdint>
 #include <functional>
@@ -463,9 +464,9 @@ public:
         {}
         virtual std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset)=0;
         bool buildFromDirectory(IPartWriteStream& ws, SystemStringView dirIn);
-        static uint64_t CalculateTotalSizeBuild(SystemStringView dirIn, PartitionKind kind, bool isWii);
+        static std::optional<uint64_t> CalculateTotalSizeBuild(SystemStringView dirIn, PartitionKind kind, bool isWii);
         bool mergeFromDirectory(IPartWriteStream& ws, const IPartition* partIn, SystemStringView dirIn);
-        static uint64_t CalculateTotalSizeMerge(const IPartition* partIn, SystemStringView dirIn);
+        static std::optional<uint64_t> CalculateTotalSizeMerge(const IPartition* partIn, SystemStringView dirIn);
     };
 protected:
     SystemString m_outPath;

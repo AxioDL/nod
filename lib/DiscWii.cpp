@@ -1352,20 +1352,20 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn)
     return EBuildResult::Success;
 }
 
-uint64_t DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer)
+std::optional<uint64_t> DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer)
 {
-    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true);
-    if (sz == -1)
-        return -1;
-    auto szDiv = std::lldiv(sz, 0x1F0000);
+    std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true);
+    if (!sz)
+        return sz;
+    auto szDiv = std::lldiv(sz.value(), 0x1F0000);
     if (szDiv.rem) ++szDiv.quot;
     sz = szDiv.quot * 0x200000;
-    sz += 0x200000;
+    sz.value() += 0x200000;
     dualLayer = (sz > 0x118240000);
     if (sz > 0x1FB4E0000)
     {
         LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
-        return -1;
+        return std::nullopt;
     }
     return sz;
 }
@@ -1469,22 +1469,22 @@ EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn)
     return EBuildResult::Success;
 }
 
-uint64_t DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc,
+std::optional<uint64_t> DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc,
                                                    SystemStringView dirIn, bool& dualLayer)
 {
-    uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(
+    std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(
                   sourceDisc.getDataPartition(), dirIn);
-    if (sz == -1)
-        return -1;
-    auto szDiv = std::lldiv(sz, 0x1F0000);
+    if (!sz)
+        return std::nullopt;
+    auto szDiv = std::lldiv(sz.value(), 0x1F0000);
     if (szDiv.rem) ++szDiv.quot;
     sz = szDiv.quot * 0x200000;
-    sz += 0x200000;
+    sz.value() += 0x200000;
     dualLayer = (sz > 0x118240000);
     if (sz > 0x1FB4E0000)
     {
         LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
-        return -1;
+        return std::nullopt;
     }
     return sz;
 }

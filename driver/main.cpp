@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        if (nod::DiscBuilderGCN::CalculateTotalSizeRequired(argv[2]) == -1)
+        if (!nod::DiscBuilderGCN::CalculateTotalSizeRequired(argv[2]))
             return 1;
 
         nod::EBuildResult ret;
@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
         }
 
         bool dual = false;
-        if (nod::DiscBuilderWii::CalculateTotalSizeRequired(argv[2], dual) == -1)
+        if (!nod::DiscBuilderWii::CalculateTotalSizeRequired(argv[2], dual))
             return 1;
 
         nod::EBuildResult ret;
@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        if (nod::DiscMergerGCN::CalculateTotalSizeRequired(static_cast<nod::DiscGCN&>(*disc), argv[2]) == -1)
+        if (!nod::DiscMergerGCN::CalculateTotalSizeRequired(static_cast<nod::DiscGCN&>(*disc), argv[2]))
             return 1;
 
         nod::EBuildResult ret;
@@ -231,7 +231,7 @@ int main(int argc, char* argv[])
         }
 
         bool dual = false;
-        if (nod::DiscMergerWii::CalculateTotalSizeRequired(static_cast<nod::DiscWii&>(*disc), argv[2], dual) == -1)
+        if (!nod::DiscMergerWii::CalculateTotalSizeRequired(static_cast<nod::DiscWii&>(*disc), argv[2], dual))
             return 1;
 
         nod::EBuildResult ret;
