@@ -1,5 +1,4 @@
-#ifndef __NOD_UTIL_HPP__
-#define __NOD_UTIL_HPP__
+#pragma once
 
 #if _WIN32 && UNICODE
 #include <wctype.h>
@@ -361,4 +360,3 @@ static inline void Printf(const SystemChar* fmt, ...)
 
 }
 
-#endif // __NOD_UTIL_HPP__

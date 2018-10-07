@@ -1,5 +1,4 @@
-#ifndef __NOD_LIB__
-#define __NOD_LIB__
+#pragma once
 
 #include <memory>
 #include <functional>
@@ -26,4 +25,3 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii);
 #include "DiscWii.hpp"
 #include "IDiscIO.hpp"
 
-#endif // __NOD_LIB__

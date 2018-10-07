@@ -1,5 +1,4 @@
-#ifndef __AES_HPP__
-#define __AES_HPP__
+#pragma once
 
 #include <cstdint>
 #include <cstdlib>
@@ -21,4 +20,3 @@ std::unique_ptr<IAES> NewAES();
 
 }
 
-#endif //__AES_HPP__

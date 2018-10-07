@@ -1,5 +1,4 @@
-#ifndef __NOD_DISC_WII__
-#define __NOD_DISC_WII__
+#pragma once
 
 #include "DiscBase.hpp"
 
@@ -37,4 +36,3 @@ public:
 
 }
 
-#endif // __NOD_DISC_WII__

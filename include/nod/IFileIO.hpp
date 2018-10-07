@@ -1,5 +1,4 @@
-#ifndef __NOD_IFILE_IO__
-#define __NOD_IFILE_IO__
+#pragma once
 
 #include <memory>
 #include <functional>
@@ -83,4 +82,3 @@ std::unique_ptr<IFileIO> NewFileIO(SystemStringView path, int64_t maxWriteSize=-
 
 }
 
-#endif // __NOD_IFILE_IO__

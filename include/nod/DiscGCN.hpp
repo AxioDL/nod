@@ -1,5 +1,4 @@
-#ifndef __NOD_DISC_GCN__
-#define __NOD_DISC_GCN__
+#pragma once
 
 #include "DiscBase.hpp"
 
@@ -38,4 +37,3 @@ public:
 }
 
 
-#endif // __NOD_DISC_GCN__

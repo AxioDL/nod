@@ -1,5 +1,4 @@
-#ifndef __NOD_IDISC_IO__
-#define __NOD_IDISC_IO__
+#pragma once
 
 #include <memory>
 #include <cstdlib>
@@ -72,4 +71,3 @@ public:
 
 }
 
-#endif // __NOD_IDISC_IO__

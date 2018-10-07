@@ -1,5 +1,4 @@
-#ifndef __NOD_DISC_BASE__
-#define __NOD_DISC_BASE__
+#pragma once
 
 #include <vector>
 #include <memory>
@@ -504,4 +503,3 @@ public:
 
 }
 
-#endif // __NOD_DISC_BASE__

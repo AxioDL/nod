@@ -1,5 +1,4 @@
-#ifndef __NOD_DIRECTORY_ENUMERATOR__
-#define __NOD_DIRECTORY_ENUMERATOR__
+#pragma once
 
 #include "Util.hpp"
 
@@ -65,4 +64,3 @@ public:
 
 }
 
-#endif // __NOD_DIRECTORY_ENUMERATOR__
