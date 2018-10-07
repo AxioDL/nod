@@ -16,6 +16,6 @@ add_library(nod
             nod.cpp
             ${PLAT_SRCS}
             ${NOD_HEADERS})
-if(NOT MSVC)
+if(NOT MSVC AND NOT NX)
 set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)
 endif()
