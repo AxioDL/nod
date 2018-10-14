@@ -26,10 +26,10 @@ int main(int argc, char* argv[])
 #endif
 {
     if (argc < 3 ||
-        (!strcasecmp(argv[1], _S("makegcn")) && argc < 3) ||
-        (!strcasecmp(argv[1], _S("makewii")) && argc < 3) ||
-        (!strcasecmp(argv[1], _S("mergegcn")) && argc < 4) ||
-        (!strcasecmp(argv[1], _S("mergewii")) && argc < 4))
+        (!strcasecmp(argv[1], _SYS_STR("makegcn")) && argc < 3) ||
+        (!strcasecmp(argv[1], _SYS_STR("makewii")) && argc < 3) ||
+        (!strcasecmp(argv[1], _SYS_STR("mergegcn")) && argc < 4) ||
+        (!strcasecmp(argv[1], _SYS_STR("mergewii")) && argc < 4))
     {
         printHelp();
         return 1;
@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
             fprintf(stderr, "Current node: %s, Extraction %g%% Complete\n", str.data(), c * 100.f);
     }};
     const nod::SystemChar* inDir = nullptr;
-    const nod::SystemChar* outDir = _S(".");
+    const nod::SystemChar* outDir = _SYS_STR(".");
 
     for (int a=2 ; a<argc ; ++a)
     {
@@ -63,15 +63,15 @@ int main(int argc, char* argv[])
 
     auto progFunc = [&](float prog, nod::SystemStringView name, size_t bytes)
     {
-        nod::Printf(_S("\r                                                                      "));
+        nod::Printf(_SYS_STR("\r                                                                      "));
         if (bytes != -1)
-            nod::Printf(_S("\r%g%% %s %" PRISize " B"), prog * 100.f, name.data(), bytes);
+            nod::Printf(_SYS_STR("\r%g%% %s %" PRISize " B"), prog * 100.f, name.data(), bytes);
         else
-            nod::Printf(_S("\r%g%% %s"), prog * 100.f, name.data());
+            nod::Printf(_SYS_STR("\r%g%% %s"), prog * 100.f, name.data());
         fflush(stdout);
     };
 
-    if (!strcasecmp(argv[1], _S("extract")))
+    if (!strcasecmp(argv[1], _SYS_STR("extract")))
     {
         bool isWii;
         std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(inDir, isWii);
@@ -87,13 +87,13 @@ int main(int argc, char* argv[])
         if (!dataPart->extractToDirectory(outDir, ctx))
             return 1;
     }
-    else if (!strcasecmp(argv[1], _S("makegcn")))
+    else if (!strcasecmp(argv[1], _SYS_STR("makegcn")))
     {
         /* Pre-validate path */
         nod::Sstat theStat;
         if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode))
         {
-            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as directory"), argv[2]);
+            nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as directory"), argv[2]);
             return 1;
         }
 
@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
         if (argc < 4)
         {
             nod::SystemString outPath(argv[2]);
-            outPath.append(_S(".iso"));
+            outPath.append(_SYS_STR(".iso"));
             nod::DiscBuilderGCN b(outPath, progFunc);
             ret = b.buildFromDirectory(argv[2]);
         }
@@ -119,13 +119,13 @@ int main(int argc, char* argv[])
         if (ret != nod::EBuildResult::Success)
             return 1;
     }
-    else if (!strcasecmp(argv[1], _S("makewii")))
+    else if (!strcasecmp(argv[1], _SYS_STR("makewii")))
     {
         /* Pre-validate path */
         nod::Sstat theStat;
         if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode))
         {
-            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as directory"), argv[4]);
+            nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as directory"), argv[4]);
             return 1;
         }
 
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
         if (argc < 4)
         {
             nod::SystemString outPath(argv[2]);
-            outPath.append(_S(".iso"));
+            outPath.append(_SYS_STR(".iso"));
             nod::DiscBuilderWii b(outPath.c_str(), dual, progFunc);
             ret = b.buildFromDirectory(argv[2]);
         }
@@ -152,18 +152,18 @@ int main(int argc, char* argv[])
         if (ret != nod::EBuildResult::Success)
             return 1;
     }
-    else if (!strcasecmp(argv[1], _S("mergegcn")))
+    else if (!strcasecmp(argv[1], _SYS_STR("mergegcn")))
     {
         /* Pre-validate paths */
         nod::Sstat theStat;
         if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode))
         {
-            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as directory"), argv[2]);
+            nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as directory"), argv[2]);
             return 1;
         }
         if (nod::Stat(argv[3], &theStat) || !S_ISREG(theStat.st_mode))
         {
-            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as file"), argv[3]);
+            nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as file"), argv[3]);
             return 1;
         }
 
@@ -171,12 +171,12 @@ int main(int argc, char* argv[])
         std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(argv[3], isWii);
         if (!disc)
         {
-            nod::LogModule.report(logvisor::Error, _S("unable to open image %s"), argv[3]);
+            nod::LogModule.report(logvisor::Error, _SYS_STR("unable to open image %s"), argv[3]);
             return 1;
         }
         if (isWii)
         {
-            nod::LogModule.report(logvisor::Error, _S("Wii images should be merged with 'mergewii'"));
+            nod::LogModule.report(logvisor::Error, _SYS_STR("Wii images should be merged with 'mergewii'"));
             return 1;
         }
 
@@ -188,7 +188,7 @@ int main(int argc, char* argv[])
         if (argc < 5)
         {
             nod::SystemString outPath(argv[2]);
-            outPath.append(_S(".iso"));
+            outPath.append(_SYS_STR(".iso"));
             nod::DiscMergerGCN b(outPath.c_str(), static_cast<nod::DiscGCN&>(*disc), progFunc);
             ret = b.mergeFromDirectory(argv[2]);
         }
@@ -202,18 +202,18 @@ int main(int argc, char* argv[])
         if (ret != nod::EBuildResult::Success)
             return 1;
     }
-    else if (!strcasecmp(argv[1], _S("mergewii")))
+    else if (!strcasecmp(argv[1], _SYS_STR("mergewii")))
     {
         /* Pre-validate paths */
         nod::Sstat theStat;
         if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode))
         {
-            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as directory"), argv[2]);
+            nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as directory"), argv[2]);
             return 1;
         }
         if (nod::Stat(argv[3], &theStat) || !S_ISREG(theStat.st_mode))
         {
-            nod::LogModule.report(logvisor::Error, _S("unable to stat %s as file"), argv[3]);
+            nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as file"), argv[3]);
             return 1;
         }
 
@@ -221,12 +221,12 @@ int main(int argc, char* argv[])
         std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(argv[3], isWii);
         if (!disc)
         {
-            nod::LogModule.report(logvisor::Error, _S("unable to open image %s"), argv[3]);
+            nod::LogModule.report(logvisor::Error, _SYS_STR("unable to open image %s"), argv[3]);
             return 1;
         }
         if (!isWii)
         {
-            nod::LogModule.report(logvisor::Error, _S("GameCube images should be merged with 'mergegcn'"));
+            nod::LogModule.report(logvisor::Error, _SYS_STR("GameCube images should be merged with 'mergegcn'"));
             return 1;
         }
 
@@ -239,7 +239,7 @@ int main(int argc, char* argv[])
         if (argc < 5)
         {
             nod::SystemString outPath(argv[2]);
-            outPath.append(_S(".iso"));
+            outPath.append(_SYS_STR(".iso"));
             nod::DiscMergerWii b(outPath.c_str(), static_cast<nod::DiscWii&>(*disc), dual, progFunc);
             ret = b.mergeFromDirectory(argv[2]);
         }
@@ -259,7 +259,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    nod::LogModule.report(logvisor::Info, _S("Success!"));
+    nod::LogModule.report(logvisor::Info, _SYS_STR("Success!"));
     return 0;
 }
 

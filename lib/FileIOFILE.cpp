@@ -17,7 +17,7 @@ public:
 
     bool exists()
     {
-        FILE* fp = Fopen(m_path.c_str(), _S("rb"));
+        FILE* fp = Fopen(m_path.c_str(), _SYS_STR("rb"));
         if (!fp)
             return false;
         fclose(fp);
@@ -26,7 +26,7 @@ public:
 
     uint64_t size()
     {
-        FILE* fp = Fopen(m_path.c_str(), _S("rb"));
+        FILE* fp = Fopen(m_path.c_str(), _SYS_STR("rb"));
         if (!fp)
             return 0;
         FSeek(fp, 0, SEEK_END);
@@ -42,27 +42,27 @@ public:
         WriteStream(SystemStringView path, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
-            fp = Fopen(path.data(), _S("wb"));
+            fp = Fopen(path.data(), _SYS_STR("wb"));
             if (!fp)
             {
-                LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
+                LogModule.report(logvisor::Error, _SYS_STR("unable to open '%s' for writing"), path.data());
                 err = true;
             }
         }
         WriteStream(SystemStringView path, uint64_t offset, int64_t maxWriteSize, bool& err)
         : m_maxWriteSize(maxWriteSize)
         {
-            fp = Fopen(path.data(), _S("ab"));
+            fp = Fopen(path.data(), _SYS_STR("ab"));
             if (!fp)
                 goto FailLoc;
             fclose(fp);
-            fp = Fopen(path.data(), _S("r+b"));
+            fp = Fopen(path.data(), _SYS_STR("r+b"));
             if (!fp)
                 goto FailLoc;
             FSeek(fp, offset, SEEK_SET);
             return;
         FailLoc:
-            LogModule.report(logvisor::Error, _S("unable to open '%s' for writing"), path.data());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to open '%s' for writing"), path.data());
             err = true;
         }
         ~WriteStream()
@@ -75,7 +75,7 @@ public:
             {
                 if (FTell(fp) + length > m_maxWriteSize)
                 {
-                    LogModule.report(logvisor::Error, _S("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
+                    LogModule.report(logvisor::Error, _SYS_STR("write operation exceeds file's %" PRIi64 "-byte limit"), m_maxWriteSize);
                     return 0;
                 }
             }
@@ -104,11 +104,11 @@ public:
         FILE* fp;
         ReadStream(SystemStringView path, bool& err)
         {
-            fp = Fopen(path.data(), _S("rb"));
+            fp = Fopen(path.data(), _SYS_STR("rb"));
             if (!fp)
             {
                 err = true;
-                LogModule.report(logvisor::Error, _S("unable to open '%s' for reading"), path.data());
+                LogModule.report(logvisor::Error, _SYS_STR("unable to open '%s' for reading"), path.data());
             }
         }
         ReadStream(SystemStringView path, uint64_t offset, bool& err)

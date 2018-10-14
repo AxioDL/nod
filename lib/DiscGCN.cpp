@@ -256,29 +256,29 @@ public:
         SystemString dirStr(dirIn);
 
         /* Check Apploader */
-        SystemString apploaderIn = dirStr + _S("/sys/apploader.img");
+        SystemString apploaderIn = dirStr + _SYS_STR("/sys/apploader.img");
         Sstat apploaderStat;
         if (Stat(apploaderIn.c_str(), &apploaderStat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), apploaderIn.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), apploaderIn.c_str());
             return false;
         }
 
         /* Check Boot */
-        SystemString bootIn = dirStr + _S("/sys/boot.bin");
+        SystemString bootIn = dirStr + _SYS_STR("/sys/boot.bin");
         Sstat bootStat;
         if (Stat(bootIn.c_str(), &bootStat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), bootIn.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), bootIn.c_str());
             return false;
         }
 
         /* Check BI2 */
-        SystemString bi2In = dirStr + _S("/sys/bi2.bin");
+        SystemString bi2In = dirStr + _SYS_STR("/sys/bi2.bin");
         Sstat bi2Stat;
         if (Stat(bi2In.c_str(), &bi2Stat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), bi2In.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), bi2In.c_str());
             return false;
         }
 
@@ -368,7 +368,7 @@ public:
         {
             std::unique_ptr<uint8_t[]> apploaderBuf = partIn->getApploaderBuf();
             size_t apploaderSz = partIn->getApploaderSize();
-            SystemString apploaderName(_S("<apploader>"));
+            SystemString apploaderName(_SYS_STR("<apploader>"));
             ws.write(apploaderBuf.get(), apploaderSz);
             xferSz += apploaderSz;
             if (0x2440 + xferSz >= m_curUser)
@@ -390,10 +390,10 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn)
         return EBuildResult::Failed;
     if (!CheckFreeSpace(m_outPath.c_str(), 0x57058000))
     {
-        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_outPath.c_str());
+        LogModule.report(logvisor::Error, _SYS_STR("not enough free disk space for %s"), m_outPath.c_str());
         return EBuildResult::DiskFull;
     }
-    m_progressCB(getProgressFactor(), _S("Preallocating image"), -1);
+    m_progressCB(getProgressFactor(), _SYS_STR("Preallocating image"), -1);
     ++m_progressIdx;
     {
         auto ws = m_fileIO->beginWriteStream(0);
@@ -416,7 +416,7 @@ uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn)
     sz += 0x30000;
     if (sz > 0x57058000)
     {
-        LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
+        LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
         return -1;
     }
     return sz;
@@ -439,10 +439,10 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn)
         return EBuildResult::Failed;
     if (!CheckFreeSpace(m_builder.m_outPath.c_str(), 0x57058000))
     {
-        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_builder.m_outPath.c_str());
+        LogModule.report(logvisor::Error, _SYS_STR("not enough free disk space for %s"), m_builder.m_outPath.c_str());
         return EBuildResult::DiskFull;
     }
-    m_builder.m_progressCB(m_builder.getProgressFactor(), _S("Preallocating image"), -1);
+    m_builder.m_progressCB(m_builder.getProgressFactor(), _SYS_STR("Preallocating image"), -1);
     ++m_builder.m_progressIdx;
     {
         auto ws = m_builder.m_fileIO->beginWriteStream(0);
@@ -467,7 +467,7 @@ uint64_t DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemSt
     sz += 0x30000;
     if (sz > 0x57058000)
     {
-        LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
+        LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
         return -1;
     }
     return sz;

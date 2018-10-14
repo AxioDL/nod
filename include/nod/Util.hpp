@@ -111,8 +111,8 @@ public:
     inline SystemStringView sys_str() const {return m_sys;}
     inline const SystemChar* c_str() const {return m_sys.c_str();}
 };
-#ifndef _S
-#define _S(val) L ## val
+#ifndef _SYS_STR
+#define _SYS_STR(val) L ## val
 #endif
 #else
 typedef char SystemChar;
@@ -321,14 +321,14 @@ static inline bool CheckFreeSpace(const SystemChar* path, size_t reqSz)
     DWORD ret = GetFullPathNameW(path, 1024, buf, &end);
     if (!ret || ret > 1024)
     {
-        LogModule.report(logvisor::Error, _S("GetFullPathNameW %s"), path);
+        LogModule.report(logvisor::Error, _SYS_STR("GetFullPathNameW %s"), path);
         return false;
     }
     if (end)
         end[0] = L'\0';
     if (!GetDiskFreeSpaceExW(buf, &freeBytes, nullptr, nullptr))
     {
-        LogModule.report(logvisor::Error, _S("GetDiskFreeSpaceExW %s: %d"), path, GetLastError());
+        LogModule.report(logvisor::Error, _SYS_STR("GetDiskFreeSpaceExW %s: %d"), path, GetLastError());
         return false;
     }
     return reqSz < freeBytes.QuadPart;

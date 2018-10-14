@@ -456,7 +456,7 @@ public:
             uint32_t h3;
             if (rs->read(&h3, 4) != 4)
             {
-                LogModule.report(logvisor::Error, _S("unable to read H3 offset apploader"));
+                LogModule.report(logvisor::Error, _SYS_STR("unable to read H3 offset apploader"));
                 return {};
             }
             h3 = SBig(h3);
@@ -479,7 +479,7 @@ public:
         SystemString basePathStr(basePath);
 
         /* Extract Ticket */
-        SystemString ticketPath = basePathStr + _S("/ticket.bin");
+        SystemString ticketPath = basePathStr + _SYS_STR("/ticket.bin");
         if (ctx.force || Stat(ticketPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -491,7 +491,7 @@ public:
         }
 
         /* Extract TMD */
-        SystemString tmdPath = basePathStr + _S("/tmd.bin");
+        SystemString tmdPath = basePathStr + _SYS_STR("/tmd.bin");
         if (ctx.force || Stat(tmdPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -503,7 +503,7 @@ public:
         }
 
         /* Extract Certs */
-        SystemString certPath = basePathStr + _S("/cert.bin");
+        SystemString certPath = basePathStr + _SYS_STR("/cert.bin");
         if (ctx.force || Stat(certPath.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -517,7 +517,7 @@ public:
         }
 
         /* Extract H3 */
-        SystemString h3Path = basePathStr + _S("/h3.bin");
+        SystemString h3Path = basePathStr + _SYS_STR("/h3.bin");
         if (ctx.force || Stat(h3Path.c_str(), &theStat))
         {
             if (ctx.progressCB)
@@ -606,16 +606,16 @@ bool DiscWii::extractDiscHeaderFiles(SystemStringView basePath, const Extraction
 {
     SystemString basePathStr(basePath);
 
-    if (Mkdir((basePathStr + _S("/disc")).c_str(), 0755) && errno != EEXIST)
+    if (Mkdir((basePathStr + _SYS_STR("/disc")).c_str(), 0755) && errno != EEXIST)
     {
-        LogModule.report(logvisor::Error, _S("unable to mkdir '%s/disc'"), basePathStr.c_str());
+        LogModule.report(logvisor::Error, _SYS_STR("unable to mkdir '%s/disc'"), basePathStr.c_str());
         return false;
     }
 
     Sstat theStat;
 
     /* Extract Header */
-    SystemString headerPath = basePathStr + _S("/disc/header.bin");
+    SystemString headerPath = basePathStr + _SYS_STR("/disc/header.bin");
     if (ctx.force || Stat(headerPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -632,7 +632,7 @@ bool DiscWii::extractDiscHeaderFiles(SystemStringView basePath, const Extraction
     }
 
     /* Extract Region info */
-    SystemString regionPath = basePathStr + _S("/disc/region.bin");
+    SystemString regionPath = basePathStr + _SYS_STR("/disc/region.bin");
     if (ctx.force || Stat(regionPath.c_str(), &theStat))
     {
         if (ctx.progressCB)
@@ -988,7 +988,7 @@ public:
         }* bfWindow = (BFWindow*)(tmdData.get() + 0x19A);
         bool good = false;
         uint64_t attempts = 0;
-        SystemString bfName(_S("Brute force attempts"));
+        SystemString bfName(_SYS_STR("Brute force attempts"));
         for (int w=0 ; w<7 ; ++w)
         {
             for (uint64_t i=0 ; i<UINT64_MAX ; ++i)
@@ -1022,59 +1022,59 @@ public:
     uint64_t buildFromDirectory(SystemStringView dirIn)
     {
         SystemString dirStr(dirIn);
-        SystemString basePath = dirStr + _S("/") + getKindString(m_kind);
+        SystemString basePath = dirStr + _SYS_STR("/") + getKindString(m_kind);
 
         /* Check Ticket */
-        SystemString ticketIn = basePath + _S("/ticket.bin");
+        SystemString ticketIn = basePath + _SYS_STR("/ticket.bin");
         Sstat theStat;
         if (Stat(ticketIn.c_str(), &theStat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), ticketIn.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), ticketIn.c_str());
             return -1;
         }
 
         /* Check TMD */
-        SystemString tmdIn = basePath + _S("/tmd.bin");
+        SystemString tmdIn = basePath + _SYS_STR("/tmd.bin");
         Sstat tmdStat;
         if (Stat(tmdIn.c_str(), &tmdStat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), tmdIn.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), tmdIn.c_str());
             return -1;
         }
 
         /* Check Cert */
-        SystemString certIn = basePath + _S("/cert.bin");
+        SystemString certIn = basePath + _SYS_STR("/cert.bin");
         Sstat certStat;
         if (Stat(certIn.c_str(), &certStat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), certIn.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), certIn.c_str());
             return -1;
         }
 
         /* Check Apploader */
-        SystemString apploaderIn = basePath + _S("/sys/apploader.img");
+        SystemString apploaderIn = basePath + _SYS_STR("/sys/apploader.img");
         Sstat apploaderStat;
         if (Stat(apploaderIn.c_str(), &apploaderStat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), apploaderIn.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), apploaderIn.c_str());
             return -1;
         }
 
         /* Check Boot */
-        SystemString bootIn = basePath + _S("/sys/boot.bin");
+        SystemString bootIn = basePath + _SYS_STR("/sys/boot.bin");
         Sstat bootStat;
         if (Stat(bootIn.c_str(), &bootStat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), bootIn.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), bootIn.c_str());
             return -1;
         }
 
         /* Check BI2 */
-        SystemString bi2In = basePath + _S("/sys/bi2.bin");
+        SystemString bi2In = basePath + _SYS_STR("/sys/bi2.bin");
         Sstat bi2Stat;
         if (Stat(bi2In.c_str(), &bi2Stat))
         {
-            LogModule.report(logvisor::Error, _S("unable to stat %s"), bi2In.c_str());
+            LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), bi2In.c_str());
             return -1;
         }
 
@@ -1235,7 +1235,7 @@ public:
         {
             std::unique_ptr<uint8_t[]> apploaderBuf = partIn->getApploaderBuf();
             size_t apploaderSz = partIn->getApploaderSize();
-            SystemString apploaderName(_S("<apploader>"));
+            SystemString apploaderName(_SYS_STR("<apploader>"));
             cws.write(apploaderBuf.get(), apploaderSz);
             xferSz += apploaderSz;
             if (0x2440 + xferSz >= 0x1F0000)
@@ -1258,7 +1258,7 @@ public:
 EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn)
 {
     SystemString dirStr(dirIn);
-    SystemString basePath = SystemString(dirStr) + _S("/") + getKindString(PartitionKind::Data);
+    SystemString basePath = SystemString(dirStr) + _SYS_STR("/") + getKindString(PartitionKind::Data);
 
     PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_partitions[0]);
     uint64_t filledSz = pb.m_baseOffset;
@@ -1267,10 +1267,10 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn)
 
     if (!CheckFreeSpace(m_outPath.c_str(), m_discCapacity))
     {
-        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_outPath.c_str());
+        LogModule.report(logvisor::Error, _SYS_STR("not enough free disk space for %s"), m_outPath.c_str());
         return EBuildResult::DiskFull;
     }
-    m_progressCB(getProgressFactor(), _S("Preallocating image"), -1);
+    m_progressCB(getProgressFactor(), _SYS_STR("Preallocating image"), -1);
     ++m_progressIdx;
     {
         std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(0);
@@ -1291,14 +1291,14 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn)
         return EBuildResult::Failed;
     }
 
-    m_progressCB(getProgressFactor(), _S("Finishing Disc"), -1);
+    m_progressCB(getProgressFactor(), _SYS_STR("Finishing Disc"), -1);
     ++m_progressIdx;
 
     /* Populate disc header */
     std::unique_ptr<IFileIO::IWriteStream> ws = m_fileIO->beginWriteStream(0);
     if (!ws)
         return EBuildResult::Failed;
-    SystemString headerPath = basePath + _S("/disc/header.bin");
+    SystemString headerPath = basePath + _SYS_STR("/disc/header.bin");
     std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(headerPath.c_str())->beginReadStream();
     if (!rs)
         return EBuildResult::Failed;
@@ -1320,7 +1320,7 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn)
     ws->write(vals, 4);
 
     /* Populate region info */
-    SystemString regionPath = basePath + _S("/disc/region.bin");
+    SystemString regionPath = basePath + _SYS_STR("/disc/region.bin");
     rs = NewFileIO(regionPath.c_str())->beginReadStream();
     if (!rs)
         return EBuildResult::Failed;
@@ -1364,7 +1364,7 @@ uint64_t DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool
     dualLayer = (sz > 0x118240000);
     if (sz > 0x1FB4E0000)
     {
-        LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
+        LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
         return -1;
     }
     return sz;
@@ -1391,10 +1391,10 @@ EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn)
 
     if (!CheckFreeSpace(m_builder.m_outPath.c_str(), m_builder.m_discCapacity))
     {
-        LogModule.report(logvisor::Error, _S("not enough free disk space for %s"), m_builder.m_outPath.c_str());
+        LogModule.report(logvisor::Error, _SYS_STR("not enough free disk space for %s"), m_builder.m_outPath.c_str());
         return EBuildResult::DiskFull;
     }
-    m_builder.m_progressCB(m_builder.getProgressFactor(), _S("Preallocating image"), -1);
+    m_builder.m_progressCB(m_builder.getProgressFactor(), _SYS_STR("Preallocating image"), -1);
     ++m_builder.m_progressIdx;
     {
         std::unique_ptr<IFileIO::IWriteStream> ws = m_builder.m_fileIO->beginWriteStream(0);
@@ -1415,7 +1415,7 @@ EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn)
         return EBuildResult::Failed;
     }
 
-    m_builder.m_progressCB(m_builder.getProgressFactor(), _S("Finishing Disc"), -1);
+    m_builder.m_progressCB(m_builder.getProgressFactor(), _SYS_STR("Finishing Disc"), -1);
     ++m_builder.m_progressIdx;
 
     /* Populate disc header */
@@ -1483,7 +1483,7 @@ uint64_t DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc,
     dualLayer = (sz > 0x118240000);
     if (sz > 0x1FB4E0000)
     {
-        LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
+        LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
         return -1;
     }
     return sz;
