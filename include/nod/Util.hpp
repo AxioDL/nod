@@ -141,8 +141,8 @@ public:
     inline SystemStringView sys_str() const {return m_sys;}
     inline const SystemChar* c_str() const {return m_sys.data();}
 };
-#ifndef _S
-#define _S(val) val
+#ifndef _SYS_STR
+#define _SYS_STR(val) val
 #endif
 #endif
 
