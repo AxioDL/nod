@@ -415,7 +415,7 @@ std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringV
     if (!sz)
         return sz;
     
-    sz.value() += 0x30000;
+    *sz += 0x30000;
     if (sz > 0x57058000)
     {
         LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
@@ -466,7 +466,7 @@ std::optional<uint64_t> DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourc
                   sourceDisc.getDataPartition(), dirIn);
     if (!sz)
         return std::nullopt;
-    sz.value() += 0x30000;
+    *sz += 0x30000;
     if (sz > 0x57058000)
     {
         LogModule.report(logvisor::Error, _S("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);

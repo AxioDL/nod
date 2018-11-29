@@ -1357,10 +1357,10 @@ std::optional<uint64_t> DiscBuilderWii::CalculateTotalSizeRequired(SystemStringV
     std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true);
     if (!sz)
         return sz;
-    auto szDiv = std::lldiv(sz.value(), 0x1F0000);
+    auto szDiv = std::lldiv(*sz, 0x1F0000);
     if (szDiv.rem) ++szDiv.quot;
     sz = szDiv.quot * 0x200000;
-    sz.value() += 0x200000;
+    *sz += 0x200000;
     dualLayer = (sz > 0x118240000);
     if (sz > 0x1FB4E0000)
     {
@@ -1476,10 +1476,10 @@ std::optional<uint64_t> DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourc
                   sourceDisc.getDataPartition(), dirIn);
     if (!sz)
         return std::nullopt;
-    auto szDiv = std::lldiv(sz.value(), 0x1F0000);
+    auto szDiv = std::lldiv(*sz, 0x1F0000);
     if (szDiv.rem) ++szDiv.quot;
     sz = szDiv.quot * 0x200000;
-    sz.value() += 0x200000;
+    *sz += 0x200000;
     dualLayer = (sz > 0x118240000);
     if (sz > 0x1FB4E0000)
     {
