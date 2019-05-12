@@ -23,7 +23,7 @@ file(GLOB NOD_HEADERS include/nod/*.h*)
 
 add_subdirectory(lib)
 add_subdirectory(driver)
-install(DIRECTORY include/nod DESTINATION include/nod)
+install(DIRECTORY include/nod DESTINATION include)
 
 set(version_config_file "${PROJECT_BINARY_DIR}/nodConfigVersion.cmake")
 set(config_file "${PROJECT_BINARY_DIR}/nodConfig.cmake")
