@@ -34,7 +34,7 @@ install(
     TARGETS nod
     EXPORT nodTargets
     ARCHIVE DESTINATION "lib"
-    INCLUDES DESTINATION "include/nod"  # This sets the INTERFACE_INCLUDE_DIRECTORIES property of the target.
+    INCLUDES DESTINATION include  # This sets the INTERFACE_INCLUDE_DIRECTORIES property of the target.
 )
 
 # Install the target config files
