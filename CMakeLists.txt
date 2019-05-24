@@ -29,14 +29,6 @@ set(version_config_file "${PROJECT_BINARY_DIR}/nodConfigVersion.cmake")
 set(config_file "${PROJECT_BINARY_DIR}/nodConfig.cmake")
 set(config_install_dir "lib/cmake/nod")
 
-# Associate target with export
-install(
-    TARGETS nod
-    EXPORT nodTargets
-    ARCHIVE DESTINATION "lib"
-    INCLUDES DESTINATION include  # This sets the INTERFACE_INCLUDE_DIRECTORIES property of the target.
-)
-
 # Install the target config files
 install(
     EXPORT nodTargets
