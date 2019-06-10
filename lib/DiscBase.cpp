@@ -317,7 +317,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildNodes(IPartWriteStream
 
       size_t fileSz = ROUND_UP_32(e.m_fileSz);
       uint64_t fileOff = userAllocate(fileSz, ws);
-      if (fileOff == -1)
+      if (fileOff == UINT64_MAX)
         return false;
       m_fileOffsetsSizes[e.m_path] = std::make_pair(fileOff, fileSz);
       std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(e.m_path)->beginReadStream();
@@ -466,7 +466,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
 
         size_t fileSz = ROUND_UP_32(e.m_fileSz);
         uint64_t fileOff = userAllocate(fileSz, ws);
-        if (fileOff == -1)
+        if (fileOff == UINT64_MAX)
           return false;
         m_fileOffsetsSizes[chKeyPath] = std::make_pair(fileOff, fileSz);
         std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(e.m_path)->beginReadStream();
@@ -518,7 +518,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
 
     size_t fileSz = ROUND_UP_32(ch.size());
     uint64_t fileOff = userAllocate(fileSz, ws);
-    if (fileOff == -1)
+    if (fileOff == UINT64_MAX)
       return false;
     m_fileOffsetsSizes[chKeyPath] = std::make_pair(fileOff, fileSz);
     std::unique_ptr<IPartReadStream> rs = ch.beginReadStream();
@@ -733,7 +733,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
     }
     size_t fileSz = ROUND_UP_32(dolStat.st_size);
     uint64_t fileOff = userAllocate(fileSz, ws);
-    if (fileOff == -1)
+    if (fileOff == UINT64_MAX)
       return false;
     m_dolOffset = fileOff;
     m_dolSize = fileSz;
@@ -770,11 +770,11 @@ uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(SystemSt
   Sstat dolStat;
   if (Stat(dolIn.c_str(), &dolStat)) {
     LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), dolIn.c_str());
-    return -1;
+    return UINT64_MAX;
   }
   uint64_t totalSz = ROUND_UP_32(dolStat.st_size);
   if (!RecursiveCalculateTotalSize(totalSz, nullptr, filesIn.c_str()))
-    return -1;
+    return UINT64_MAX;
   return totalSz;
 }
 
@@ -806,7 +806,7 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
     size_t xferSz = partIn->getDOLSize();
     size_t fileSz = ROUND_UP_32(xferSz);
     uint64_t fileOff = userAllocate(fileSz, ws);
-    if (fileOff == -1)
+    if (fileOff == UINT64_MAX)
       return false;
     m_dolOffset = fileOff;
     m_dolSize = fileSz;
@@ -842,7 +842,7 @@ uint64_t DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const IP
 
   uint64_t totalSz = ROUND_UP_32(partIn->getDOLSize());
   if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), filesIn.c_str()))
-    return -1;
+    return UINT64_MAX;
   return totalSz;
 }
 

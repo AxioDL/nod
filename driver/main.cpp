@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
 
   auto progFunc = [&](float prog, nod::SystemStringView name, size_t bytes) {
     nod::Printf(_SYS_STR("\r                                                                      "));
-    if (bytes != -1)
+    if (bytes != SIZE_MAX)
       nod::Printf(_SYS_STR("\r%g%% %s %" PRISize " B"), prog * 100.f, name.data(), bytes);
     else
       nod::Printf(_SYS_STR("\r%g%% %s"), prog * 100.f, name.data());
@@ -89,7 +89,7 @@ int main(int argc, char* argv[])
       return 1;
     }
 
-    if (nod::DiscBuilderGCN::CalculateTotalSizeRequired(argv[2]) == -1)
+    if (nod::DiscBuilderGCN::CalculateTotalSizeRequired(argv[2]) == UINT64_MAX)
       return 1;
 
     nod::EBuildResult ret;
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
     }
 
     bool dual = false;
-    if (nod::DiscBuilderWii::CalculateTotalSizeRequired(argv[2], dual) == -1)
+    if (nod::DiscBuilderWii::CalculateTotalSizeRequired(argv[2], dual) == UINT64_MAX)
       return 1;
 
     nod::EBuildResult ret;
@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
       return 1;
     }
 
-    if (nod::DiscMergerGCN::CalculateTotalSizeRequired(static_cast<nod::DiscGCN&>(*disc), argv[2]) == -1)
+    if (nod::DiscMergerGCN::CalculateTotalSizeRequired(static_cast<nod::DiscGCN&>(*disc), argv[2]) == UINT64_MAX)
       return 1;
 
     nod::EBuildResult ret;
@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
     }
 
     bool dual = false;
-    if (nod::DiscMergerWii::CalculateTotalSizeRequired(static_cast<nod::DiscWii&>(*disc), argv[2], dual) == -1)
+    if (nod::DiscMergerWii::CalculateTotalSizeRequired(static_cast<nod::DiscWii&>(*disc), argv[2], dual) == UINT64_MAX)
       return 1;
 
     nod::EBuildResult ret;

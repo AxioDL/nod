@@ -1010,7 +1010,7 @@ public:
           rs->read(tmdData.get(), tmdStat.st_size);
           ws.write(tmdData.get(), tmdStat.st_size);
           uint32_t tmdPadding = ROUND_UP_32(tmdStat.st_size) - tmdStat.st_size;
-          for (int i = 0; i < tmdPadding; ++i)
+          for (uint32_t i = 0; i < tmdPadding; ++i)
             ws.write("", 1);
 
           rs = NewFileIO(certIn.c_str())->beginReadStream();
@@ -1146,13 +1146,13 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn) {
     if (!ws)
       return EBuildResult::Failed;
     char zeroBytes[1024] = {};
-    for (uint64_t i = 0; i < m_discCapacity; i += 1024)
+    for (int64_t i = 0; i < m_discCapacity; i += 1024)
       ws->write(zeroBytes, 1024);
   }
 
   /* Assemble image */
   filledSz = pb.buildFromDirectory(dirIn);
-  if (filledSz == -1)
+  if (filledSz == UINT64_MAX)
     return EBuildResult::Failed;
   else if (filledSz >= uint64_t(m_discCapacity)) {
     LogModule.report(logvisor::Error, "data partition exceeds disc capacity");
@@ -1220,8 +1220,8 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn) {
 
 uint64_t DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer) {
   uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true);
-  if (sz == -1)
-    return -1;
+  if (sz == UINT64_MAX)
+    return UINT64_MAX;
   auto szDiv = std::lldiv(sz, 0x1F0000);
   if (szDiv.rem)
     ++szDiv.quot;
@@ -1230,7 +1230,7 @@ uint64_t DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool
   dualLayer = (sz > 0x118240000);
   if (sz > 0x1FB4E0000) {
     LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
-    return -1;
+    return UINT64_MAX;
   }
   return sz;
 }
@@ -1261,13 +1261,13 @@ EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn) {
     if (!ws)
       return EBuildResult::Failed;
     char zeroBytes[1024] = {};
-    for (uint64_t i = 0; i < m_builder.m_discCapacity; i += 1024)
+    for (int64_t i = 0; i < m_builder.m_discCapacity; i += 1024)
       ws->write(zeroBytes, 1024);
   }
 
   /* Assemble image */
   filledSz = pb.mergeFromDirectory(static_cast<PartitionWii*>(m_sourceDisc.getDataPartition()), dirIn);
-  if (filledSz == -1)
+  if (filledSz == UINT64_MAX)
     return EBuildResult::Failed;
   else if (filledSz >= uint64_t(m_builder.m_discCapacity)) {
     LogModule.report(logvisor::Error, "data partition exceeds disc capacity");
@@ -1328,8 +1328,8 @@ EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn) {
 
 uint64_t DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc, SystemStringView dirIn, bool& dualLayer) {
   uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
-  if (sz == -1)
-    return -1;
+  if (sz == UINT64_MAX)
+    return UINT64_MAX;
   auto szDiv = std::lldiv(sz, 0x1F0000);
   if (szDiv.rem)
     ++szDiv.quot;
@@ -1338,7 +1338,7 @@ uint64_t DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc, SystemSt
   dualLayer = (sz > 0x118240000);
   if (sz > 0x1FB4E0000) {
     LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
-    return -1;
+    return UINT64_MAX;
   }
   return sz;
 }

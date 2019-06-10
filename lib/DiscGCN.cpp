@@ -358,12 +358,12 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn) {
 
 uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn) {
   uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
-  if (sz == -1)
-    return -1;
+  if (sz == UINT64_MAX)
+    return UINT64_MAX;
   sz += 0x30000;
   if (sz > 0x57058000) {
     LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
-    return -1;
+    return UINT64_MAX;
   }
   return sz;
 }
@@ -403,8 +403,8 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn) {
 
 uint64_t DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn) {
   uint64_t sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
-  if (sz == -1)
-    return -1;
+  if (sz == UINT64_MAX)
+    return UINT64_MAX;
   sz += 0x30000;
   if (sz > 0x57058000) {
     LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
