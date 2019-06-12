@@ -16,8 +16,9 @@ add_library(nod
             nod.cpp
             ${PLAT_SRCS}
             ${NOD_HEADERS})
+target_link_libraries(nod PUBLIC logvisor)
 if(NOT MSVC AND NOT NX)
-set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)
+  set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)
 endif()
 
 # Associate target with export
