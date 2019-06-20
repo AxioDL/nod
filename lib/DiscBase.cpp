@@ -416,7 +416,7 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodesPre(const Node* n
 
   /* Write-through remaining dir nodes */
   for (const auto& p : dirNodes) {
-    recursiveMergeNodesPre(p.second, nullptr);
+    recursiveMergeNodesPre(p.second, {});
   }
 
   /* Write-through remaining file nodes */
@@ -501,7 +501,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
   for (const auto& p : dirNodes) {
     SystemStringConv sysName(p.second->getName());
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.c_str();
-    if (!recursiveMergeNodes(ws, system, p.second, nullptr, chKeyPath))
+    if (!recursiveMergeNodes(ws, system, p.second, {}, chKeyPath))
       return false;
   }
 
@@ -623,7 +623,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
     addBuildName(sysName.sys_str());
     incParents();
 
-    if (!recursiveMergeFST(p.second, nullptr,
+    if (!recursiveMergeFST(p.second, {},
                            [&]() {
                              m_buildNodes[dirNodeIdx].incrementLength();
                              incParents();
@@ -688,7 +688,7 @@ bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(uint64_t
 
   /* Write-through remaining dir nodes */
   for (const auto& p : dirNodes) {
-    if (!RecursiveCalculateTotalSize(totalSz, p.second, nullptr))
+    if (!RecursiveCalculateTotalSize(totalSz, p.second, {}))
       return false;
   }
 
