@@ -37,7 +37,7 @@ public:
     WriteStream(SystemStringView path, int64_t maxWriteSize, bool& err) : m_maxWriteSize(maxWriteSize) {
       fp = Fopen(path.data(), _SYS_STR("wb"));
       if (!fp) {
-        LogModule.report(logvisor::Error, _SYS_STR("unable to open '%s' for writing"), path.data());
+        LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to open '{}' for writing")), path);
         err = true;
       }
     }
@@ -53,14 +53,14 @@ public:
       FSeek(fp, offset, SEEK_SET);
       return;
     FailLoc:
-      LogModule.report(logvisor::Error, _SYS_STR("unable to open '%s' for writing"), path.data());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to open '{}' for writing")), path);
       err = true;
     }
     ~WriteStream() { fclose(fp); }
     uint64_t write(const void* buf, uint64_t length) {
       if (m_maxWriteSize >= 0) {
         if (FTell(fp) + length > m_maxWriteSize) {
-          LogModule.report(logvisor::Error, _SYS_STR("write operation exceeds file's %" PRIi64 "-byte limit"),
+          LogModule.report(logvisor::Error, fmt(_SYS_STR("write operation exceeds file's {}-byte limit")),
                            m_maxWriteSize);
           return 0;
         }
@@ -89,7 +89,7 @@ public:
       fp = Fopen(path.data(), _SYS_STR("rb"));
       if (!fp) {
         err = true;
-        LogModule.report(logvisor::Error, _SYS_STR("unable to open '%s' for reading"), path.data());
+        LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to open '{}' for reading")), path);
       }
     }
     ReadStream(SystemStringView path, uint64_t offset, bool& err) : ReadStream(path, err) {
@@ -107,11 +107,11 @@ public:
       while (length) {
         uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
         if (read(buf, thisSz) != thisSz) {
-          LogModule.report(logvisor::Error, "unable to read enough from file");
+          LogModule.report(logvisor::Error, fmt("unable to read enough from file"));
           return written;
         }
         if (discio.write(buf, thisSz) != thisSz) {
-          LogModule.report(logvisor::Error, "unable to write enough to disc");
+          LogModule.report(logvisor::Error, fmt("unable to write enough to disc"));
           return written;
         }
         length -= thisSz;

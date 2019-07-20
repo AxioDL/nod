@@ -41,12 +41,12 @@ auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
         lastIdx = idx;
         /* NOD provides I/O wrappers using wchar_t on Windows;
          * _S() conditionally makes string-literals wide */
-        nod::Printf(_S("\n"));
+        fmt::print(_S("\n"));
     }
     if (bytes != -1)
-        nod::Printf(_S("\r%s %" PRISize " B"), name.c_str(), bytes);
+        fmt::print(_S("\r{} {} B"), name, bytes);
     else
-        nod::Printf(_S("\r%s"), name.c_str());
+        fmt::print(_S("\r{}"), name);
     fflush(stdout);
 };
 

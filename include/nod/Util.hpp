@@ -261,7 +261,7 @@ static inline FILE* Fopen(const SystemChar* path, const SystemChar* mode, FileLo
                &ov);
 #else
     if (flock(fileno(fp), ((lock == FileLockType::Write) ? LOCK_EX : LOCK_SH) | LOCK_NB))
-      LogModule.report(logvisor::Error, "flock %s: %s", path, strerror(errno));
+      LogModule.report(logvisor::Error, fmt("flock {}: {}"), path, strerror(errno));
 #endif
   }
 
@@ -295,39 +295,24 @@ static inline bool CheckFreeSpace(const SystemChar* path, size_t reqSz) {
   wchar_t* end;
   DWORD ret = GetFullPathNameW(path, 1024, buf, &end);
   if (!ret || ret > 1024) {
-    LogModule.report(logvisor::Error, _SYS_STR("GetFullPathNameW %s"), path);
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("GetFullPathNameW {}")), path);
     return false;
   }
   if (end)
     end[0] = L'\0';
   if (!GetDiskFreeSpaceExW(buf, &freeBytes, nullptr, nullptr)) {
-    LogModule.report(logvisor::Error, _SYS_STR("GetDiskFreeSpaceExW %s: %d"), path, GetLastError());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("GetDiskFreeSpaceExW {}: {}")), path, GetLastError());
     return false;
   }
   return reqSz < freeBytes.QuadPart;
 #else
   struct statvfs svfs;
   if (statvfs(path, &svfs)) {
-    LogModule.report(logvisor::Error, "statvfs %s: %s", path, strerror(errno));
+    LogModule.report(logvisor::Error, fmt("statvfs {}: {}"), path, strerror(errno));
     return false;
   }
   return reqSz < svfs.f_frsize * svfs.f_bavail;
 #endif
-}
-
-#if __GNUC__
-__attribute__((__format__(__printf__, 1, 2)))
-#endif
-static inline void
-Printf(const SystemChar* fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-#if NOD_UCS2
-  vwprintf(fmt, args);
-#else
-  vprintf(fmt, args);
-#endif
-  va_end(args);
 }
 
 } // namespace nod

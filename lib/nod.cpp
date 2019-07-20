@@ -13,7 +13,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii) 
   /* Temporary file handle to determine image type */
   std::unique_ptr<IFileIO> fio = NewFileIO(path);
   if (!fio->exists()) {
-    LogModule.report(logvisor::Error, _SYS_STR("Unable to open '%s'"), path.data());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("Unable to open '{}'")), path);
     return {};
   }
   std::unique_ptr<IFileIO::IReadStream> rs = fio->beginReadStream();
@@ -24,7 +24,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii) 
   std::unique_ptr<IDiscIO> discIO;
   uint32_t magic = 0;
   if (rs->read(&magic, 4) != 4) {
-    LogModule.report(logvisor::Error, _SYS_STR("Unable to read magic from '%s'"), path.data());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("Unable to read magic from '{}'")), path);
     return {};
   }
 
@@ -47,7 +47,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii) 
   }
 
   if (!discIO) {
-    LogModule.report(logvisor::Error, _SYS_STR("'%s' is not a valid image"), path.data());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("'{}' is not a valid image")), path);
     return {};
   }
 

@@ -26,12 +26,12 @@ namespace nod {
 
 static const uint8_t InCo[4] = {0xB, 0xD, 0x9, 0xE}; /* Inverse Coefficients */
 
-static inline uint32_t pack(const uint8_t* b) {
+static uint32_t pack(const uint8_t* b) {
   /* pack bytes into a 32-bit Word */
   return ((uint32_t)b[3] << 24) | ((uint32_t)b[2] << 16) | ((uint32_t)b[1] << 8) | (uint32_t)b[0];
 }
 
-static inline void unpack(uint32_t a, uint8_t* b) {
+static void unpack(uint32_t a, uint8_t* b) {
   /* unpack bytes from a word */
   b[0] = (uint8_t)a;
   b[1] = (uint8_t)(a >> 8);
@@ -39,7 +39,7 @@ static inline void unpack(uint32_t a, uint8_t* b) {
   b[3] = (uint8_t)(a >> 24);
 }
 
-static inline uint8_t xtime(uint8_t a) { return ((a << 1) ^ (((a >> 7) & 1) * 0x11B)); }
+constexpr uint8_t xtime(uint8_t a) { return ((a << 1) ^ (((a >> 7) & 1) * 0x11B)); }
 
 static const struct SoftwareAESTables {
   uint8_t fbsub[256];

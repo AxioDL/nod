@@ -407,7 +407,7 @@ public:
 
       uint32_t h3;
       if (rs->read(&h3, 4) != 4) {
-        LogModule.report(logvisor::Error, _SYS_STR("unable to read H3 offset apploader"));
+        LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to read H3 offset apploader")));
         return {};
       }
       h3 = SBig(h3);
@@ -524,7 +524,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err) : DiscBase(std::move
       kind = part.partType;
       break;
     default:
-      LogModule.report(logvisor::Error, "invalid partition type %d", part.partType);
+      LogModule.report(logvisor::Error, fmt("invalid partition type {}"), part.partType);
       err = true;
       return;
     }
@@ -542,7 +542,7 @@ bool DiscWii::extractDiscHeaderFiles(SystemStringView basePath, const Extraction
   SystemString basePathStr(basePath);
 
   if (Mkdir((basePathStr + _SYS_STR("/disc")).c_str(), 0755) && errno != EEXIST) {
-    LogModule.report(logvisor::Error, _SYS_STR("unable to mkdir '%s/disc'"), basePathStr.c_str());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to mkdir '{}/disc'")), basePathStr);
     return false;
   }
 
@@ -660,7 +660,7 @@ public:
       }
 
       if (m_fio->write(m_buf, 0x200000) != 0x200000) {
-        LogModule.report(logvisor::Error, "unable to write full disc group");
+        LogModule.report(logvisor::Error, fmt("unable to write full disc group"));
         return;
       }
     }
@@ -669,7 +669,7 @@ public:
     PartWriteStream(PartitionBuilderWii& parent, uint64_t baseOffset, uint64_t offset, bool& err)
     : m_parent(parent), m_baseOffset(baseOffset), m_offset(offset) {
       if (offset % 0x1F0000) {
-        LogModule.report(logvisor::Error, "partition write stream MUST begin on 0x1F0000-aligned boundary");
+        LogModule.report(logvisor::Error, fmt("partition write stream MUST begin on 0x1F0000-aligned boundary"));
         err = true;
         return;
       }
@@ -739,13 +739,13 @@ public:
   uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws) {
     reqSz = ROUND_UP_32(reqSz);
     if (m_curUser + reqSz >= 0x1FB450000) {
-      LogModule.report(logvisor::Error, "partition exceeds maximum single-partition capacity");
+      LogModule.report(logvisor::Error, fmt("partition exceeds maximum single-partition capacity"));
       return -1;
     }
     uint64_t ret = m_curUser;
     PartWriteStream& cws = static_cast<PartWriteStream&>(ws);
     if (cws.m_offset > ret) {
-      LogModule.report(logvisor::Error, "partition overwrite error");
+      LogModule.report(logvisor::Error, fmt("partition overwrite error"));
       return -1;
     }
     while (cws.m_offset < ret)
@@ -821,7 +821,7 @@ public:
       fstSz = ROUND_UP_32(fstSz);
 
       if (fstOff + fstSz >= 0x1F0000) {
-        LogModule.report(logvisor::Error, "FST flows into user area (one or the other is too big)");
+        LogModule.report(logvisor::Error, fmt("FST flows into user area (one or the other is too big)"));
         return -1;
       }
 
@@ -837,7 +837,7 @@ public:
 
       size_t fstOffRel = fstOff - 0x2440;
       if (xferSz > fstOffRel) {
-        LogModule.report(logvisor::Error, "apploader unexpectedly flows into FST");
+        LogModule.report(logvisor::Error, fmt("apploader unexpectedly flows into FST"));
         return -1;
       }
       for (size_t i = 0; i < fstOffRel - xferSz; ++i)
@@ -921,7 +921,7 @@ public:
     SystemString ticketIn = basePath + _SYS_STR("/ticket.bin");
     Sstat theStat;
     if (Stat(ticketIn.c_str(), &theStat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), ticketIn.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), ticketIn);
       return -1;
     }
 
@@ -929,7 +929,7 @@ public:
     SystemString tmdIn = basePath + _SYS_STR("/tmd.bin");
     Sstat tmdStat;
     if (Stat(tmdIn.c_str(), &tmdStat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), tmdIn.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), tmdIn);
       return -1;
     }
 
@@ -937,7 +937,7 @@ public:
     SystemString certIn = basePath + _SYS_STR("/cert.bin");
     Sstat certStat;
     if (Stat(certIn.c_str(), &certStat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), certIn.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), certIn);
       return -1;
     }
 
@@ -945,7 +945,7 @@ public:
     SystemString apploaderIn = basePath + _SYS_STR("/sys/apploader.img");
     Sstat apploaderStat;
     if (Stat(apploaderIn.c_str(), &apploaderStat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), apploaderIn.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), apploaderIn);
       return -1;
     }
 
@@ -953,7 +953,7 @@ public:
     SystemString bootIn = basePath + _SYS_STR("/sys/boot.bin");
     Sstat bootStat;
     if (Stat(bootIn.c_str(), &bootStat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), bootIn.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), bootIn);
       return -1;
     }
 
@@ -961,7 +961,7 @@ public:
     SystemString bi2In = basePath + _SYS_STR("/sys/bi2.bin");
     Sstat bi2Stat;
     if (Stat(bi2In.c_str(), &bi2Stat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), bi2In.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), bi2In);
       return -1;
     }
 
@@ -1054,7 +1054,7 @@ public:
             cws.write(buf, rdSz);
             xferSz += rdSz;
             if (0x2440 + xferSz >= 0x1F0000) {
-              LogModule.report(logvisor::Error, "apploader flows into user area (one or the other is too big)");
+              LogModule.report(logvisor::Error, fmt("apploader flows into user area (one or the other is too big)"));
               return false;
             }
             m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderIn, xferSz);
@@ -1112,7 +1112,7 @@ public:
           cws.write(apploaderBuf.get(), apploaderSz);
           xferSz += apploaderSz;
           if (0x2440 + xferSz >= 0x1F0000) {
-            LogModule.report(logvisor::Error, "apploader flows into user area (one or the other is too big)");
+            LogModule.report(logvisor::Error, fmt("apploader flows into user area (one or the other is too big)"));
             return false;
           }
           m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderName, xferSz);
@@ -1136,7 +1136,7 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn) {
     return EBuildResult::Failed;
 
   if (!CheckFreeSpace(m_outPath.c_str(), m_discCapacity)) {
-    LogModule.report(logvisor::Error, _SYS_STR("not enough free disk space for %s"), m_outPath.c_str());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("not enough free disk space for {}")), m_outPath);
     return EBuildResult::DiskFull;
   }
   m_progressCB(getProgressFactor(), _SYS_STR("Preallocating image"), -1);
@@ -1155,7 +1155,7 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn) {
   if (filledSz == UINT64_MAX)
     return EBuildResult::Failed;
   else if (filledSz >= uint64_t(m_discCapacity)) {
-    LogModule.report(logvisor::Error, "data partition exceeds disc capacity");
+    LogModule.report(logvisor::Error, fmt("data partition exceeds disc capacity"));
     return EBuildResult::Failed;
   }
 
@@ -1229,7 +1229,7 @@ uint64_t DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool
   sz += 0x200000;
   dualLayer = (sz > 0x118240000);
   if (sz > 0x1FB4E0000) {
-    LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("disc capacity exceeded [{} / {}]")), sz, 0x1FB4E0000);
     return UINT64_MAX;
   }
   return sz;
@@ -1251,7 +1251,7 @@ EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn) {
     return EBuildResult::Failed;
 
   if (!CheckFreeSpace(m_builder.m_outPath.c_str(), m_builder.m_discCapacity)) {
-    LogModule.report(logvisor::Error, _SYS_STR("not enough free disk space for %s"), m_builder.m_outPath.c_str());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("not enough free disk space for {}")), m_builder.m_outPath);
     return EBuildResult::DiskFull;
   }
   m_builder.m_progressCB(m_builder.getProgressFactor(), _SYS_STR("Preallocating image"), -1);
@@ -1270,7 +1270,7 @@ EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn) {
   if (filledSz == UINT64_MAX)
     return EBuildResult::Failed;
   else if (filledSz >= uint64_t(m_builder.m_discCapacity)) {
-    LogModule.report(logvisor::Error, "data partition exceeds disc capacity");
+    LogModule.report(logvisor::Error, fmt("data partition exceeds disc capacity"));
     return EBuildResult::Failed;
   }
 
@@ -1337,7 +1337,7 @@ uint64_t DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc, SystemSt
   sz += 0x200000;
   dualLayer = (sz > 0x118240000);
   if (sz > 0x1FB4E0000) {
-    LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x1FB4E0000);
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("disc capacity exceeded [{} / {}]")), sz, 0x1FB4E0000);
     return UINT64_MAX;
   }
   return sz;

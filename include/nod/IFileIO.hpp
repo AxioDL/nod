@@ -22,11 +22,11 @@ public:
         uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
         uint64_t readSz = discio.read(buf, thisSz);
         if (thisSz != readSz) {
-          LogModule.report(logvisor::Error, "unable to read enough from disc");
+          LogModule.report(logvisor::Error, fmt("unable to read enough from disc"));
           return read;
         }
         if (write(buf, readSz) != readSz) {
-          LogModule.report(logvisor::Error, "unable to write in file");
+          LogModule.report(logvisor::Error, fmt("unable to write in file"));
           return read;
         }
         length -= thisSz;
@@ -42,11 +42,11 @@ public:
         uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
         uint64_t readSz = discio.read(buf, thisSz);
         if (thisSz != readSz) {
-          LogModule.report(logvisor::Error, "unable to read enough from disc");
+          LogModule.report(logvisor::Error, fmt("unable to read enough from disc"));
           return read;
         }
         if (write(buf, readSz) != readSz) {
-          LogModule.report(logvisor::Error, "unable to write in file");
+          LogModule.report(logvisor::Error, fmt("unable to write in file"));
           return read;
         }
         length -= thisSz;

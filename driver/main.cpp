@@ -4,13 +4,13 @@
 #include "nod/nod.hpp"
 
 static void printHelp() {
-  fprintf(stderr,
+  fmt::print(stderr, fmt(
           "Usage:\n"
           "  nodtool extract [-f] <image-in> [<dir-out>]\n"
           "  nodtool makegcn <fsroot-in> [<image-out>]\n"
           "  nodtool makewii <fsroot-in> [<image-out>]\n"
           "  nodtool mergegcn <fsroot-in> <image-in> [<image-out>]\n"
-          "  nodtool mergewii <fsroot-in> <image-in> [<image-out>]\n");
+          "  nodtool mergewii <fsroot-in> <image-in> [<image-out>]\n"));
 }
 
 #if NOD_UCS2
@@ -40,8 +40,8 @@ int main(int argc, char* argv[])
   bool verbose = false;
   nod::ExtractionContext ctx = {true, [&](std::string_view str, float c) {
                                   if (verbose)
-                                    fprintf(stderr, "Current node: %s, Extraction %g%% Complete\n", str.data(),
-                                            c * 100.f);
+                                    fmt::print(stderr, fmt("Current node: {}, Extraction {:g}% Complete\n"), str,
+                                               c * 100.f);
                                 }};
   const nod::SystemChar* inDir = nullptr;
   const nod::SystemChar* outDir = _SYS_STR(".");
@@ -59,11 +59,11 @@ int main(int argc, char* argv[])
   }
 
   auto progFunc = [&](float prog, nod::SystemStringView name, size_t bytes) {
-    nod::Printf(_SYS_STR("\r                                                                      "));
+    fmt::print(fmt(_SYS_STR("\r                                                                      ")));
     if (bytes != SIZE_MAX)
-      nod::Printf(_SYS_STR("\r%g%% %s %" PRISize " B"), prog * 100.f, name.data(), bytes);
+      fmt::print(fmt(_SYS_STR("\r{:g}% {} {} B")), prog * 100.f, name, bytes);
     else
-      nod::Printf(_SYS_STR("\r%g%% %s"), prog * 100.f, name.data());
+      fmt::print(fmt(_SYS_STR("\r{:g}% {}")), prog * 100.f, name);
     fflush(stdout);
   };
 
@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
     /* Pre-validate path */
     nod::Sstat theStat;
     if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as directory"), argv[2]);
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as directory")), argv[2]);
       return 1;
     }
 
@@ -104,14 +104,14 @@ int main(int argc, char* argv[])
       ret = b.buildFromDirectory(argv[2]);
     }
 
-    printf("\n");
+    fmt::print(fmt("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (!strcasecmp(argv[1], _SYS_STR("makewii"))) {
     /* Pre-validate path */
     nod::Sstat theStat;
     if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as directory"), argv[4]);
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as directory")), argv[4]);
       return 1;
     }
 
@@ -131,29 +131,29 @@ int main(int argc, char* argv[])
       ret = b.buildFromDirectory(argv[2]);
     }
 
-    printf("\n");
+    fmt::print(fmt("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (!strcasecmp(argv[1], _SYS_STR("mergegcn"))) {
     /* Pre-validate paths */
     nod::Sstat theStat;
     if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as directory"), argv[2]);
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as directory")), argv[2]);
       return 1;
     }
     if (nod::Stat(argv[3], &theStat) || !S_ISREG(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as file"), argv[3]);
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as file")), argv[3]);
       return 1;
     }
 
     bool isWii;
     std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(argv[3], isWii);
     if (!disc) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("unable to open image %s"), argv[3]);
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to open image {}")), argv[3]);
       return 1;
     }
     if (isWii) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("Wii images should be merged with 'mergewii'"));
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("Wii images should be merged with 'mergewii'")));
       return 1;
     }
 
@@ -172,29 +172,29 @@ int main(int argc, char* argv[])
       ret = b.mergeFromDirectory(argv[2]);
     }
 
-    printf("\n");
+    fmt::print(fmt("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (!strcasecmp(argv[1], _SYS_STR("mergewii"))) {
     /* Pre-validate paths */
     nod::Sstat theStat;
     if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as directory"), argv[2]);
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as directory")), argv[2]);
       return 1;
     }
     if (nod::Stat(argv[3], &theStat) || !S_ISREG(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s as file"), argv[3]);
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as file")), argv[3]);
       return 1;
     }
 
     bool isWii;
     std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(argv[3], isWii);
     if (!disc) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("unable to open image %s"), argv[3]);
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to open image {}")), argv[3]);
       return 1;
     }
     if (!isWii) {
-      nod::LogModule.report(logvisor::Error, _SYS_STR("GameCube images should be merged with 'mergegcn'"));
+      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("GameCube images should be merged with 'mergegcn'")));
       return 1;
     }
 
@@ -214,7 +214,7 @@ int main(int argc, char* argv[])
       ret = b.mergeFromDirectory(argv[2]);
     }
 
-    printf("\n");
+    fmt::print(fmt("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else {
@@ -222,6 +222,6 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  nod::LogModule.report(logvisor::Info, _SYS_STR("Success!"));
+  nod::LogModule.report(logvisor::Info, fmt(_SYS_STR("Success!")));
   return 0;
 }

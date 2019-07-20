@@ -155,7 +155,7 @@ public:
     m_curUser -= reqSz;
     m_curUser &= 0xfffffffffffffff0;
     if (m_curUser < 0x30000) {
-      LogModule.report(logvisor::Error, "user area low mark reached");
+      LogModule.report(logvisor::Error, fmt("user area low mark reached"));
       return -1;
     }
     static_cast<PartWriteStream&>(ws).seek(m_curUser);
@@ -195,7 +195,7 @@ public:
     fstSz = ROUND_UP_32(fstSz);
 
     if (fstOff + fstSz >= m_curUser) {
-      LogModule.report(logvisor::Error, "FST flows into user area (one or the other is too big)");
+      LogModule.report(logvisor::Error, fmt("FST flows into user area (one or the other is too big)"));
       return false;
     }
 
@@ -224,7 +224,7 @@ public:
     SystemString apploaderIn = dirStr + _SYS_STR("/sys/apploader.img");
     Sstat apploaderStat;
     if (Stat(apploaderIn.c_str(), &apploaderStat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), apploaderIn.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), apploaderIn);
       return false;
     }
 
@@ -232,7 +232,7 @@ public:
     SystemString bootIn = dirStr + _SYS_STR("/sys/boot.bin");
     Sstat bootStat;
     if (Stat(bootIn.c_str(), &bootStat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), bootIn.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), bootIn);
       return false;
     }
 
@@ -240,7 +240,7 @@ public:
     SystemString bi2In = dirStr + _SYS_STR("/sys/bi2.bin");
     Sstat bi2Stat;
     if (Stat(bi2In.c_str(), &bi2Stat)) {
-      LogModule.report(logvisor::Error, _SYS_STR("unable to stat %s"), bi2In.c_str());
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {}")), bi2In);
       return false;
     }
 
@@ -282,7 +282,7 @@ public:
             ws.write(buf, rdSz);
             xferSz += rdSz;
             if (0x2440 + xferSz >= m_curUser) {
-              LogModule.report(logvisor::Error, "apploader flows into user area (one or the other is too big)");
+              LogModule.report(logvisor::Error, fmt("apploader flows into user area (one or the other is too big)"));
               return false;
             }
             m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderIn, xferSz);
@@ -324,7 +324,7 @@ public:
           ws.write(apploaderBuf.get(), apploaderSz);
           xferSz += apploaderSz;
           if (0x2440 + xferSz >= m_curUser) {
-            LogModule.report(logvisor::Error, "apploader flows into user area (one or the other is too big)");
+            LogModule.report(logvisor::Error, fmt("apploader flows into user area (one or the other is too big)"));
             return false;
           }
           m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderName, xferSz);
@@ -338,7 +338,7 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn) {
   if (!m_fileIO->beginWriteStream())
     return EBuildResult::Failed;
   if (!CheckFreeSpace(m_outPath.c_str(), 0x57058000)) {
-    LogModule.report(logvisor::Error, _SYS_STR("not enough free disk space for %s"), m_outPath.c_str());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("not enough free disk space for {}")), m_outPath);
     return EBuildResult::DiskFull;
   }
   m_progressCB(getProgressFactor(), _SYS_STR("Preallocating image"), -1);
@@ -362,7 +362,7 @@ uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn) {
     return UINT64_MAX;
   sz += 0x30000;
   if (sz > 0x57058000) {
-    LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("disc capacity exceeded [{} / {}]")), sz, 0x57058000);
     return UINT64_MAX;
   }
   return sz;
@@ -381,7 +381,7 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn) {
   if (!m_builder.getFileIO().beginWriteStream())
     return EBuildResult::Failed;
   if (!CheckFreeSpace(m_builder.m_outPath.c_str(), 0x57058000)) {
-    LogModule.report(logvisor::Error, _SYS_STR("not enough free disk space for %s"), m_builder.m_outPath.c_str());
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("not enough free disk space for {}")), m_builder.m_outPath);
     return EBuildResult::DiskFull;
   }
   m_builder.m_progressCB(m_builder.getProgressFactor(), _SYS_STR("Preallocating image"), -1);
@@ -407,7 +407,7 @@ uint64_t DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemSt
     return UINT64_MAX;
   sz += 0x30000;
   if (sz > 0x57058000) {
-    LogModule.report(logvisor::Error, _SYS_STR("disc capacity exceeded [%" PRIu64 " / %" PRIu64 "]"), sz, 0x57058000);
+    LogModule.report(logvisor::Error, fmt(_SYS_STR("disc capacity exceeded [{} / {}]")), sz, 0x57058000);
     return -1;
   }
   return sz;
