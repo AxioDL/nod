@@ -6,20 +6,16 @@ namespace nod {
 
 struct CaseInsensitiveCompare {
   bool operator()(std::string_view lhs, std::string_view rhs) const {
-#if _WIN32
-    if (_stricmp(lhs.data(), rhs.data()) < 0)
-#else
-    if (strcasecmp(lhs.data(), rhs.data()) < 0)
-#endif
-      return true;
-    return false;
+    return std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](char lhs, char rhs) {
+      return std::tolower(static_cast<unsigned char>(lhs)) < std::tolower(static_cast<unsigned char>(rhs));
+    });
   }
 
 #if _WIN32
   bool operator()(std::wstring_view lhs, std::wstring_view rhs) const {
-    if (_wcsicmp(lhs.data(), rhs.data()) < 0)
-      return true;
-    return false;
+    return std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](wchar_t lhs, wchar_t rhs) {
+      return std::towlower(lhs) < std::towlower(rhs);
+    });
   }
 #endif
 };

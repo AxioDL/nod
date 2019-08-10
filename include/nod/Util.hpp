@@ -1,7 +1,7 @@
 #pragma once
 
 #if _WIN32 && UNICODE
-#include <wctype.h>
+#include <cwctype>
 #include <direct.h>
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
@@ -16,20 +16,19 @@
 #define WINDOWS_STORE 0
 #endif
 #else
-#include <ctype.h>
-#include <sys/file.h>
-#include <unistd.h>
+#include <cctype>
 #include <cerrno>
+#include <sys/file.h>
 #include <sys/param.h>
 #include <sys/statvfs.h>
-
+#include <unistd.h>
 #endif
 #include <sys/stat.h>
 
+#include <algorithm>
+#include <cstring>
 #include <string>
 #include <string_view>
-#include <cstring>
-#include <algorithm>
 #include "logvisor/logvisor.hpp"
 #ifdef _MSC_VER
 #pragma warning(disable : 4996)
