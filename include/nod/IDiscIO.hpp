@@ -32,11 +32,11 @@ public:
 };
 
 struct IPartReadStream : IReadStream {
-  virtual ~IPartReadStream() = default;
+  ~IPartReadStream() override = default;
 };
 
 struct IPartWriteStream : IWriteStream {
-  virtual ~IPartWriteStream() = default;
+  ~IPartWriteStream() override = default;
   virtual void close() = 0;
   virtual uint64_t position() const = 0;
 };
@@ -49,15 +49,15 @@ class AthenaPartReadStream : public athena::io::IStreamReader {
 public:
   AthenaPartReadStream(std::unique_ptr<IPartReadStream>&& rs) : m_rs(std::move(rs)) {}
 
-  inline void seek(atInt64 off, athena::SeekOrigin origin) {
+  void seek(atInt64 off, athena::SeekOrigin origin) override {
     if (origin == athena::Begin)
       m_rs->seek(off, SEEK_SET);
     else if (origin == athena::Current)
       m_rs->seek(off, SEEK_CUR);
   }
-  inline atUint64 position() const { return m_rs->position(); }
-  inline atUint64 length() const { return 0; }
-  inline atUint64 readUBytesToBuf(void* buf, atUint64 sz) {
+  atUint64 position() const override { return m_rs->position(); }
+  atUint64 length() const override { return 0; }
+  atUint64 readUBytesToBuf(void* buf, atUint64 sz) override {
     m_rs->read(buf, sz);
     return sz;
   }

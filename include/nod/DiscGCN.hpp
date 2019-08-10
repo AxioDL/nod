@@ -11,7 +11,7 @@ class DiscGCN : public DiscBase {
 
 public:
   DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err);
-  bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const;
+  bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const override;
 };
 
 class DiscBuilderGCN : public DiscBuilderBase {

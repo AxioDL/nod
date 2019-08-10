@@ -345,7 +345,7 @@ public:
       decryptBlock();
       m_curBlock = block;
     }
-    void seek(int64_t offset, int whence) {
+    void seek(int64_t offset, int whence) override {
       if (whence == SEEK_SET)
         m_offset = offset;
       else if (whence == SEEK_CUR)
@@ -359,8 +359,8 @@ public:
         m_curBlock = block;
       }
     }
-    uint64_t position() const { return m_offset; }
-    uint64_t read(void* buf, uint64_t length) {
+    uint64_t position() const override { return m_offset; }
+    uint64_t read(void* buf, uint64_t length) override {
       size_t block = m_offset / 0x7c00;
       size_t cacheOffset = m_offset % 0x7c00;
       uint64_t cacheSize;
@@ -389,7 +389,7 @@ public:
     }
   };
 
-  std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const {
+  std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const override {
     bool Err = false;
     auto ret = std::unique_ptr<IPartReadStream>(new PartReadStream(*this, m_dataOff, offset, Err));
     if (Err)
@@ -397,7 +397,7 @@ public:
     return ret;
   }
 
-  uint64_t normalizeOffset(uint64_t anOffset) const { return anOffset << 2; }
+  uint64_t normalizeOffset(uint64_t anOffset) const override { return anOffset << 2; }
 
   std::unique_ptr<uint8_t[]> readPartitionHeaderBuf(size_t& szOut) const {
     {
@@ -424,7 +424,7 @@ public:
     return buf;
   }
 
-  bool extractCryptoFiles(SystemStringView basePath, const ExtractionContext& ctx) const {
+  bool extractCryptoFiles(SystemStringView basePath, const ExtractionContext& ctx) const override {
     Sstat theStat;
     SystemString basePathStr(basePath);
 
@@ -679,8 +679,8 @@ public:
         err = true;
       m_curGroup = group;
     }
-    ~PartWriteStream() { close(); }
-    void close() {
+    ~PartWriteStream() override { PartWriteStream::close(); }
+    void close() override {
       if (m_closed)
         return;
       m_closed = true;
@@ -692,8 +692,8 @@ public:
       encryptGroup(m_parent.m_h3[m_curGroup]);
       m_fio.reset();
     }
-    uint64_t position() const { return m_offset; }
-    uint64_t write(const void* buf, uint64_t length) {
+    uint64_t position() const override { return m_offset; }
+    uint64_t write(const void* buf, uint64_t length) override {
       size_t group = m_offset / 0x1F0000;
       size_t block = (m_offset - group * 0x1F0000) / 0x7c00;
       size_t cacheOffset = m_offset % 0x7c00;
@@ -736,7 +736,7 @@ public:
 
   uint64_t getCurUserEnd() const { return m_curUser; }
 
-  uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws) {
+  uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws) override {
     reqSz = ROUND_UP_32(reqSz);
     if (m_curUser + reqSz >= 0x1FB450000) {
       LogModule.report(logvisor::Error, fmt("partition exceeds maximum single-partition capacity"));
@@ -754,9 +754,9 @@ public:
     return ret;
   }
 
-  uint32_t packOffset(uint64_t offset) const { return uint32_t(offset >> uint64_t(2)); }
+  uint32_t packOffset(uint64_t offset) const override { return uint32_t(offset >> uint64_t(2)); }
 
-  std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset) {
+  std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset) override {
     bool Err = false;
     std::unique_ptr<IPartWriteStream> ret =
         std::make_unique<PartWriteStream>(*this, m_baseOffset + m_userOffset, offset, Err);

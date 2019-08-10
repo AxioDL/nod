@@ -232,7 +232,7 @@ public:
     }
 
   public:
-    uint64_t read(void* buf, uint64_t length) {
+    uint64_t read(void* buf, uint64_t length) override {
       uint8_t extra[4];
       uint64_t rem_offset = m_offset % 4;
       if (rem_offset) {
@@ -249,8 +249,8 @@ public:
       m_offset += length;
       return length;
     }
-    uint64_t position() const { return m_offset; }
-    void seek(int64_t offset, int whence) {
+    uint64_t position() const override { return m_offset; }
+    void seek(int64_t offset, int whence) override {
       if (whence == SEEK_SET)
         m_offset = offset;
       else if (whence == SEEK_CUR)
@@ -258,7 +258,7 @@ public:
     }
   };
 
-  std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const {
+  std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const override {
     bool Err = false;
     auto ret = std::unique_ptr<IReadStream>(new ReadStream(*this, NewFileIO(filepath)->beginReadStream(), offset, Err));
     if (Err)
@@ -266,7 +266,9 @@ public:
     return ret;
   }
 
-  std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const { return std::unique_ptr<IWriteStream>(); }
+  std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const override {
+    return std::unique_ptr<IWriteStream>();
+  }
 };
 
 std::unique_ptr<IDiscIO> NewDiscIOWBFS(SystemStringView path) { return std::unique_ptr<IDiscIO>(new DiscIOWBFS(path)); }
