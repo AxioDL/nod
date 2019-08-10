@@ -1,9 +1,3 @@
-if(NOT WIN32)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-multichar")
-set(PLAT_SRCS FileIOFILE.cpp)
-else()
-set(PLAT_SRCS FileIOWin32.cpp)
-endif()
 add_library(nod
             aes.cpp
             sha1.c
@@ -14,9 +8,16 @@ add_library(nod
             DiscWii.cpp
             DirectoryEnumerator.cpp
             nod.cpp
-            ${PLAT_SRCS}
             ${NOD_HEADERS})
 target_link_libraries(nod PUBLIC logvisor)
+
+if(WIN32)
+  target_sources(nod PRIVATE FileIOWin32.cpp)
+else()
+  target_compile_options(nod PRIVATE -Wno-multichar)
+  target_sources(nod PRIVATE FileIOFILE.cpp)
+endif()
+
 if(NOT MSVC AND NOT NX)
   set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)
 endif()
