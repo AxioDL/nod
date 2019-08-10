@@ -13,7 +13,7 @@ class FileIOWin32 : public IFileIO {
 public:
   FileIOWin32(SystemStringView path, int64_t maxWriteSize) : m_path(path), m_maxWriteSize(maxWriteSize) {}
 
-  bool exists() {
+  bool exists() override {
 #if !WINDOWS_STORE
     HANDLE fp = CreateFileW(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                             FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -26,7 +26,7 @@ public:
     return true;
   }
 
-  uint64_t size() {
+  uint64_t size() override {
 #if !WINDOWS_STORE
     HANDLE fp = CreateFileW(m_path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                             FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -76,8 +76,8 @@ public:
       lioffset.QuadPart = offset;
       SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
     }
-    ~WriteStream() { CloseHandle(fp); }
-    uint64_t write(const void* buf, uint64_t length) {
+    ~WriteStream() override { CloseHandle(fp); }
+    uint64_t write(const void* buf, uint64_t length) override {
       if (m_maxWriteSize >= 0) {
         LARGE_INTEGER li = {};
         LARGE_INTEGER res;
@@ -94,14 +94,14 @@ public:
       return ret;
     }
   };
-  std::unique_ptr<IWriteStream> beginWriteStream() const {
+  std::unique_ptr<IWriteStream> beginWriteStream() const override {
     bool Err = false;
     auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, m_maxWriteSize, Err));
     if (Err)
       return {};
     return ret;
   }
-  std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const {
+  std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const override {
     bool Err = false;
     auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset, m_maxWriteSize, Err));
     if (Err)
@@ -130,24 +130,24 @@ public:
       lioffset.QuadPart = offset;
       SetFilePointerEx(fp, lioffset, nullptr, FILE_BEGIN);
     }
-    ~ReadStream() { CloseHandle(fp); }
-    void seek(int64_t offset, int whence) {
+    ~ReadStream() override { CloseHandle(fp); }
+    void seek(int64_t offset, int whence) override {
       LARGE_INTEGER li;
       li.QuadPart = offset;
       SetFilePointerEx(fp, li, nullptr, whence);
     }
-    uint64_t position() const {
+    uint64_t position() const override {
       LARGE_INTEGER li = {};
       LARGE_INTEGER res;
       SetFilePointerEx(fp, li, &res, FILE_CURRENT);
       return res.QuadPart;
     }
-    uint64_t read(void* buf, uint64_t length) {
+    uint64_t read(void* buf, uint64_t length) override {
       DWORD ret = 0;
       ReadFile(fp, buf, length, &ret, nullptr);
       return ret;
     }
-    uint64_t copyToDisc(IPartWriteStream& discio, uint64_t length) {
+    uint64_t copyToDisc(IPartWriteStream& discio, uint64_t length) override {
       uint64_t written = 0;
       uint8_t buf[0x7c00];
       while (length) {
@@ -166,14 +166,14 @@ public:
       return written;
     }
   };
-  std::unique_ptr<IReadStream> beginReadStream() const {
+  std::unique_ptr<IReadStream> beginReadStream() const override {
     bool Err = false;
     auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, Err));
     if (Err)
       return {};
     return ret;
   }
-  std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const {
+  std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const override {
     bool Err = false;
     auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, offset, Err));
     if (Err)

@@ -9,7 +9,7 @@ class DiscWii : public DiscBase {
 public:
   DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err);
   DiscBuilderWii makeMergeBuilder(SystemStringView outPath, bool dualLayer, FProgress progressCB);
-  bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const;
+  bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const override;
 };
 
 class DiscBuilderWii : public DiscBuilderBase {

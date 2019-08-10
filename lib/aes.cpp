@@ -173,9 +173,9 @@ protected:
   void _decrypt(uint8_t* buff);
 
 public:
-  void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len);
-  void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len);
-  void setKey(const uint8_t* key);
+  void encrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len) override;
+  void decrypt(const uint8_t* iv, const uint8_t* inbuf, uint8_t* outbuf, size_t len) override;
+  void setKey(const uint8_t* key) override;
 };
 
 void SoftwareAES::gkey(int nb, int nk, const uint8_t* key) {

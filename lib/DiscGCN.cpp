@@ -52,7 +52,7 @@ public:
       m_dio->read(m_buf, BUFFER_SZ);
       m_curBlock = block;
     }
-    void seek(int64_t offset, int whence) {
+    void seek(int64_t offset, int whence) override {
       if (whence == SEEK_SET)
         m_offset = offset;
       else if (whence == SEEK_CUR)
@@ -66,8 +66,8 @@ public:
         m_curBlock = block;
       }
     }
-    uint64_t position() const { return m_offset; }
-    uint64_t read(void* buf, uint64_t length) {
+    uint64_t position() const override { return m_offset; }
+    uint64_t read(void* buf, uint64_t length) override {
       size_t block = m_offset / BUFFER_SZ;
       size_t cacheOffset = m_offset % BUFFER_SZ;
       uint64_t cacheSize;
@@ -96,7 +96,7 @@ public:
     }
   };
 
-  std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const {
+  std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const override {
     bool Err = false;
     auto ret = std::unique_ptr<IPartReadStream>(new PartReadStream(*this, offset, Err));
     if (Err)
@@ -135,9 +135,9 @@ public:
       if (!m_fio)
         err = true;
     }
-    void close() { m_fio.reset(); }
-    uint64_t position() const { return m_offset; }
-    uint64_t write(const void* buf, uint64_t length) {
+    void close() override { m_fio.reset(); }
+    uint64_t position() const override { return m_offset; }
+    uint64_t write(const void* buf, uint64_t length) override {
       uint64_t len = m_fio->write(buf, length);
       m_offset += len;
       return len;
@@ -151,7 +151,7 @@ public:
   PartitionBuilderGCN(DiscBuilderBase& parent)
   : DiscBuilderBase::PartitionBuilderBase(parent, PartitionKind::Data, false) {}
 
-  uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws) {
+  uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws) override {
     m_curUser -= reqSz;
     m_curUser &= 0xfffffffffffffff0;
     if (m_curUser < 0x30000) {
@@ -162,9 +162,9 @@ public:
     return m_curUser;
   }
 
-  uint32_t packOffset(uint64_t offset) const { return offset; }
+  uint32_t packOffset(uint64_t offset) const override { return offset; }
 
-  std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset) {
+  std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset) override {
     bool Err = false;
     std::unique_ptr<IPartWriteStream> ret = std::make_unique<PartWriteStream>(*this, offset, Err);
     if (Err)
