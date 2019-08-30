@@ -1,14 +1,26 @@
 add_library(nod
-            aes.cpp
-            sha1.c
-            DiscBase.cpp
-            DiscGCN.cpp
-            DiscIOISO.cpp
-            DiscIOWBFS.cpp
-            DiscWii.cpp
-            DirectoryEnumerator.cpp
-            nod.cpp
-            ${NOD_HEADERS})
+  aes.cpp
+  sha1.c
+
+  DirectoryEnumerator.cpp
+  DiscBase.cpp
+  DiscGCN.cpp
+  DiscIOISO.cpp
+  DiscIOWBFS.cpp
+  DiscWii.cpp
+  nod.cpp
+
+  ../include/nod/aes.hpp
+  ../include/nod/DirectoryEnumerator.hpp
+  ../include/nod/DiscBase.hpp
+  ../include/nod/DiscGCN.hpp
+  ../include/nod/DiscWii.hpp
+  ../include/nod/IDiscIO.hpp
+  ../include/nod/IFileIO.hpp
+  ../include/nod/nod.hpp
+  ../include/nod/sha1.h
+  ../include/nod/Util.hpp
+)
 target_link_libraries(nod PUBLIC logvisor)
 
 if(WIN32)

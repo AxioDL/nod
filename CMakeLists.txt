@@ -17,8 +17,6 @@ if (NOT TARGET logvisor)
   add_subdirectory(logvisor)
 endif()
 
-file(GLOB NOD_HEADERS include/nod/*.h*)
-
 add_subdirectory(lib)
 add_subdirectory(driver)
 target_include_directories(nod PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
