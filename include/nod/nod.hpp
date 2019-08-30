@@ -1,9 +1,10 @@
 #pragma once
 
-#include <memory>
 #include <functional>
-#include "logvisor/logvisor.hpp"
-#include "Util.hpp"
+#include <memory>
+#include <string>
+
+#include "nod/Util.hpp"
 
 namespace nod {
 
@@ -18,7 +19,3 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path);
 std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii);
 
 } // namespace nod
-
-#include "DiscGCN.hpp"
-#include "DiscWii.hpp"
-#include "IDiscIO.hpp"

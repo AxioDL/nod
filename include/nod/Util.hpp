@@ -29,7 +29,7 @@
 #include <cstring>
 #include <string>
 #include <string_view>
-#include "logvisor/logvisor.hpp"
+#include <logvisor/logvisor.hpp>
 #ifdef _MSC_VER
 #pragma warning(disable : 4996)
 

@@ -1,14 +1,22 @@
 #include "nod/DiscBase.hpp"
-#include "nod/IFileIO.hpp"
-#include "nod/DirectoryEnumerator.hpp"
-#include "nod/nod.hpp"
 
-#include <cstdio>
 #include <cerrno>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <unordered_map>
+
+#include "nod/DirectoryEnumerator.hpp"
+#include "nod/IFileIO.hpp"
+#include "nod/nod.hpp"
+#include "nod/Util.hpp"
 
 #ifndef _WIN32
 #include <unistd.h>
 #else
+
+#include <logvisor/logvisor.hpp>
+
 static void* memmem(const void* haystack, size_t hlen, const void* needle, size_t nlen) {
   int needle_first;
   const uint8_t* p = static_cast<const uint8_t*>(haystack);

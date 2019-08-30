@@ -1,11 +1,15 @@
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
-#include <cinttypes>
 #include "nod/DiscWii.hpp"
+
+#include <cinttypes>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
 #include "nod/aes.hpp"
-#include "nod/sha1.h"
 #include "nod/nod.hpp"
+#include "nod/sha1.h"
+#include "nod/Util.hpp"
 
 namespace nod {
 

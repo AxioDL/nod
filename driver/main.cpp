@@ -1,7 +1,14 @@
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include "logvisor/logvisor.hpp"
-#include "nod/nod.hpp"
+
+#include <logvisor/logvisor.hpp>
+
+#include <nod/DiscBase.hpp>
+#include <nod/DiscGCN.hpp>
+#include <nod/DiscWii.hpp>
+#include <nod/nod.hpp>
 
 static void printHelp() {
   fmt::print(stderr, fmt(

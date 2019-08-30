@@ -1,6 +1,10 @@
-#include <cstdio>
 #include "nod/nod.hpp"
+
+#include <cstdio>
+
 #include "nod/DiscBase.hpp"
+#include "nod/DiscGCN.hpp"
+#include "nod/DiscWii.hpp"
 
 namespace nod {
 
