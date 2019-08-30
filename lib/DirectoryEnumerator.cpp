@@ -1,3 +1,5 @@
+#include "nod/DirectoryEnumerator.hpp"
+
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -5,9 +7,8 @@
 #include <dirent.h>
 #endif
 
+#include <cstring>
 #include <map>
-
-#include "nod/DirectoryEnumerator.hpp"
 
 namespace nod {
 

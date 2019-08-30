@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DiscBase.hpp"
+#include "nod/DiscBase.hpp"
 
 namespace nod {
 class DiscBuilderGCN;

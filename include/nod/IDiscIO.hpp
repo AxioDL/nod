@@ -1,9 +1,8 @@
 #pragma once
 
-#include <memory>
-#include <cstdlib>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
+#include <memory>
 
 #if NOD_ATHENA
 #include <athena/IStreamReader.hpp>

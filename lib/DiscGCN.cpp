@@ -1,6 +1,16 @@
 #include "nod/DiscGCN.hpp"
-#include "nod/nod.hpp"
+
 #include <cinttypes>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include "nod/nod.hpp"
+#include "nod/Util.hpp"
+
+#include <logvisor/logvisor.hpp>
+
 #define BUFFER_SZ 0x8000
 
 namespace nod {
