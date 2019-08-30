@@ -563,11 +563,11 @@ std::unique_ptr<IAES> NewAES() {
 #endif
   }
   if (HAS_AES_NI)
-    return std::unique_ptr<IAES>(new NiAES);
+    return std::make_unique<NiAES>();
   else
-    return std::unique_ptr<IAES>(new SoftwareAES);
+    return std::make_unique<SoftwareAES>();
 #else
-  return std::unique_ptr<IAES>(new SoftwareAES);
+  return std::make_unique<SoftwareAES>();
 #endif
 }
 

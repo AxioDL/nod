@@ -72,18 +72,26 @@ public:
       return fwrite(buf, 1, length, fp);
     }
   };
+
   std::unique_ptr<IWriteStream> beginWriteStream() const override {
-    bool Err = false;
-    auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, m_maxWriteSize, Err));
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, m_maxWriteSize, err));
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
+
   std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const override {
-    bool Err = false;
-    auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset, m_maxWriteSize, Err));
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset, m_maxWriteSize, err));
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
 
@@ -124,24 +132,32 @@ public:
       return written;
     }
   };
+
   std::unique_ptr<IReadStream> beginReadStream() const override {
-    bool Err = false;
-    auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, Err));
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, err));
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
+
   std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const override {
-    bool Err = false;
-    auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, offset, Err));
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, offset, err));
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
 };
 
 std::unique_ptr<IFileIO> NewFileIO(SystemStringView path, int64_t maxWriteSize) {
-  return std::unique_ptr<IFileIO>(new FileIOFILE(path, maxWriteSize));
+  return std::make_unique<FileIOFILE>(path, maxWriteSize);
 }
 
 } // namespace nod
