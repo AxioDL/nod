@@ -259,18 +259,19 @@ public:
   };
 
   std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const override {
-    bool Err = false;
-    auto ret = std::unique_ptr<IReadStream>(new ReadStream(*this, NewFileIO(filepath)->beginReadStream(), offset, Err));
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::unique_ptr<IReadStream>(new ReadStream(*this, NewFileIO(filepath)->beginReadStream(), offset, err));
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
 
-  std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const override {
-    return std::unique_ptr<IWriteStream>();
-  }
+  std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const override { return nullptr; }
 };
 
-std::unique_ptr<IDiscIO> NewDiscIOWBFS(SystemStringView path) { return std::unique_ptr<IDiscIO>(new DiscIOWBFS(path)); }
+std::unique_ptr<IDiscIO> NewDiscIOWBFS(SystemStringView path) { return std::make_unique<DiscIOWBFS>(path); }
 
 } // namespace nod

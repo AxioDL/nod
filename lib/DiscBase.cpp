@@ -110,11 +110,12 @@ std::unique_ptr<IPartReadStream> Node::beginReadStream(uint64_t offset) const {
 std::unique_ptr<uint8_t[]> Node::getBuf() const {
   if (m_kind != Kind::File) {
     LogModule.report(logvisor::Error, fmt("unable to buffer a non-file {}"), m_name);
-    return std::unique_ptr<uint8_t[]>();
+    return nullptr;
   }
-  uint8_t* buf = new uint8_t[m_discLength];
-  beginReadStream()->read(buf, m_discLength);
-  return std::unique_ptr<uint8_t[]>(buf);
+
+  auto buf = std::unique_ptr<uint8_t[]>(new uint8_t[m_discLength]);
+  beginReadStream()->read(buf.get(), m_discLength);
+  return buf;
 }
 
 bool Node::extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx) const {

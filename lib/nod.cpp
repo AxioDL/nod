@@ -51,18 +51,20 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii) 
     return {};
   }
 
-  bool Err = false;
+  bool err = false;
   std::unique_ptr<DiscBase> ret;
   if (isWii) {
-    ret = std::unique_ptr<DiscBase>(new DiscWii(std::move(discIO), Err));
-    if (Err)
-      return {};
+    ret = std::make_unique<DiscWii>(std::move(discIO), err);
+    if (err) {
+      return nullptr;
+    }
     return ret;
   }
 
-  ret = std::unique_ptr<DiscBase>(new DiscGCN(std::move(discIO), Err));
-  if (Err)
-    return {};
+  ret = std::make_unique<DiscGCN>(std::move(discIO), err);
+  if (err) {
+    return nullptr;
+  }
   return ret;
 }
 

@@ -97,10 +97,13 @@ public:
   };
 
   std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const override {
-    bool Err = false;
-    auto ret = std::unique_ptr<IPartReadStream>(new PartReadStream(*this, offset, Err));
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::make_unique<PartReadStream>(*this, offset, err);
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
 };
@@ -110,7 +113,7 @@ DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err) : DiscBase(std::move
     return;
 
   /* One lone partition for GCN */
-  m_partitions.emplace_back(new PartitionGCN(*this, 0, err));
+  m_partitions.emplace_back(std::make_unique<PartitionGCN>(*this, 0, err));
 }
 
 DiscBuilderGCN DiscGCN::makeMergeBuilder(SystemStringView outPath, FProgress progressCB) {
@@ -165,10 +168,13 @@ public:
   uint32_t packOffset(uint64_t offset) const override { return offset; }
 
   std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset) override {
-    bool Err = false;
-    std::unique_ptr<IPartWriteStream> ret = std::make_unique<PartWriteStream>(*this, offset, Err);
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::make_unique<PartWriteStream>(*this, offset, err);
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
 
@@ -370,8 +376,7 @@ uint64_t DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn) {
 
 DiscBuilderGCN::DiscBuilderGCN(SystemStringView outPath, FProgress progressCB)
 : DiscBuilderBase(outPath, 0x57058000, progressCB) {
-  PartitionBuilderGCN* partBuilder = new PartitionBuilderGCN(*this);
-  m_partitions.emplace_back(partBuilder);
+  m_partitions.emplace_back(std::make_unique<PartitionBuilderGCN>(*this));
 }
 
 DiscMergerGCN::DiscMergerGCN(SystemStringView outPath, DiscGCN& sourceDisc, FProgress progressCB)

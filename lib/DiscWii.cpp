@@ -390,10 +390,13 @@ public:
   };
 
   std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset) const override {
-    bool Err = false;
-    auto ret = std::unique_ptr<IPartReadStream>(new PartReadStream(*this, m_dataOff, offset, Err));
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::make_unique<PartReadStream>(*this, m_dataOff, offset, err);
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
 
@@ -402,21 +405,23 @@ public:
   std::unique_ptr<uint8_t[]> readPartitionHeaderBuf(size_t& szOut) const {
     {
       std::unique_ptr<IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset + 0x2B4);
-      if (!rs)
-        return {};
+      if (!rs) {
+        return nullptr;
+      }
 
       uint32_t h3;
       if (rs->read(&h3, 4) != 4) {
         LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to read H3 offset apploader")));
-        return {};
+        return nullptr;
       }
       h3 = SBig(h3);
       szOut = uint64_t(h3) << 2;
     }
 
     std::unique_ptr<IReadStream> rs = m_parent.getDiscIO().beginReadStream(m_offset);
-    if (!rs)
-      return {};
+    if (!rs) {
+      return nullptr;
+    }
 
     std::unique_ptr<uint8_t[]> buf(new uint8_t[szOut]);
     rs->read(buf.get(), szOut);
@@ -528,7 +533,7 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err) : DiscBase(std::move
       err = true;
       return;
     }
-    m_partitions.emplace_back(new PartitionWii(*this, kind, part.partDataOff << 2, err));
+    m_partitions.emplace_back(std::make_unique<PartitionWii>(*this, kind, part.partDataOff << 2, err));
     if (err)
       return;
   }
@@ -757,11 +762,13 @@ public:
   uint32_t packOffset(uint64_t offset) const override { return uint32_t(offset >> uint64_t(2)); }
 
   std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset) override {
-    bool Err = false;
-    std::unique_ptr<IPartWriteStream> ret =
-        std::make_unique<PartWriteStream>(*this, m_baseOffset + m_userOffset, offset, Err);
-    if (Err)
-      return {};
+    bool err = false;
+    auto ret = std::make_unique<PartWriteStream>(*this, m_baseOffset + m_userOffset, offset, err);
+
+    if (err) {
+      return nullptr;
+    }
+
     return ret;
   }
 
@@ -1237,8 +1244,7 @@ uint64_t DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool
 
 DiscBuilderWii::DiscBuilderWii(SystemStringView outPath, bool dualLayer, FProgress progressCB)
 : DiscBuilderBase(outPath, dualLayer ? 0x1FB4E0000 : 0x118240000, progressCB) {
-  PartitionBuilderWii* partBuilder = new PartitionBuilderWii(*this, PartitionKind::Data, 0x200000);
-  m_partitions.emplace_back(partBuilder);
+  m_partitions.emplace_back(std::make_unique<PartitionBuilderWii>(*this, PartitionKind::Data, 0x200000));
 }
 
 DiscMergerWii::DiscMergerWii(SystemStringView outPath, DiscWii& sourceDisc, bool dualLayer, FProgress progressCB)
