@@ -19,8 +19,6 @@ endif()
 
 add_subdirectory(lib)
 add_subdirectory(driver)
-target_include_directories(nod PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-install(DIRECTORY include/nod DESTINATION include)
 
 set(version_config_file "${PROJECT_BINARY_DIR}/nodConfigVersion.cmake")
 set(config_file "${PROJECT_BINARY_DIR}/nodConfig.cmake")
