@@ -207,8 +207,8 @@ public:
     using pointer = Node*;
     using reference = Node&;
 
-    bool operator!=(const DirectoryIterator& other) { return m_it != other.m_it; }
-    bool operator==(const DirectoryIterator& other) { return m_it == other.m_it; }
+    bool operator==(const DirectoryIterator& other) const { return m_it == other.m_it; }
+    bool operator!=(const DirectoryIterator& other) const { return !operator==(other); }
     DirectoryIterator& operator++() {
       if (m_it->m_kind == Kind::Directory)
         m_it = m_it->rawEnd();
@@ -217,7 +217,9 @@ public:
       return *this;
     }
     Node& operator*() { return *m_it; }
+    const Node& operator*() const { return *m_it; }
     Node* operator->() { return &*m_it; }
+    const Node* operator->() const { return &*m_it; }
   };
   DirectoryIterator begin() const { return DirectoryIterator(m_childrenBegin); }
   DirectoryIterator end() const { return DirectoryIterator(m_childrenEnd); }
