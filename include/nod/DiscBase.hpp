@@ -35,10 +35,10 @@ public:
     offset = SBig(off);
     length = SBig(len);
   }
-  inline bool isDir() const { return ((SBig(typeAndNameOffset) >> 24) != 0); }
-  inline uint32_t getNameOffset() const { return SBig(typeAndNameOffset) & 0xffffff; }
-  inline uint32_t getOffset() const { return SBig(offset); }
-  inline uint32_t getLength() const { return SBig(length); }
+  bool isDir() const { return ((SBig(typeAndNameOffset) >> 24) != 0); }
+  uint32_t getNameOffset() const { return SBig(typeAndNameOffset) & 0xffffff; }
+  uint32_t getOffset() const { return SBig(offset); }
+  uint32_t getLength() const { return SBig(length); }
   void incrementLength() {
     uint32_t orig = SBig(length);
     ++orig;
@@ -187,13 +187,13 @@ private:
 
 public:
   Node(const IPartition& parent, const FSTNode& node, std::string_view name);
-  inline Kind getKind() const { return m_kind; }
-  inline std::string_view getName() const { return m_name; }
-  inline uint64_t size() const { return m_discLength; }
+  Kind getKind() const { return m_kind; }
+  std::string_view getName() const { return m_name; }
+  uint64_t size() const { return m_discLength; }
   std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset = 0) const;
   std::unique_ptr<uint8_t[]> getBuf() const;
-  inline std::vector<Node>::iterator rawBegin() const { return m_childrenBegin; }
-  inline std::vector<Node>::iterator rawEnd() const { return m_childrenEnd; }
+  std::vector<Node>::iterator rawBegin() const { return m_childrenBegin; }
+  std::vector<Node>::iterator rawEnd() const { return m_childrenEnd; }
 
   class DirectoryIterator {
     friend class Node;
@@ -207,21 +207,23 @@ public:
     using pointer = Node*;
     using reference = Node&;
 
-    inline bool operator!=(const DirectoryIterator& other) { return m_it != other.m_it; }
-    inline bool operator==(const DirectoryIterator& other) { return m_it == other.m_it; }
-    inline DirectoryIterator& operator++() {
+    bool operator==(const DirectoryIterator& other) const { return m_it == other.m_it; }
+    bool operator!=(const DirectoryIterator& other) const { return !operator==(other); }
+    DirectoryIterator& operator++() {
       if (m_it->m_kind == Kind::Directory)
         m_it = m_it->rawEnd();
       else
         ++m_it;
       return *this;
     }
-    inline Node& operator*() { return *m_it; }
-    inline Node* operator->() { return &*m_it; }
+    Node& operator*() { return *m_it; }
+    const Node& operator*() const { return *m_it; }
+    Node* operator->() { return &*m_it; }
+    const Node* operator->() const { return &*m_it; }
   };
-  inline DirectoryIterator begin() const { return DirectoryIterator(m_childrenBegin); }
-  inline DirectoryIterator end() const { return DirectoryIterator(m_childrenEnd); }
-  inline DirectoryIterator find(std::string_view name) const {
+  DirectoryIterator begin() const { return DirectoryIterator(m_childrenBegin); }
+  DirectoryIterator end() const { return DirectoryIterator(m_childrenEnd); }
+  DirectoryIterator find(std::string_view name) const {
     if (m_kind == Kind::Directory) {
       DirectoryIterator it = begin();
       for (; it != end(); ++it) {
@@ -289,47 +291,47 @@ public:
   IPartition(const DiscBase& parent, PartitionKind kind, bool isWii, uint64_t offset)
   : m_parent(parent), m_kind(kind), m_offset(offset), m_isWii(isWii) {}
   virtual uint64_t normalizeOffset(uint64_t anOffset) const { return anOffset; }
-  inline PartitionKind getKind() const { return m_kind; }
-  inline bool isWii() const { return m_isWii; }
-  inline uint64_t getDiscOffset() const { return m_offset; }
+  PartitionKind getKind() const { return m_kind; }
+  bool isWii() const { return m_isWii; }
+  uint64_t getDiscOffset() const { return m_offset; }
   virtual std::unique_ptr<IPartReadStream> beginReadStream(uint64_t offset = 0) const = 0;
-  inline std::unique_ptr<IPartReadStream> beginDOLReadStream(uint64_t offset = 0) const {
+  std::unique_ptr<IPartReadStream> beginDOLReadStream(uint64_t offset = 0) const {
     return beginReadStream(m_dolOff + offset);
   }
-  inline std::unique_ptr<IPartReadStream> beginFSTReadStream(uint64_t offset = 0) const {
+  std::unique_ptr<IPartReadStream> beginFSTReadStream(uint64_t offset = 0) const {
     return beginReadStream(m_fstOff + offset);
   }
-  inline std::unique_ptr<IPartReadStream> beginApploaderReadStream(uint64_t offset = 0) const {
+  std::unique_ptr<IPartReadStream> beginApploaderReadStream(uint64_t offset = 0) const {
     return beginReadStream(0x2440 + offset);
   }
-  inline const Node& getFSTRoot() const { return m_nodes[0]; }
-  inline Node& getFSTRoot() { return m_nodes[0]; }
+  const Node& getFSTRoot() const { return m_nodes[0]; }
+  Node& getFSTRoot() { return m_nodes[0]; }
   bool extractToDirectory(SystemStringView path, const ExtractionContext& ctx);
 
-  inline uint64_t getDOLSize() const { return m_dolSz; }
-  inline std::unique_ptr<uint8_t[]> getDOLBuf() const {
+  uint64_t getDOLSize() const { return m_dolSz; }
+  std::unique_ptr<uint8_t[]> getDOLBuf() const {
     std::unique_ptr<uint8_t[]> buf(new uint8_t[m_dolSz]);
     beginDOLReadStream()->read(buf.get(), m_dolSz);
     return buf;
   }
 
-  inline uint64_t getFSTSize() const { return m_fstSz; }
-  inline std::unique_ptr<uint8_t[]> getFSTBuf() const {
+  uint64_t getFSTSize() const { return m_fstSz; }
+  std::unique_ptr<uint8_t[]> getFSTBuf() const {
     std::unique_ptr<uint8_t[]> buf(new uint8_t[m_fstSz]);
     beginFSTReadStream()->read(buf.get(), m_fstSz);
     return buf;
   }
 
-  inline uint64_t getApploaderSize() const { return m_apploaderSz; }
-  inline std::unique_ptr<uint8_t[]> getApploaderBuf() const {
+  uint64_t getApploaderSize() const { return m_apploaderSz; }
+  std::unique_ptr<uint8_t[]> getApploaderBuf() const {
     std::unique_ptr<uint8_t[]> buf(new uint8_t[m_apploaderSz]);
     beginApploaderReadStream()->read(buf.get(), m_apploaderSz);
     return buf;
   }
 
-  inline size_t getNodeCount() const { return m_nodes.size(); }
-  inline const Header& getHeader() const { return m_header; }
-  inline const BI2Header& getBI2() const { return m_bi2Header; }
+  size_t getNodeCount() const { return m_nodes.size(); }
+  const Header& getHeader() const { return m_header; }
+  const BI2Header& getBI2() const { return m_bi2Header; }
   virtual bool extractCryptoFiles(SystemStringView path, const ExtractionContext& ctx) const { return true; }
   bool extractSysFiles(SystemStringView path, const ExtractionContext& ctx) const;
 };
@@ -346,29 +348,30 @@ protected:
 public:
   DiscBase(std::unique_ptr<IDiscIO>&& dio, bool& err) : m_discIO(std::move(dio)), m_header(*m_discIO, err) {}
 
-  inline const Header& getHeader() const { return m_header; }
-  inline const IDiscIO& getDiscIO() const { return *m_discIO; }
-  inline size_t getPartitonNodeCount(size_t partition = 0) const {
-    if (partition > m_partitions.size())
+  const Header& getHeader() const { return m_header; }
+  const IDiscIO& getDiscIO() const { return *m_discIO; }
+  size_t getPartitionNodeCount(size_t partition = 0) const {
+    if (partition >= m_partitions.size()) {
       return -1;
+    }
     return m_partitions[partition]->getNodeCount();
   }
 
-  inline IPartition* getDataPartition() {
+  IPartition* getDataPartition() {
     for (const std::unique_ptr<IPartition>& part : m_partitions)
       if (part->getKind() == PartitionKind::Data)
         return part.get();
     return nullptr;
   }
 
-  inline IPartition* getUpdatePartition() {
+  IPartition* getUpdatePartition() {
     for (const std::unique_ptr<IPartition>& part : m_partitions)
       if (part->getKind() == PartitionKind::Update)
         return part.get();
     return nullptr;
   }
 
-  inline void extractToDirectory(SystemStringView path, const ExtractionContext& ctx) {
+  void extractToDirectory(SystemStringView path, const ExtractionContext& ctx) {
     for (std::unique_ptr<IPartition>& part : m_partitions)
       part->extractToDirectory(path, ctx);
   }
@@ -455,7 +458,7 @@ public:
   : m_outPath(outPath)
   , m_fileIO(NewFileIO(outPath, discCapacity))
   , m_discCapacity(discCapacity)
-  , m_progressCB(progressCB) {}
+  , m_progressCB(std::move(progressCB)) {}
   DiscBuilderBase(DiscBuilderBase&&) = default;
   DiscBuilderBase& operator=(DiscBuilderBase&&) = default;
 
