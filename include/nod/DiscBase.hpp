@@ -457,7 +457,7 @@ public:
   : m_outPath(outPath)
   , m_fileIO(NewFileIO(outPath, discCapacity))
   , m_discCapacity(discCapacity)
-  , m_progressCB(progressCB) {}
+  , m_progressCB(std::move(progressCB)) {}
   DiscBuilderBase(DiscBuilderBase&&) = default;
   DiscBuilderBase& operator=(DiscBuilderBase&&) = default;
 
