@@ -350,7 +350,7 @@ public:
 
   const Header& getHeader() const { return m_header; }
   const IDiscIO& getDiscIO() const { return *m_discIO; }
-  size_t getPartitonNodeCount(size_t partition = 0) const {
+  size_t getPartitionNodeCount(size_t partition = 0) const {
     if (partition >= m_partitions.size()) {
       return -1;
     }
