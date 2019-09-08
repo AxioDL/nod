@@ -49,10 +49,11 @@ public:
   AthenaPartReadStream(std::unique_ptr<IPartReadStream>&& rs) : m_rs(std::move(rs)) {}
 
   void seek(atInt64 off, athena::SeekOrigin origin) override {
-    if (origin == athena::Begin)
+    if (origin == athena::SeekOrigin::Begin) {
       m_rs->seek(off, SEEK_SET);
-    else if (origin == athena::Current)
+    } else if (origin == athena::SeekOrigin::Current) {
       m_rs->seek(off, SEEK_CUR);
+    }
   }
   atUint64 position() const override { return m_rs->position(); }
   atUint64 length() const override { return 0; }
