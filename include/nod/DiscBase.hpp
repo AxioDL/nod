@@ -225,7 +225,7 @@ public:
     if (m_kind == Kind::Directory) {
       DirectoryIterator it = begin();
       for (; it != end(); ++it) {
-        if (!it->getName().compare(name))
+        if (it->getName() == name)
           return it;
       }
       return it;
