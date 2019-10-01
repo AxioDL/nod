@@ -16,7 +16,7 @@ class DiscBuilderWii : public DiscBuilderBase {
 public:
   DiscBuilderWii(SystemStringView outPath, bool dualLayer, FProgress progressCB);
   EBuildResult buildFromDirectory(SystemStringView dirIn);
-  static uint64_t CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer);
+  static std::optional<uint64_t> CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer);
 };
 
 class DiscMergerWii {
@@ -26,7 +26,7 @@ class DiscMergerWii {
 public:
   DiscMergerWii(SystemStringView outPath, DiscWii& sourceDisc, bool dualLayer, FProgress progressCB);
   EBuildResult mergeFromDirectory(SystemStringView dirIn);
-  static uint64_t CalculateTotalSizeRequired(DiscWii& sourceDisc, SystemStringView dirIn, bool& dualLayer);
+  static std::optional<uint64_t> CalculateTotalSizeRequired(DiscWii& sourceDisc, SystemStringView dirIn, bool& dualLayer);
 };
 
 } // namespace nod

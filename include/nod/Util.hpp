@@ -94,8 +94,8 @@ public:
     m_utf8.assign(len, '\0');
     WideCharToMultiByte(CP_UTF8, 0, str.data(), str.size(), &m_utf8[0], len, nullptr, nullptr);
   }
-  inline std::string_view utf8_str() const { return m_utf8; }
-  inline const char* c_str() const { return m_utf8.c_str(); }
+  std::string_view utf8_str() const { return m_utf8; }
+  const char* c_str() const { return m_utf8.c_str(); }
 };
 class SystemStringConv {
   std::wstring m_sys;
@@ -106,8 +106,8 @@ public:
     m_sys.assign(len, L'\0');
     MultiByteToWideChar(CP_UTF8, 0, str.data(), str.size(), &m_sys[0], len);
   }
-  inline SystemStringView sys_str() const { return m_sys; }
-  inline const SystemChar* c_str() const { return m_sys.c_str(); }
+  SystemStringView sys_str() const { return m_sys; }
+  const SystemChar* c_str() const { return m_sys.c_str(); }
 };
 #ifndef _SYS_STR
 #define _SYS_STR(val) L##val
@@ -124,16 +124,16 @@ class SystemUTF8Conv {
 
 public:
   explicit SystemUTF8Conv(SystemStringView str) : m_utf8(str) {}
-  inline std::string_view utf8_str() const { return m_utf8; }
-  inline const char* c_str() const { return m_utf8.data(); }
+  std::string_view utf8_str() const { return m_utf8; }
+  const char* c_str() const { return m_utf8.data(); }
 };
 class SystemStringConv {
   SystemStringView m_sys;
 
 public:
   explicit SystemStringConv(std::string_view str) : m_sys(str) {}
-  inline SystemStringView sys_str() const { return m_sys; }
-  inline const SystemChar* c_str() const { return m_sys.data(); }
+  SystemStringView sys_str() const { return m_sys; }
+  const SystemChar* c_str() const { return m_sys.data(); }
 };
 #ifndef _SYS_STR
 #define _SYS_STR(val) val
