@@ -42,25 +42,26 @@ class DiscIONFS : public IDiscIO {
     }
 
     struct FBO {
-      uint32_t file, block, offset;
+      uint32_t file, block, lblock, offset;
     };
 
     FBO logicalToFBO(uint64_t offset) const {
       auto blockAndRemBytes = std::lldiv(offset, 0x8000); /* 32768 bytes per block */
-      uint32_t i, physicalBlock;
-      for (i = 0, physicalBlock = 0; i < nfsHead.lbaRangeCount; ++i) {
+      uint32_t block = UINT32_MAX;
+      for (uint32_t i = 0, physicalBlock = 0; i < nfsHead.lbaRangeCount; ++i) {
         const auto& range = nfsHead.lbaRanges[i];
         if (blockAndRemBytes.quot >= range.startBlock && blockAndRemBytes.quot - range.startBlock < range.numBlocks) {
-          blockAndRemBytes.quot = physicalBlock + (blockAndRemBytes.quot - range.startBlock);
+          block = physicalBlock + (blockAndRemBytes.quot - range.startBlock);
           break;
         }
         physicalBlock += range.numBlocks;
       }
       /* This offset has no physical mapping, read zeroes */
-      if (i == nfsHead.lbaRangeCount)
-        return {UINT32_MAX, UINT32_MAX, UINT32_MAX};
-      auto fileAndRemBlocks = std::lldiv(blockAndRemBytes.quot, 8000); /* 8000 blocks per file */
-      return {uint32_t(fileAndRemBlocks.quot), uint32_t(fileAndRemBlocks.rem), uint32_t(blockAndRemBytes.rem)};
+      if (block == UINT32_MAX)
+        return {UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX};
+      auto fileAndRemBlocks = std::lldiv(block, 8000); /* 8000 blocks per file */
+      return {uint32_t(fileAndRemBlocks.quot), uint32_t(fileAndRemBlocks.rem),
+              uint32_t(blockAndRemBytes.quot), uint32_t(blockAndRemBytes.rem)};
     }
 
     DiscIONFSShared(SystemStringView fpin, bool& err) {
@@ -157,7 +158,7 @@ public:
 
     ReadStream(std::shared_ptr<DiscIONFSShared> shared, uint64_t offset, bool& err)
     : m_shared(std::move(shared)), m_aes(NewAES()),
-      m_physAddr({UINT32_MAX, UINT32_MAX, UINT32_MAX}), m_offset(offset) {
+      m_physAddr({UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX}), m_offset(offset) {
       m_aes->setKey(m_shared->key);
       setNewLogicalAddr(offset);
     }
@@ -212,7 +213,7 @@ public:
       }
 
       /* Decrypt */
-      const uint32_t ivBuf[] = {0, 0, 0, SBig(m_physAddr.block)};
+      const uint32_t ivBuf[] = {0, 0, 0, SBig(m_physAddr.lblock)};
       m_aes->decrypt((const uint8_t*)ivBuf, m_encBuf, m_decBuf, 0x8000);
     }
 
