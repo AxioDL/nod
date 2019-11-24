@@ -68,7 +68,7 @@ class DiscIONFS : public IDiscIO {
       /* Validate file path format */
       using SignedSize = std::make_signed<SystemString::size_type>::type;
       const auto dotPos = SignedSize(fpin.rfind('.'));
-      const auto slashPos = SignedSize(fpin.rfind("/\\"));
+      const auto slashPos = SignedSize(fpin.find_last_of("/\\"));
       if (fpin.size() <= 4 || dotPos == -1 || dotPos <= slashPos ||
           fpin.compare(slashPos + 1, 4, "hif_") ||
           fpin.compare(dotPos, fpin.size() - dotPos, ".nfs")) {

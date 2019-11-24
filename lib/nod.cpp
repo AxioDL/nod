@@ -35,7 +35,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii) 
 
   using SignedSize = std::make_signed<SystemString::size_type>::type;
   const auto dotPos = SignedSize(path.rfind('.'));
-  const auto slashPos = SignedSize(path.rfind("/\\"));
+  const auto slashPos = SignedSize(path.find_last_of("/\\"));
   if (magic == nod::SBig((uint32_t)'WBFS')) {
     discIO = NewDiscIOWBFS(path);
     isWii = true;
