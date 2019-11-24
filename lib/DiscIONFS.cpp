@@ -34,12 +34,10 @@ class DiscIONFS : public IDiscIO {
     uint8_t key[16];
 
     uint32_t calculateNumFiles() const {
-      uint32_t totalSectorCount = 0;
-      for (uint32_t i = 0; i < nfsHead.lbaRangeCount; ++i) {
-        const auto& range = nfsHead.lbaRanges[i];
-        totalSectorCount += range.numBlocks;
-      }
-      return (uint64_t(totalSectorCount) * uint64_t(0x8000) +
+      uint32_t totalBlockCount = 0;
+      for (uint32_t i = 0; i < nfsHead.lbaRangeCount; ++i)
+        totalBlockCount += nfsHead.lbaRanges[i].numBlocks;
+      return (uint64_t(totalBlockCount) * uint64_t(0x8000) +
               (uint64_t(0x200) + uint64_t(0xF9FFFFF))) / uint64_t(0xFA00000);
     }
 
@@ -48,13 +46,12 @@ class DiscIONFS : public IDiscIO {
     };
 
     FBO logicalToFBO(uint64_t offset) const {
-      auto sectorAndRemBytes = std::lldiv(offset, 0x8000); /* 32768 bytes per block */
+      auto blockAndRemBytes = std::lldiv(offset, 0x8000); /* 32768 bytes per block */
       uint32_t i, physicalBlock;
       for (i = 0, physicalBlock = 0; i < nfsHead.lbaRangeCount; ++i) {
         const auto& range = nfsHead.lbaRanges[i];
-        if (sectorAndRemBytes.quot >= range.startBlock &&
-            sectorAndRemBytes.quot - range.startBlock < range.numBlocks) {
-          sectorAndRemBytes.quot = physicalBlock + (sectorAndRemBytes.quot - range.startBlock);
+        if (blockAndRemBytes.quot >= range.startBlock && blockAndRemBytes.quot - range.startBlock < range.numBlocks) {
+          blockAndRemBytes.quot = physicalBlock + (blockAndRemBytes.quot - range.startBlock);
           break;
         }
         physicalBlock += range.numBlocks;
@@ -62,8 +59,8 @@ class DiscIONFS : public IDiscIO {
       /* This offset has no physical mapping, read zeroes */
       if (i == nfsHead.lbaRangeCount)
         return {UINT32_MAX, UINT32_MAX, UINT32_MAX};
-      auto fileAndRemBlocks = std::lldiv(sectorAndRemBytes.quot, 8000); /* 8000 blocks per file */
-      return {uint32_t(fileAndRemBlocks.quot), uint32_t(fileAndRemBlocks.rem), uint32_t(sectorAndRemBytes.rem)};
+      auto fileAndRemBlocks = std::lldiv(blockAndRemBytes.quot, 8000); /* 8000 blocks per file */
+      return {uint32_t(fileAndRemBlocks.quot), uint32_t(fileAndRemBlocks.rem), uint32_t(blockAndRemBytes.rem)};
     }
 
     DiscIONFSShared(SystemStringView fpin, bool& err) {
