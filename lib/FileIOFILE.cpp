@@ -77,9 +77,8 @@ public:
     bool err = false;
     auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, m_maxWriteSize, err));
 
-    if (err) {
-      return nullptr;
-    }
+    if (err)
+      return {};
 
     return ret;
   }
@@ -88,9 +87,8 @@ public:
     bool err = false;
     auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_path, offset, m_maxWriteSize, err));
 
-    if (err) {
-      return nullptr;
-    }
+    if (err)
+      return {};
 
     return ret;
   }
@@ -137,9 +135,8 @@ public:
     bool err = false;
     auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, err));
 
-    if (err) {
-      return nullptr;
-    }
+    if (err)
+      return {};
 
     return ret;
   }
@@ -148,9 +145,8 @@ public:
     bool err = false;
     auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_path, offset, err));
 
-    if (err) {
-      return nullptr;
-    }
+    if (err)
+      return {};
 
     return ret;
   }

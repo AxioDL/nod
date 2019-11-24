@@ -6,6 +6,7 @@ add_library(nod
   DiscBase.cpp
   DiscGCN.cpp
   DiscIOISO.cpp
+  DiscIONFS.cpp
   DiscIOWBFS.cpp
   DiscWii.cpp
   nod.cpp

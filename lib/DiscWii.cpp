@@ -332,14 +332,22 @@ public:
     uint8_t m_decBuf[0x7c00];
 
     void decryptBlock() {
-      m_dio->read(m_encBuf, 0x8000);
-      m_aes->decrypt(&m_encBuf[0x3d0], &m_encBuf[0x400], m_decBuf, 0x7c00);
+      if (m_aes) {
+        m_dio->read(m_encBuf, 0x8000);
+        m_aes->decrypt(&m_encBuf[0x3d0], &m_encBuf[0x400], m_decBuf, 0x7c00);
+      } else {
+        m_dio->seek(0x400, SEEK_CUR);
+        m_dio->read(m_decBuf, 0x7c00);
+      }
     }
 
   public:
     PartReadStream(const PartitionWii& parent, uint64_t baseOffset, uint64_t offset, bool& err)
-    : m_aes(NewAES()), m_parent(parent), m_baseOffset(baseOffset), m_offset(offset) {
-      m_aes->setKey(parent.m_decKey);
+    : m_parent(parent), m_baseOffset(baseOffset), m_offset(offset) {
+      if (m_parent.m_parent.getDiscIO().hasWiiCrypto()) {
+        m_aes = NewAES();
+        m_aes->setKey(parent.m_decKey);
+      }
       size_t block = m_offset / 0x7c00;
       m_dio = m_parent.m_parent.getDiscIO().beginReadStream(m_baseOffset + block * 0x8000);
       if (!m_dio) {
@@ -365,27 +373,25 @@ public:
     }
     uint64_t position() const override { return m_offset; }
     uint64_t read(void* buf, uint64_t length) override {
-      size_t block = m_offset / 0x7c00;
-      size_t cacheOffset = m_offset % 0x7c00;
-      uint64_t cacheSize;
+      auto blockAndRemOff = std::lldiv(m_offset, 0x7c00);
       uint64_t rem = length;
       uint8_t* dst = (uint8_t*)buf;
 
       while (rem) {
-        if (block != m_curBlock) {
+        if (blockAndRemOff.quot != m_curBlock) {
           decryptBlock();
-          m_curBlock = block;
+          m_curBlock = blockAndRemOff.quot;
         }
 
-        cacheSize = rem;
-        if (cacheSize + cacheOffset > 0x7c00)
-          cacheSize = 0x7c00 - cacheOffset;
+        uint64_t cacheSize = rem;
+        if (cacheSize + blockAndRemOff.rem > 0x7c00)
+          cacheSize = 0x7c00 - blockAndRemOff.rem;
 
-        memmove(dst, m_decBuf + cacheOffset, cacheSize);
+        memmove(dst, m_decBuf + blockAndRemOff.rem, cacheSize);
         dst += cacheSize;
         rem -= cacheSize;
-        cacheOffset = 0;
-        ++block;
+        blockAndRemOff.rem = 0;
+        ++blockAndRemOff.quot;
       }
 
       m_offset += length;

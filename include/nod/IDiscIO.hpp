@@ -28,6 +28,7 @@ public:
   virtual ~IDiscIO() = default;
   virtual std::unique_ptr<IReadStream> beginReadStream(uint64_t offset = 0) const = 0;
   virtual std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset = 0) const = 0;
+  virtual bool hasWiiCrypto() const { return true; } /* NFS overrides this to false */
 };
 
 struct IPartReadStream : IReadStream {

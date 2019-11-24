@@ -28,9 +28,8 @@ public:
     bool err = false;
     auto ret = std::unique_ptr<IReadStream>(new ReadStream(m_fio->beginReadStream(offset), err));
 
-    if (err) {
-      return nullptr;
-    }
+    if (err)
+      return {};
 
     return ret;
   }
@@ -51,9 +50,8 @@ public:
     bool err = false;
     auto ret = std::unique_ptr<IWriteStream>(new WriteStream(m_fio->beginWriteStream(offset), err));
 
-    if (err) {
-      return nullptr;
-    }
+    if (err)
+      return {};
 
     return ret;
   }

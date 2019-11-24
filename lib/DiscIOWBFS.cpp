@@ -23,7 +23,7 @@ static uint8_t size_to_shift(uint32_t size) {
 }
 
 class DiscIOWBFS : public IDiscIO {
-  SystemString filepath;
+  std::unique_ptr<IFileIO> m_fio;
 
   struct WBFSHead {
     uint32_t magic;
@@ -83,10 +83,9 @@ class DiscIOWBFS : public IDiscIO {
   }
 
 public:
-  DiscIOWBFS(SystemStringView fpin) : filepath(fpin) {
+  DiscIOWBFS(SystemStringView fpin) : m_fio(NewFileIO(fpin)) {
     /* Temporary file handle to read LBA table */
-    std::unique_ptr<IFileIO> fio = NewFileIO(filepath);
-    std::unique_ptr<IFileIO::IReadStream> rs = fio->beginReadStream();
+    std::unique_ptr<IFileIO::IReadStream> rs = m_fio->beginReadStream();
     if (!rs)
       return;
 
@@ -265,16 +264,15 @@ public:
 
   std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const override {
     bool err = false;
-    auto ret = std::unique_ptr<IReadStream>(new ReadStream(*this, NewFileIO(filepath)->beginReadStream(), offset, err));
+    auto ret = std::unique_ptr<IReadStream>(new ReadStream(*this, m_fio->beginReadStream(), offset, err));
 
-    if (err) {
-      return nullptr;
-    }
+    if (err)
+      return {};
 
     return ret;
   }
 
-  std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const override { return nullptr; }
+  std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const override { return {}; }
 };
 
 std::unique_ptr<IDiscIO> NewDiscIOWBFS(SystemStringView path) { return std::make_unique<DiscIOWBFS>(path); }
