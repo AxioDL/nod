@@ -373,7 +373,7 @@ public:
     }
     uint64_t position() const override { return m_offset; }
     uint64_t read(void* buf, uint64_t length) override {
-      auto blockAndRemOff = std::lldiv(m_offset, 0x7c00);
+      auto blockAndRemOff = nod::div(m_offset, uint64_t(0x7c00));
       uint64_t rem = length;
       uint8_t* dst = (uint8_t*)buf;
 
@@ -1239,7 +1239,7 @@ std::optional<uint64_t> DiscBuilderWii::CalculateTotalSizeRequired(SystemStringV
   std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true);
   if (!sz)
     return sz;  
-  auto szDiv = std::lldiv(*sz, 0x1F0000);
+  auto szDiv = nod::div(*sz, uint64_t(0x1F0000));
   if (szDiv.rem)
     ++szDiv.quot;
   sz = szDiv.quot * 0x200000;
@@ -1346,7 +1346,7 @@ std::optional<uint64_t> DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourc
   std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
   if (!sz)
     return std::nullopt;
-  auto szDiv = std::lldiv(*sz, 0x1F0000);
+  auto szDiv = nod::div(*sz, uint64_t(0x1F0000));
   if (szDiv.rem)
     ++szDiv.quot;
   sz = szDiv.quot * 0x200000;

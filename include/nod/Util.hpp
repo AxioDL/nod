@@ -54,12 +54,19 @@
 namespace nod {
 /* define our own min/max to avoid MSVC BS */
 template <typename T>
-inline T min(T a, T b) {
+constexpr T min(T a, T b) {
   return a < b ? a : b;
 }
 template <typename T>
-inline T max(T a, T b) {
+constexpr T max(T a, T b) {
   return a > b ? a : b;
+}
+
+/* template-based div for flexible typing and avoiding a library call */
+template <typename T>
+constexpr auto div(T a, T b) {
+  struct DivTp { T quot, rem; };
+  return DivTp{a / b, a % b};
 }
 
 /* Log Module */
