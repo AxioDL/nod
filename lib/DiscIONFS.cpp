@@ -65,49 +65,49 @@ public:
   DiscIONFS(SystemStringView fpin, bool& err) {
     /* Validate file path format */
     using SignedSize = std::make_signed<SystemString::size_type>::type;
-    const auto dotPos = SignedSize(fpin.rfind('.'));
-    const auto slashPos = SignedSize(fpin.find_last_of("/\\"));
+    const auto dotPos = SignedSize(fpin.rfind(_SYS_STR('.')));
+    const auto slashPos = SignedSize(fpin.find_last_of(_SYS_STR("/\\")));
     if (fpin.size() <= 4 || dotPos == -1 || dotPos <= slashPos ||
-        fpin.compare(slashPos + 1, 4, "hif_") ||
-        fpin.compare(dotPos, fpin.size() - dotPos, ".nfs")) {
+        fpin.compare(slashPos + 1, 4, _SYS_STR("hif_")) ||
+        fpin.compare(dotPos, fpin.size() - dotPos, _SYS_STR(".nfs"))) {
       LogModule.report(logvisor::Error,
-                       fmt("'{}' must begin with 'hif_' and end with '.nfs' to be accepted as an NFS image"), fpin);
+        fmt(_SYS_STR("'{}' must begin with 'hif_' and end with '.nfs' to be accepted as an NFS image")), fpin);
       err = true;
       return;
     }
 
     /* Load key file */
     const SystemString dir(fpin.begin(), fpin.begin() + slashPos + 1);
-    auto keyFile = NewFileIO(dir + "../code/htk.bin")->beginReadStream();
+    auto keyFile = NewFileIO(dir + _SYS_STR("../code/htk.bin"))->beginReadStream();
     if (!keyFile)
-      keyFile = NewFileIO(dir + "htk.bin")->beginReadStream();
+      keyFile = NewFileIO(dir + _SYS_STR("htk.bin"))->beginReadStream();
     if (!keyFile) {
-      LogModule.report(logvisor::Error, fmt("Unable to open '{}../code/htk.bin' or '{}htk.bin'"), dir, dir);
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("Unable to open '{}../code/htk.bin' or '{}htk.bin'")), dir, dir);
       err = true;
       return;
     }
     if (keyFile->read(key, 16) != 16) {
-      LogModule.report(logvisor::Error, fmt("Unable to read from '{}../code/htk.bin' or '{}htk.bin'"), dir, dir);
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("Unable to read from '{}../code/htk.bin' or '{}htk.bin'")), dir, dir);
       err = true;
       return;
     }
 
     /* Load header from first file */
-    const SystemString firstPath = fmt::format(fmt("{}hif_{:06}.nfs"), dir, 0);
+    const SystemString firstPath = fmt::format(fmt(_SYS_STR("{}hif_{:06}.nfs")), dir, 0);
     files.push_back(NewFileIO(firstPath));
     auto rs = files.back()->beginReadStream();
     if (!rs) {
-      LogModule.report(logvisor::Error, fmt("'{}' does not exist"), firstPath);
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("'{}' does not exist")), firstPath);
       err = true;
       return;
     }
     if (rs->read(&nfsHead, 0x200) != 0x200) {
-      LogModule.report(logvisor::Error, fmt("Unable to read header from '{}'"), firstPath);
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("Unable to read header from '{}'")), firstPath);
       err = true;
       return;
     }
     if (std::memcmp(&nfsHead.magic, "EGGS", 4)) {
-      LogModule.report(logvisor::Error, fmt("Invalid magic in '{}'"), firstPath);
+      LogModule.report(logvisor::Error, fmt(_SYS_STR("Invalid magic in '{}'")), firstPath);
       err = true;
       return;
     }
@@ -122,10 +122,10 @@ public:
     const uint32_t numFiles = calculateNumFiles();
     files.reserve(numFiles);
     for (uint32_t i = 1; i < numFiles; ++i) {
-      SystemString path = fmt::format(fmt("{}hif_{:06}.nfs"), dir, i);
+      SystemString path = fmt::format(fmt(_SYS_STR("{}hif_{:06}.nfs")), dir, i);
       files.push_back(NewFileIO(path));
       if (!files.back()->exists()) {
-        LogModule.report(logvisor::Error, fmt("'{}' does not exist"), path);
+        LogModule.report(logvisor::Error, fmt(_SYS_STR("'{}' does not exist")), path);
         err = true;
         return;
       }
