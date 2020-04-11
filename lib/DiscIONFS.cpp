@@ -71,7 +71,7 @@ public:
         fpin.compare(slashPos + 1, 4, _SYS_STR("hif_")) ||
         fpin.compare(dotPos, fpin.size() - dotPos, _SYS_STR(".nfs"))) {
       LogModule.report(logvisor::Error,
-        fmt(_SYS_STR("'{}' must begin with 'hif_' and end with '.nfs' to be accepted as an NFS image")), fpin);
+        FMT_STRING(_SYS_STR("'{}' must begin with 'hif_' and end with '.nfs' to be accepted as an NFS image")), fpin);
       err = true;
       return;
     }
@@ -82,32 +82,32 @@ public:
     if (!keyFile)
       keyFile = NewFileIO(dir + _SYS_STR("htk.bin"))->beginReadStream();
     if (!keyFile) {
-      LogModule.report(logvisor::Error, fmt(_SYS_STR("Unable to open '{}../code/htk.bin' or '{}htk.bin'")), dir, dir);
+      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Unable to open '{}../code/htk.bin' or '{}htk.bin'")), dir, dir);
       err = true;
       return;
     }
     if (keyFile->read(key, 16) != 16) {
-      LogModule.report(logvisor::Error, fmt(_SYS_STR("Unable to read from '{}../code/htk.bin' or '{}htk.bin'")), dir, dir);
+      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Unable to read from '{}../code/htk.bin' or '{}htk.bin'")), dir, dir);
       err = true;
       return;
     }
 
     /* Load header from first file */
-    const SystemString firstPath = fmt::format(fmt(_SYS_STR("{}hif_{:06}.nfs")), dir, 0);
+    const SystemString firstPath = fmt::format(FMT_STRING(_SYS_STR("{}hif_{:06}.nfs")), dir, 0);
     files.push_back(NewFileIO(firstPath));
     auto rs = files.back()->beginReadStream();
     if (!rs) {
-      LogModule.report(logvisor::Error, fmt(_SYS_STR("'{}' does not exist")), firstPath);
+      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("'{}' does not exist")), firstPath);
       err = true;
       return;
     }
     if (rs->read(&nfsHead, 0x200) != 0x200) {
-      LogModule.report(logvisor::Error, fmt(_SYS_STR("Unable to read header from '{}'")), firstPath);
+      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Unable to read header from '{}'")), firstPath);
       err = true;
       return;
     }
     if (std::memcmp(&nfsHead.magic, "EGGS", 4)) {
-      LogModule.report(logvisor::Error, fmt(_SYS_STR("Invalid magic in '{}'")), firstPath);
+      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Invalid magic in '{}'")), firstPath);
       err = true;
       return;
     }
@@ -122,10 +122,10 @@ public:
     const uint32_t numFiles = calculateNumFiles();
     files.reserve(numFiles);
     for (uint32_t i = 1; i < numFiles; ++i) {
-      SystemString path = fmt::format(fmt(_SYS_STR("{}hif_{:06}.nfs")), dir, i);
+      SystemString path = fmt::format(FMT_STRING(_SYS_STR("{}hif_{:06}.nfs")), dir, i);
       files.push_back(NewFileIO(path));
       if (!files.back()->exists()) {
-        LogModule.report(logvisor::Error, fmt(_SYS_STR("'{}' does not exist")), path);
+        LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("'{}' does not exist")), path);
         err = true;
         return;
       }
@@ -161,7 +161,7 @@ public:
 
     void setCurFile(uint32_t curFile) {
       if (curFile >= m_parent.files.size()) {
-        LogModule.report(logvisor::Error, fmt("Out of bounds NFS file access"));
+        LogModule.report(logvisor::Error, FMT_STRING("Out of bounds NFS file access"));
         return;
       }
       m_curFile = curFile;

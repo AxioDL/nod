@@ -11,7 +11,7 @@
 #include <nod/nod.hpp>
 
 static void printHelp() {
-  fmt::print(stderr, fmt(
+  fmt::print(stderr, FMT_STRING(
           "Usage:\n"
           "  nodtool extract [-f] <image-in> [<dir-out>]\n"
           "  nodtool makegcn <fsroot-in> [<image-out>]\n"
@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
   bool verbose = false;
   nod::ExtractionContext ctx = {true, [&](std::string_view str, float c) {
                                   if (verbose)
-                                    fmt::print(stderr, fmt("Current node: {}, Extraction {:g}% Complete\n"), str,
+                                    fmt::print(stderr, FMT_STRING("Current node: {}, Extraction {:g}% Complete\n"), str,
                                                c * 100.f);
                                 }};
   const nod::SystemChar* inDir = nullptr;
@@ -66,11 +66,11 @@ int main(int argc, char* argv[])
   }
 
   auto progFunc = [&](float prog, nod::SystemStringView name, size_t bytes) {
-    fmt::print(fmt(_SYS_STR("\r                                                                      ")));
+    fmt::print(FMT_STRING(_SYS_STR("\r                                                                      ")));
     if (bytes != SIZE_MAX)
-      fmt::print(fmt(_SYS_STR("\r{:g}% {} {} B")), prog * 100.f, name, bytes);
+      fmt::print(FMT_STRING(_SYS_STR("\r{:g}% {} {} B")), prog * 100.f, name, bytes);
     else
-      fmt::print(fmt(_SYS_STR("\r{:g}% {}")), prog * 100.f, name);
+      fmt::print(FMT_STRING(_SYS_STR("\r{:g}% {}")), prog * 100.f, name);
     fflush(stdout);
   };
 
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
     /* Pre-validate path */
     nod::Sstat theStat;
     if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as directory")), argv[2]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as directory")), argv[2]);
       return 1;
     }
 
@@ -111,14 +111,14 @@ int main(int argc, char* argv[])
       ret = b.buildFromDirectory(argv[2]);
     }
 
-    fmt::print(fmt("\n"));
+    fmt::print(FMT_STRING("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (!strcasecmp(argv[1], _SYS_STR("makewii"))) {
     /* Pre-validate path */
     nod::Sstat theStat;
     if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as directory")), argv[4]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as directory")), argv[4]);
       return 1;
     }
 
@@ -138,29 +138,29 @@ int main(int argc, char* argv[])
       ret = b.buildFromDirectory(argv[2]);
     }
 
-    fmt::print(fmt("\n"));
+    fmt::print(FMT_STRING("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (!strcasecmp(argv[1], _SYS_STR("mergegcn"))) {
     /* Pre-validate paths */
     nod::Sstat theStat;
     if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as directory")), argv[2]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as directory")), argv[2]);
       return 1;
     }
     if (nod::Stat(argv[3], &theStat) || !S_ISREG(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as file")), argv[3]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as file")), argv[3]);
       return 1;
     }
 
     bool isWii;
     std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(argv[3], isWii);
     if (!disc) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to open image {}")), argv[3]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to open image {}")), argv[3]);
       return 1;
     }
     if (isWii) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("Wii images should be merged with 'mergewii'")));
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Wii images should be merged with 'mergewii'")));
       return 1;
     }
 
@@ -179,29 +179,29 @@ int main(int argc, char* argv[])
       ret = b.mergeFromDirectory(argv[2]);
     }
 
-    fmt::print(fmt("\n"));
+    fmt::print(FMT_STRING("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (!strcasecmp(argv[1], _SYS_STR("mergewii"))) {
     /* Pre-validate paths */
     nod::Sstat theStat;
     if (nod::Stat(argv[2], &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as directory")), argv[2]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as directory")), argv[2]);
       return 1;
     }
     if (nod::Stat(argv[3], &theStat) || !S_ISREG(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to stat {} as file")), argv[3]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as file")), argv[3]);
       return 1;
     }
 
     bool isWii;
     std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(argv[3], isWii);
     if (!disc) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("unable to open image {}")), argv[3]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to open image {}")), argv[3]);
       return 1;
     }
     if (!isWii) {
-      nod::LogModule.report(logvisor::Error, fmt(_SYS_STR("GameCube images should be merged with 'mergegcn'")));
+      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("GameCube images should be merged with 'mergegcn'")));
       return 1;
     }
 
@@ -221,7 +221,7 @@ int main(int argc, char* argv[])
       ret = b.mergeFromDirectory(argv[2]);
     }
 
-    fmt::print(fmt("\n"));
+    fmt::print(FMT_STRING("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else {
@@ -229,6 +229,6 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  nod::LogModule.report(logvisor::Info, fmt(_SYS_STR("Success!")));
+  nod::LogModule.report(logvisor::Info, FMT_STRING(_SYS_STR("Success!")));
   return 0;
 }
