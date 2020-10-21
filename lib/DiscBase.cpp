@@ -284,6 +284,7 @@ static bool IsSystemFile(SystemStringView name, bool& isDol) {
  *  This is required for multi-DOL games, but doesn't harm functionality otherwise */
 static void PatchDOL(std::unique_ptr<uint8_t[]>& buf, size_t sz, bool& patched) {
   patched = false;
+#ifndef __SWITCH__
   uint8_t* found = static_cast<uint8_t*>(memmem(buf.get(), sz,
                                                 "\x3C\x03\xF8\x00\x28\x00\x00\x00\x40\x82\x00\x0C"
                                                 "\x38\x60\x00\x01\x48\x00\x02\x44\x38\x61\x00\x18\x48",
@@ -292,6 +293,7 @@ static void PatchDOL(std::unique_ptr<uint8_t[]>& buf, size_t sz, bool& patched) 
     found[11] = '\x04';
     patched = true;
   }
+#endif
 }
 
 static size_t PatchDOL(IFileIO::IReadStream& in, IPartWriteStream& out, size_t sz, bool& patched) {

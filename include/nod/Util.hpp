@@ -265,7 +265,7 @@ static inline FILE* Fopen(const SystemChar* path, const SystemChar* mode, FileLo
     OVERLAPPED ov = {};
     LockFileEx((HANDLE)(uintptr_t)_fileno(fp), (lock == FileLockType::Write) ? LOCKFILE_EXCLUSIVE_LOCK : 0, 0, 0, 1,
                &ov);
-#else
+#elif !defined(__SWITCH__)
     if (flock(fileno(fp), ((lock == FileLockType::Write) ? LOCK_EX : LOCK_SH) | LOCK_NB))
       LogModule.report(logvisor::Error, FMT_STRING("flock {}: {}"), path, strerror(errno));
 #endif
@@ -277,7 +277,7 @@ static inline FILE* Fopen(const SystemChar* path, const SystemChar* mode, FileLo
 static inline int FSeek(FILE* fp, int64_t offset, int whence) {
 #if _WIN32
   return _fseeki64(fp, offset, whence);
-#elif __APPLE__ || __FreeBSD__
+#elif __APPLE__ || __FreeBSD__ || __SWITCH__
   return fseeko(fp, offset, whence);
 #else
   return fseeko64(fp, offset, whence);
@@ -287,7 +287,7 @@ static inline int FSeek(FILE* fp, int64_t offset, int whence) {
 static inline int64_t FTell(FILE* fp) {
 #if _WIN32
   return _ftelli64(fp);
-#elif __APPLE__ || __FreeBSD__
+#elif __APPLE__ || __FreeBSD__ || __SWITCH__
   return ftello(fp);
 #else
   return ftello64(fp);

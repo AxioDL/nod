@@ -4,7 +4,7 @@
 
 #if _WIN32
 #include <intrin.h>
-#else
+#elif __x86_64__
 #include <cpuid.h>
 #endif
 

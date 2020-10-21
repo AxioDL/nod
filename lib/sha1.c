@@ -17,7 +17,7 @@
 # endif
 #else // ! defined __LITTLE_ENDIAN__
 #ifndef _WIN32
-# include <endian.h> // machine/endian.h
+# include <machine/endian.h>
 #endif
 # if __BYTE_ORDER__ ==  __ORDER_BIG_ENDIAN__
 #  define SHA_BIG_ENDIAN
