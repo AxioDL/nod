@@ -36,7 +36,7 @@ else()
   target_sources(nod PRIVATE FileIOFILE.cpp)
 endif()
 
-if(NOT MSVC AND NOT NX)
+if(NOT MSVC AND ${CMAKE_SYSTEM_PROCESSOR} STREQUAL x86_64)
   set_source_files_properties(aes.cpp PROPERTIES COMPILE_FLAGS -maes)
 endif()
 
