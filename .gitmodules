@@ -1,3 +1,4 @@
 [submodule "logvisor"]
 	path = logvisor
 	url = ../logvisor.git
+	branch = master
