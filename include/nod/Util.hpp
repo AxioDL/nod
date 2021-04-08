@@ -93,23 +93,23 @@ typedef std::wstring_view SystemStringView;
 static inline void ToLower(SystemString& str) { std::transform(str.begin(), str.end(), str.begin(), towlower); }
 static inline void ToUpper(SystemString& str) { std::transform(str.begin(), str.end(), str.begin(), towupper); }
 static inline size_t StrLen(const SystemChar* str) { return wcslen(str); }
-class SystemUTF8Conv {
-  std::string m_utf8;
+class SystemShiftJISConv {
+  std::string m_shiftjis;
 
 public:
-  explicit SystemUTF8Conv(SystemStringView str) {
+  explicit SystemShiftJISConv(SystemStringView str) {
     const size_t len = WideCharToMultiByte(CP_SHIFT_JIS, 0, str.data(), str.size(), nullptr, 0, nullptr, nullptr);
-    m_utf8.assign(len, '\0');
-    WideCharToMultiByte(CP_SHIFT_JIS, 0, str.data(), str.size(), &m_utf8[0], len, nullptr, nullptr);
+    m_shiftjis.assign(len, '\0');
+    WideCharToMultiByte(CP_SHIFT_JIS, 0, str.data(), str.size(), &m_shiftjis[0], len, nullptr, nullptr);
   }
-  std::string_view utf8_str() const { return m_utf8; }
-  const char* c_str() const { return m_utf8.c_str(); }
+  std::string_view shiftjis_str() const { return m_shiftjis; }
+  const char* c_str() const { return m_shiftjis.c_str(); }
 };
-class SystemStringConv {
+class ShiftJISSystemConv {
   std::wstring m_sys;
 
 public:
-  explicit SystemStringConv(std::string_view str) {
+  explicit ShiftJISSystemConv(std::string_view str) {
     const size_t len = MultiByteToWideChar(CP_SHIFT_JIS, 0, str.data(), str.size(), nullptr, 0);
     m_sys.assign(len, L'\0');
     MultiByteToWideChar(CP_SHIFT_JIS, 0, str.data(), str.size(), &m_sys[0], len);

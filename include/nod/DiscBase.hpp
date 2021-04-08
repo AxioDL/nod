@@ -410,9 +410,9 @@ public:
     static bool RecursiveCalculateTotalSize(uint64_t& totalSz, const Node* nodeIn, SystemStringView dirIn);
 
     void addBuildName(SystemStringView str) {
-      SystemUTF8Conv utf8View(str);
-      m_buildNames.emplace_back(utf8View.utf8_str());
-      m_buildNameOff += utf8View.utf8_str().size() + 1;
+      SystemShiftJISConv shiftjisView(str);
+      m_buildNames.emplace_back(shiftjisView.shiftjis_str());
+      m_buildNameOff += shiftjisView.shiftjis_str().size() + 1;
     }
 
     DiscBuilderBase& m_parent;

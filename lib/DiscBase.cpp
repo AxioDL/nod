@@ -127,7 +127,7 @@ std::unique_ptr<uint8_t[]> Node::getBuf() const {
 }
 
 bool Node::extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx) const {
-  SystemStringConv nameView(getName());
+  ShiftJISSystemConv nameView(getName());
   SystemString path = SystemString(basePath) + _SYS_STR('/') + nameView.sys_str().data();
 
   if (m_kind == Kind::Directory) {
@@ -406,10 +406,10 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodesPre(const Node* n
   if (!dirIn.empty()) {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum) {
-      SystemUTF8Conv nameView(e.m_name);
+      SystemShiftJISConv nameView(e.m_name);
 
       if (e.m_isDir) {
-        auto search = dirNodes.find(nameView.utf8_str().data());
+        auto search = dirNodes.find(nameView.shiftjis_str().data());
         if (search != dirNodes.cend()) {
           recursiveMergeNodesPre(search->second, e.m_path.c_str());
           dirNodes.erase(search);
@@ -417,7 +417,7 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodesPre(const Node* n
           recursiveMergeNodesPre(nullptr, e.m_path.c_str());
         }
       } else {
-        fileNodes.erase(nameView.utf8_str().data());
+        fileNodes.erase(nameView.shiftjis_str().data());
         ++m_parent.m_progressTotal;
       }
     }
@@ -452,11 +452,11 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
   if (!dirIn.empty()) {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum) {
-      SystemUTF8Conv nameView(e.m_name);
+      SystemShiftJISConv nameView(e.m_name);
       SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + e.m_name;
 
       if (e.m_isDir) {
-        auto search = dirNodes.find(nameView.utf8_str().data());
+        auto search = dirNodes.find(nameView.shiftjis_str().data());
         if (search != dirNodes.cend()) {
           if (!recursiveMergeNodes(ws, system, search->second, e.m_path.c_str(), chKeyPath))
             return false;
@@ -471,7 +471,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
         if (system ^ isSys)
           continue;
 
-        fileNodes.erase(nameView.utf8_str().data());
+        fileNodes.erase(nameView.shiftjis_str().data());
 
         size_t fileSz = ROUND_UP_32(e.m_fileSz);
         uint64_t fileOff = userAllocate(fileSz, ws);
@@ -508,7 +508,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
 
   /* Write-through remaining dir nodes */
   for (const auto& p : dirNodes) {
-    SystemStringConv sysName(p.second->getName());
+    ShiftJISSystemConv sysName(p.second->getName());
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.c_str();
     if (!recursiveMergeNodes(ws, system, p.second, {}, chKeyPath))
       return false;
@@ -517,7 +517,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
   /* Write-through remaining file nodes */
   for (const auto& p : fileNodes) {
     const Node& ch = *p.second;
-    SystemStringConv sysName(ch.getName());
+    ShiftJISSystemConv sysName(ch.getName());
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.c_str();
 
     bool isDol;
@@ -584,7 +584,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
   if (!dirIn.empty()) {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum) {
-      SystemUTF8Conv nameView(e.m_name);
+      SystemShiftJISConv nameView(e.m_name);
       SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + e.m_name;
 
       if (e.m_isDir) {
@@ -593,7 +593,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
         addBuildName(e.m_name);
         incParents();
 
-        auto search = dirNodes.find(nameView.utf8_str().data());
+        auto search = dirNodes.find(nameView.shiftjis_str().data());
         if (search != dirNodes.cend()) {
           if (!recursiveMergeFST(search->second, e.m_path.c_str(),
                                  [&]() {
@@ -613,7 +613,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
             return false;
         }
       } else {
-        fileNodes.erase(nameView.utf8_str().data());
+        fileNodes.erase(nameView.shiftjis_str().data());
         std::pair<uint64_t, uint64_t> fileOffSz = m_fileOffsetsSizes.at(chKeyPath);
         m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
         addBuildName(e.m_name);
@@ -624,7 +624,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
 
   /* Write-through remaining dir nodes */
   for (const auto& p : dirNodes) {
-    SystemStringConv sysName(p.second->getName());
+    ShiftJISSystemConv sysName(p.second->getName());
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.sys_str().data();
 
     size_t dirNodeIdx = m_buildNodes.size();
@@ -644,7 +644,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
   /* Write-through remaining file nodes */
   for (const auto& p : fileNodes) {
     const Node& ch = *p.second;
-    SystemStringConv sysName(ch.getName());
+    ShiftJISSystemConv sysName(ch.getName());
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.sys_str().data();
 
     std::pair<uint64_t, uint64_t> fileOffSz = m_fileOffsetsSizes.at(chKeyPath);
@@ -676,10 +676,10 @@ bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(uint64_t
   if (!dirIn.empty()) {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum) {
-      SystemUTF8Conv nameView(e.m_name);
+      SystemShiftJISConv nameView(e.m_name);
 
       if (e.m_isDir) {
-        auto search = dirNodes.find(nameView.utf8_str().data());
+        auto search = dirNodes.find(nameView.shiftjis_str().data());
         if (search != dirNodes.cend()) {
           if (!RecursiveCalculateTotalSize(totalSz, search->second, e.m_path.c_str()))
             return false;
@@ -689,7 +689,7 @@ bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(uint64_t
             return false;
         }
       } else {
-        fileNodes.erase(nameView.utf8_str().data());
+        fileNodes.erase(nameView.shiftjis_str().data());
         totalSz += ROUND_UP_32(e.m_fileSz);
       }
     }

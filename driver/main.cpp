@@ -66,11 +66,12 @@ int main(int argc, char* argv[])
   }
 
   auto progFunc = [&](float prog, nod::SystemStringView name, size_t bytes) {
-    fmt::print(FMT_STRING(_SYS_STR("\r                                                                      ")));
+    nod::SystemShiftJISConv shiftjis_name(name);
+    fmt::print(FMT_STRING("\r                                                                      "));
     if (bytes != SIZE_MAX)
-      fmt::print(FMT_STRING(_SYS_STR("\r{:g}% {} {} B")), prog * 100.f, name, bytes);
+      fmt::print(FMT_STRING("\r{:g}% {} {} B"), prog * 100.f, shiftjis_name.shiftjis_str(), bytes);
     else
-      fmt::print(FMT_STRING(_SYS_STR("\r{:g}% {}")), prog * 100.f, name);
+      fmt::print(FMT_STRING("\r{:g}% {}"), prog * 100.f, shiftjis_name.shiftjis_str());
     fflush(stdout);
   };
 
