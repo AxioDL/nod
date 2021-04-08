@@ -3,6 +3,7 @@
 #if _WIN32 && UNICODE
 #include <cwctype>
 #include <direct.h>
+#define CP_SHIFT_JIS 932
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -97,9 +98,9 @@ class SystemUTF8Conv {
 
 public:
   explicit SystemUTF8Conv(SystemStringView str) {
-    int len = WideCharToMultiByte(CP_UTF8, 0, str.data(), str.size(), nullptr, 0, nullptr, nullptr);
+    const size_t len = WideCharToMultiByte(CP_SHIFT_JIS, 0, str.data(), str.size(), nullptr, 0, nullptr, nullptr);
     m_utf8.assign(len, '\0');
-    WideCharToMultiByte(CP_UTF8, 0, str.data(), str.size(), &m_utf8[0], len, nullptr, nullptr);
+    WideCharToMultiByte(CP_SHIFT_JIS, 0, str.data(), str.size(), &m_utf8[0], len, nullptr, nullptr);
   }
   std::string_view utf8_str() const { return m_utf8; }
   const char* c_str() const { return m_utf8.c_str(); }
@@ -109,9 +110,9 @@ class SystemStringConv {
 
 public:
   explicit SystemStringConv(std::string_view str) {
-    int len = MultiByteToWideChar(CP_UTF8, 0, str.data(), str.size(), nullptr, 0);
+    const size_t len = MultiByteToWideChar(CP_SHIFT_JIS, 0, str.data(), str.size(), nullptr, 0);
     m_sys.assign(len, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, str.data(), str.size(), &m_sys[0], len);
+    MultiByteToWideChar(CP_SHIFT_JIS, 0, str.data(), str.size(), &m_sys[0], len);
   }
   SystemStringView sys_str() const { return m_sys; }
   const SystemChar* c_str() const { return m_sys.c_str(); }
