@@ -3,7 +3,6 @@
 #if _WIN32 && UNICODE
 #include <cwctype>
 #include <direct.h>
-#define CP_SHIFT_JIS 932
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -11,6 +10,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#define CP_SHIFT_JIS 932
 #if defined(WINAPI_FAMILY) && WINAPI_FAMILY != WINAPI_FAMILY_DESKTOP_APP
 #define WINDOWS_STORE 1
 #else
