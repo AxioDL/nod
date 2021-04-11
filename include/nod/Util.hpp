@@ -19,6 +19,7 @@
 #else
 #include <cctype>
 #include <cerrno>
+#include <iconv.h>
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/statvfs.h>
@@ -106,7 +107,7 @@ public:
   const char* c_str() const { return m_shiftjis.c_str(); }
 };
 class ShiftJISSystemConv {
-  std::wstring m_sys;
+  SystemString m_sys;
 
 public:
   explicit ShiftJISSystemConv(std::string_view str) {
@@ -127,19 +128,64 @@ typedef std::string_view SystemStringView;
 static inline void ToLower(SystemString& str) { std::transform(str.begin(), str.end(), str.begin(), tolower); }
 static inline void ToUpper(SystemString& str) { std::transform(str.begin(), str.end(), str.begin(), toupper); }
 static inline size_t StrLen(const SystemChar* str) { return strlen(str); }
-class SystemUTF8Conv {
-  std::string_view m_utf8;
+static inline void CodeTo(const char* input_encoding, const char* output_encoding, std::string_view input, std::string& output)
+{
+  iconv_t const conv_desc = iconv_open(output_encoding, input_encoding);
+  if ((iconv_t)-1 != conv_desc)
+  {
+    size_t const in_bytes = input.size();
+    size_t const out_buffer_size = 4 * in_bytes;
+
+    std::string out_buffer;
+    out_buffer.resize(out_buffer_size);
+
+    auto src_buffer = input.data();
+    size_t src_bytes = in_bytes;
+    auto dst_buffer = out_buffer.data();
+    size_t dst_bytes = out_buffer.size();
+
+    while (src_bytes != 0) {
+      size_t const iconv_result =
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+          iconv(conv_desc, reinterpret_cast<const char**>(&src_buffer), &src_bytes, &dst_buffer, &dst_bytes);
+#else
+          iconv(conv_desc, const_cast<char**>(reinterpret_cast<const char**>(&src_buffer)), &src_bytes, &dst_buffer, &dst_bytes);
+#endif
+      if ((size_t)-1 == iconv_result) {
+        if (EILSEQ == errno || EINVAL == errno) {
+          // Try to skip the bad character
+          if (src_bytes != 0) {
+            src_bytes--;
+            src_buffer++;
+          }
+        }
+        else {
+          break;
+        }
+      }
+    }
+    out_buffer.resize(out_buffer_size - dst_bytes);
+    out_buffer.swap(output);
+    iconv_close(conv_desc);
+  }
+}
+class SystemShiftJISConv {
+  std::string m_shiftjis;
 
 public:
-  explicit SystemUTF8Conv(SystemStringView str) : m_utf8(str) {}
-  std::string_view utf8_str() const { return m_utf8; }
-  const char* c_str() const { return m_utf8.data(); }
+  explicit SystemShiftJISConv(SystemStringView str) {
+    CodeTo("UTF-8", "SJIS", str, m_shiftjis);
+  }
+  std::string_view shiftjis_str() const { return m_shiftjis; }
+  const char* c_str() const { return m_shiftjis.data(); }
 };
-class SystemStringConv {
-  SystemStringView m_sys;
+class ShiftJISSystemConv {
+  SystemString m_sys;
 
 public:
-  explicit SystemStringConv(std::string_view str) : m_sys(str) {}
+  explicit ShiftJISSystemConv(std::string_view str) {
+    CodeTo("SJIS", "UTF-8", str, m_sys);
+  }
   SystemStringView sys_str() const { return m_sys; }
   const SystemChar* c_str() const { return m_sys.data(); }
 };
