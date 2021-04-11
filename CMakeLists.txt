@@ -12,9 +12,6 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         /wd4267 /wd4244 /wd4200 /wd4305 /wd4067 /wd4146 /wd4309 /wd4805 ${VS_OPTIONS})
 
     add_compile_options(
-      # Disable exceptions
-      $<$<COMPILE_LANGUAGE:CXX>:/EHsc->
-
       # Disable RTTI
       $<$<COMPILE_LANGUAGE:CXX>:/GR->
 
@@ -30,7 +27,6 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
       # Use latest C++ standard.
       $<$<COMPILE_LANGUAGE:CXX>:/std:c++latest>
     )
-    add_compile_definitions(FMT_EXCEPTIONS=0 _HAS_EXCEPTIONS=0)
 
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
       # Flags for MSVC (not clang-cl)

@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <locale>
 
 #include <logvisor/logvisor.hpp>
 
@@ -66,12 +67,23 @@ int main(int argc, char* argv[])
   }
 
   auto progFunc = [&](float prog, nod::SystemStringView name, size_t bytes) {
-    nod::SystemShiftJISConv shiftjis_name(name);
-    fmt::print(FMT_STRING("\r                                                                      "));
-    if (bytes != SIZE_MAX)
-      fmt::print(FMT_STRING("\r{:g}% {} {} B"), prog * 100.f, shiftjis_name.shiftjis_str(), bytes);
-    else
-      fmt::print(FMT_STRING("\r{:g}% {}"), prog * 100.f, shiftjis_name.shiftjis_str());
+    fmt::print(FMT_STRING(_SYS_STR("\r                                                                      ")));
+    FMT_TRY {
+      if (bytes != SIZE_MAX)
+        fmt::print(FMT_STRING(_SYS_STR("\r{:g}% {} {} B")), prog * 100.f, name, bytes);
+      else
+        fmt::print(FMT_STRING(_SYS_STR("\r{:g}% {}")), prog * 100.f, name);
+    }
+    // Windows Command Prompt does not support Unicode.
+    FMT_CATCH(const fmt::system_error& e) {
+      std::string narrow_name(name.size(), '\0');
+      std::locale loc;
+      std::use_facet<std::ctype<nod::SystemChar>>(loc).narrow(name.data(), name.data()+name.size()+1, '?', narrow_name.data());
+      if (bytes != SIZE_MAX)
+        fmt::print(FMT_STRING("\r{:g}% {} {} B"), prog * 100.f, narrow_name, bytes);
+      else
+        fmt::print(FMT_STRING("\r{:g}% {}"), prog * 100.f, narrow_name);
+    }
     fflush(stdout);
   };
 
