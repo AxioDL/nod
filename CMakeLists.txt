@@ -66,6 +66,7 @@ endif()
 add_subdirectory(lib)
 add_subdirectory(driver)
 
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 set(version_config_file "${PROJECT_BINARY_DIR}/nodConfigVersion.cmake")
 set(config_file "${PROJECT_BINARY_DIR}/nodConfig.cmake")
 set(config_install_dir "lib/cmake/nod")
@@ -95,3 +96,4 @@ install(
     FILES "${config_file}" "${version_config_file}"
     DESTINATION ${config_install_dir}
 )
+endif()
