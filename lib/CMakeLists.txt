@@ -10,6 +10,7 @@ add_library(nod
   DiscIOWBFS.cpp
   DiscWii.cpp
   nod.cpp
+  OSUTF.c
 
   ../include/nod/aes.hpp
   ../include/nod/DirectoryEnumerator.hpp
@@ -21,13 +22,14 @@ add_library(nod
   ../include/nod/nod.hpp
   ../include/nod/sha1.h
   ../include/nod/Util.hpp
+  ../include/nod/OSUTF.h
 )
 
 target_include_directories(nod PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
 )
 
-target_link_libraries(nod PUBLIC logvisor)
+target_link_libraries(nod PUBLIC $<BUILD_INTERFACE:logvisor>)
 
 if(WIN32)
   target_sources(nod PRIVATE FileIOWin32.cpp)

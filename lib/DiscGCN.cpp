@@ -17,8 +17,8 @@ namespace nod {
 
 class PartitionGCN : public IPartition {
 public:
-  PartitionGCN(const DiscGCN& parent, uint64_t offset, bool& err, Codepage_t codepage)
-  : IPartition(parent, PartitionKind::Data, false, offset, codepage) {
+  PartitionGCN(const DiscGCN& parent, uint64_t offset, bool& err)
+  : IPartition(parent, PartitionKind::Data, false, offset) {
     /* GCN-specific header reads */
     std::unique_ptr<IPartReadStream> s = beginReadStream(0x0);
     if (!s) {
@@ -118,19 +118,19 @@ public:
   }
 };
 
-DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err, Codepage_t codepage) : DiscBase(std::move(dio), err) {
+DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err) : DiscBase(std::move(dio), err) {
   if (err)
     return;
 
   /* One lone partition for GCN */
-  m_partitions.emplace_back(std::make_unique<PartitionGCN>(*this, 0, err, codepage));
+  m_partitions.emplace_back(std::make_unique<PartitionGCN>(*this, 0, err));
 }
 
-DiscBuilderGCN DiscGCN::makeMergeBuilder(SystemStringView outPath, FProgress progressCB, Codepage_t codepage) {
-  return DiscBuilderGCN(outPath, progressCB, codepage);
+DiscBuilderGCN DiscGCN::makeMergeBuilder(std::string_view outPath, FProgress progressCB) {
+  return DiscBuilderGCN(outPath, progressCB);
 }
 
-bool DiscGCN::extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const { return true; }
+bool DiscGCN::extractDiscHeaderFiles(std::string_view path, const ExtractionContext& ctx) const { return true; }
 
 class PartitionBuilderGCN : public DiscBuilderBase::PartitionBuilderBase {
   uint64_t m_curUser = 0x57058000;
@@ -161,8 +161,8 @@ public:
     }
   };
 
-  PartitionBuilderGCN(DiscBuilderBase& parent, Codepage_t codepage)
-  : DiscBuilderBase::PartitionBuilderBase(parent, PartitionKind::Data, false, codepage) {}
+  PartitionBuilderGCN(DiscBuilderBase& parent)
+  : DiscBuilderBase::PartitionBuilderBase(parent, PartitionKind::Data, false) {}
 
   uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws) override {
     m_curUser -= reqSz;
@@ -226,7 +226,7 @@ public:
     return true;
   }
 
-  bool buildFromDirectory(SystemStringView dirIn) {
+  bool buildFromDirectory(std::string_view dirIn) {
     std::unique_ptr<IPartWriteStream> ws = beginWriteStream(0);
     if (!ws)
       return false;
@@ -234,29 +234,29 @@ public:
     if (!result)
       return false;
 
-    SystemString dirStr(dirIn);
+    std::string dirStr(dirIn);
 
     /* Check Apploader */
-    SystemString apploaderIn = dirStr + _SYS_STR("/sys/apploader.img");
+    std::string apploaderIn = dirStr + "/sys/apploader.img";
     Sstat apploaderStat;
     if (Stat(apploaderIn.c_str(), &apploaderStat)) {
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {}")), apploaderIn);
+      LogModule.report(logvisor::Error, FMT_STRING("unable to stat {}"), apploaderIn);
       return false;
     }
 
     /* Check Boot */
-    SystemString bootIn = dirStr + _SYS_STR("/sys/boot.bin");
+    std::string bootIn = dirStr + "/sys/boot.bin";
     Sstat bootStat;
     if (Stat(bootIn.c_str(), &bootStat)) {
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {}")), bootIn);
+      LogModule.report(logvisor::Error, FMT_STRING("unable to stat {}"), bootIn);
       return false;
     }
 
     /* Check BI2 */
-    SystemString bi2In = dirStr + _SYS_STR("/sys/bi2.bin");
+    std::string bi2In = dirStr + "/sys/bi2.bin";
     Sstat bi2Stat;
     if (Stat(bi2In.c_str(), &bi2Stat)) {
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {}")), bi2In);
+      LogModule.report(logvisor::Error, FMT_STRING("unable to stat {}"), bi2In);
       return false;
     }
 
@@ -308,7 +308,7 @@ public:
         });
   }
 
-  bool mergeFromDirectory(const PartitionGCN* partIn, SystemStringView dirIn) {
+  bool mergeFromDirectory(const PartitionGCN* partIn, std::string_view dirIn) {
     std::unique_ptr<IPartWriteStream> ws = beginWriteStream(0);
     if (!ws)
       return false;
@@ -336,7 +336,7 @@ public:
         [this, partIn](IPartWriteStream& ws, size_t& xferSz) -> bool {
           std::unique_ptr<uint8_t[]> apploaderBuf = partIn->getApploaderBuf();
           size_t apploaderSz = partIn->getApploaderSize();
-          SystemString apploaderName(_SYS_STR("<apploader>"));
+          std::string apploaderName("<apploader>");
           ws.write(apploaderBuf.get(), apploaderSz);
           xferSz += apploaderSz;
           if (0x2440 + xferSz >= m_curUser) {
@@ -350,14 +350,14 @@ public:
   }
 };
 
-EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn) {
+EBuildResult DiscBuilderGCN::buildFromDirectory(std::string_view dirIn) {
   if (!m_fileIO->beginWriteStream())
     return EBuildResult::Failed;
   if (!CheckFreeSpace(m_outPath.c_str(), 0x57058000)) {
-    LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("not enough free disk space for {}")), m_outPath);
+    LogModule.report(logvisor::Error, FMT_STRING("not enough free disk space for {}"), m_outPath);
     return EBuildResult::DiskFull;
   }
-  m_progressCB(getProgressFactor(), _SYS_STR("Preallocating image"), -1);
+  m_progressCB(getProgressFactor(), "Preallocating image", -1);
   ++m_progressIdx;
   {
     auto ws = m_fileIO->beginWriteStream(0);
@@ -372,34 +372,34 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn) {
   return pb.buildFromDirectory(dirIn) ? EBuildResult::Success : EBuildResult::Failed;
 }
 
-std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn, Codepage_t codepage) {
-  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false, codepage);
+std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(std::string_view dirIn) {
+  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
   if (!sz)
     return sz;
   *sz += 0x30000;
   if (sz > 0x57058000) {
-    LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("disc capacity exceeded [{} / {}]")), *sz, 0x57058000);
+    LogModule.report(logvisor::Error, FMT_STRING("disc capacity exceeded [{} / {}]"), *sz, 0x57058000);
     return std::nullopt;
   }
   return sz;
 }
 
-DiscBuilderGCN::DiscBuilderGCN(SystemStringView outPath, FProgress progressCB, Codepage_t codepage)
+DiscBuilderGCN::DiscBuilderGCN(std::string_view outPath, FProgress progressCB)
 : DiscBuilderBase(outPath, 0x57058000, progressCB) {
-  m_partitions.emplace_back(std::make_unique<PartitionBuilderGCN>(*this, codepage));
+  m_partitions.emplace_back(std::make_unique<PartitionBuilderGCN>(*this));
 }
 
-DiscMergerGCN::DiscMergerGCN(SystemStringView outPath, DiscGCN& sourceDisc, FProgress progressCB, Codepage_t codepage)
-: m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, progressCB, codepage)) {}
+DiscMergerGCN::DiscMergerGCN(std::string_view outPath, DiscGCN& sourceDisc, FProgress progressCB)
+: m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, progressCB)) {}
 
-EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn) {
+EBuildResult DiscMergerGCN::mergeFromDirectory(std::string_view dirIn) {
   if (!m_builder.getFileIO().beginWriteStream())
     return EBuildResult::Failed;
   if (!CheckFreeSpace(m_builder.m_outPath.c_str(), 0x57058000)) {
-    LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("not enough free disk space for {}")), m_builder.m_outPath);
+    LogModule.report(logvisor::Error, FMT_STRING("not enough free disk space for {}"), m_builder.m_outPath);
     return EBuildResult::DiskFull;
   }
-  m_builder.m_progressCB(m_builder.getProgressFactor(), _SYS_STR("Preallocating image"), -1);
+  m_builder.m_progressCB(m_builder.getProgressFactor(), "Preallocating image", -1);
   ++m_builder.m_progressIdx;
   {
     auto ws = m_builder.m_fileIO->beginWriteStream(0);
@@ -416,13 +416,13 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn) {
              : EBuildResult::Failed;
 }
 
-std::optional<uint64_t> DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn, Codepage_t codepage) {
-  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn, codepage);
+std::optional<uint64_t> DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, std::string_view dirIn) {
+  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
   if (!sz)
     return std::nullopt;
   *sz += 0x30000;
   if (sz > 0x57058000) {
-    LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("disc capacity exceeded [{} / {}]")), *sz, 0x57058000);
+    LogModule.report(logvisor::Error, FMT_STRING("disc capacity exceeded [{} / {}]"), *sz, 0x57058000);
     return std::nullopt;
   }
   return sz;

@@ -34,7 +34,7 @@ a content pipeline using the `nod::DiscBuilderBase` interface.
 ```cpp
 /* Sample logging lambda for progress feedback */
 size_t lastIdx = -1;
-auto progFunc = [&](size_t idx, const nod::SystemString& name, size_t bytes)
+auto progFunc = [&](size_t idx, const std::string& name, size_t bytes)
 {
     if (idx != lastIdx)
     {

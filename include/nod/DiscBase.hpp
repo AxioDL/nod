@@ -12,16 +12,17 @@
 
 #include "nod/IDiscIO.hpp"
 #include "nod/IFileIO.hpp"
+#include "nod/OSUTF.h"
 #include "nod/Util.hpp"
 
 namespace nod {
 
-using FProgress = std::function<void(float totalProg, SystemStringView fileName, size_t fileBytesXfered)>;
+using FProgress = std::function<void(float totalProg, std::string_view fileName, size_t fileBytesXfered)>;
 
 enum class EBuildResult { Success, Failed, DiskFull };
 
 enum class PartitionKind : uint32_t { Data, Update, Channel };
-const SystemChar* getKindString(PartitionKind kind);
+const char* getKindString(PartitionKind kind);
 
 class FSTNode {
   uint32_t typeAndNameOffset;
@@ -236,7 +237,7 @@ public:
     return end();
   }
 
-  bool extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx, Codepage_t codepage = CP_US_ASCII) const;
+  bool extractToDirectory(std::string_view basePath, const ExtractionContext& ctx) const;
 };
 
 class IPartition {
@@ -275,7 +276,6 @@ protected:
   PartitionKind m_kind;
   uint64_t m_offset;
   bool m_isWii;
-  Codepage_t m_codepage;
 
 public:
   mutable size_t m_curNodeIdx = 0;
@@ -290,8 +290,8 @@ public:
       return m_curNodeIdx / float(getNodeCount());
   }
 
-  IPartition(const DiscBase& parent, PartitionKind kind, bool isWii, uint64_t offset, Codepage_t codepage)
-  : m_parent(parent), m_kind(kind), m_offset(offset), m_isWii(isWii), m_codepage(codepage) {}
+  IPartition(const DiscBase& parent, PartitionKind kind, bool isWii, uint64_t offset)
+  : m_parent(parent), m_kind(kind), m_offset(offset), m_isWii(isWii) {}
   virtual uint64_t normalizeOffset(uint64_t anOffset) const { return anOffset; }
   PartitionKind getKind() const { return m_kind; }
   bool isWii() const { return m_isWii; }
@@ -308,7 +308,7 @@ public:
   }
   const Node& getFSTRoot() const { return m_nodes[0]; }
   Node& getFSTRoot() { return m_nodes[0]; }
-  bool extractToDirectory(SystemStringView path, const ExtractionContext& ctx);
+  bool extractToDirectory(std::string_view path, const ExtractionContext& ctx);
 
   uint64_t getDOLSize() const { return m_dolSz; }
   std::unique_ptr<uint8_t[]> getDOLBuf() const {
@@ -334,8 +334,8 @@ public:
   size_t getNodeCount() const { return m_nodes.size(); }
   const Header& getHeader() const { return m_header; }
   const BI2Header& getBI2() const { return m_bi2Header; }
-  virtual bool extractCryptoFiles(SystemStringView path, const ExtractionContext& ctx) const { return true; }
-  bool extractSysFiles(SystemStringView path, const ExtractionContext& ctx) const;
+  virtual bool extractCryptoFiles(std::string_view path, const ExtractionContext& ctx) const { return true; }
+  bool extractSysFiles(std::string_view path, const ExtractionContext& ctx) const;
 };
 
 class DiscBase {
@@ -373,12 +373,12 @@ public:
     return nullptr;
   }
 
-  void extractToDirectory(SystemStringView path, const ExtractionContext& ctx) {
+  void extractToDirectory(std::string_view path, const ExtractionContext& ctx) {
     for (std::unique_ptr<IPartition>& part : m_partitions)
       part->extractToDirectory(path, ctx);
   }
 
-  virtual bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const = 0;
+  virtual bool extractDiscHeaderFiles(std::string_view path, const ExtractionContext& ctx) const = 0;
 };
 
 class DiscBuilderBase {
@@ -390,30 +390,30 @@ public:
     virtual ~PartitionBuilderBase() = default;
 
   protected:
-    std::unordered_map<SystemString, std::pair<uint64_t, uint64_t>> m_fileOffsetsSizes;
+    std::unordered_map<std::string, std::pair<uint64_t, uint64_t>> m_fileOffsetsSizes;
     std::vector<FSTNode> m_buildNodes;
     std::vector<std::string> m_buildNames;
     size_t m_buildNameOff = 0;
     virtual uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws) = 0;
     virtual uint32_t packOffset(uint64_t offset) const = 0;
 
-    void recursiveBuildNodesPre(SystemStringView dirIn);
-    bool recursiveBuildNodes(IPartWriteStream& ws, bool system, SystemStringView dirIn);
+    void recursiveBuildNodesPre(std::string_view dirIn);
+    bool recursiveBuildNodes(IPartWriteStream& ws, bool system, std::string_view dirIn);
 
-    bool recursiveBuildFST(SystemStringView dirIn, std::function<void(void)> incParents, size_t parentDirIdx);
+    bool recursiveBuildFST(std::string_view dirIn, std::function<void(void)> incParents, size_t parentDirIdx);
 
-    void recursiveMergeNodesPre(const Node* nodeIn, SystemStringView dirIn);
-    bool recursiveMergeNodes(IPartWriteStream& ws, bool system, const Node* nodeIn, SystemStringView dirIn,
-                             SystemStringView keyPath);
-    bool recursiveMergeFST(const Node* nodeIn, SystemStringView dirIn, std::function<void(void)> incParents,
-                           size_t parentDirIdx, SystemStringView keyPath);
+    void recursiveMergeNodesPre(const Node* nodeIn, std::string_view dirIn);
+    bool recursiveMergeNodes(IPartWriteStream& ws, bool system, const Node* nodeIn, std::string_view dirIn,
+                             std::string_view keyPath);
+    bool recursiveMergeFST(const Node* nodeIn, std::string_view dirIn, std::function<void(void)> incParents,
+                           size_t parentDirIdx, std::string_view keyPath);
 
-    static bool RecursiveCalculateTotalSize(uint64_t& totalSz, const Node* nodeIn, SystemStringView dirIn, Codepage_t codepage);
+    static bool RecursiveCalculateTotalSize(uint64_t& totalSz, const Node* nodeIn, std::string_view dirIn);
 
-    void addBuildName(SystemStringView str) {
-      SystemToDiscLocConv nameView(str, m_codepage);
-      m_buildNames.emplace_back(nameView.disc_str());
-      m_buildNameOff += nameView.disc_str().size() + 1;
+    void addBuildName(std::string_view str) {
+      UTF8ToSJIS nameView(str);
+      m_buildNames.emplace_back(nameView.str());
+      m_buildNameOff += nameView.str().size() + 1;
     }
 
     DiscBuilderBase& m_parent;
@@ -421,20 +421,19 @@ public:
     uint64_t m_dolOffset = 0;
     uint64_t m_dolSize = 0;
     bool m_isWii;
-    Codepage_t m_codepage;
 
   public:
-    PartitionBuilderBase(DiscBuilderBase& parent, PartitionKind kind, bool isWii, Codepage_t codepage)
-    : m_parent(parent), m_kind(kind), m_isWii(isWii), m_codepage(codepage) {}
+    PartitionBuilderBase(DiscBuilderBase& parent, PartitionKind kind, bool isWii)
+    : m_parent(parent), m_kind(kind), m_isWii(isWii) {}
     virtual std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset) = 0;
-    bool buildFromDirectory(IPartWriteStream& ws, SystemStringView dirIn);
-    static std::optional<uint64_t> CalculateTotalSizeBuild(SystemStringView dirIn, PartitionKind kind, bool isWii, Codepage_t codepage);
-    bool mergeFromDirectory(IPartWriteStream& ws, const IPartition* partIn, SystemStringView dirIn);
-    static std::optional<uint64_t> CalculateTotalSizeMerge(const IPartition* partIn, SystemStringView dirIn, Codepage_t codepage);
+    bool buildFromDirectory(IPartWriteStream& ws, std::string_view dirIn);
+    static std::optional<uint64_t> CalculateTotalSizeBuild(std::string_view dirIn, PartitionKind kind, bool isWii);
+    bool mergeFromDirectory(IPartWriteStream& ws, const IPartition* partIn, std::string_view dirIn);
+    static std::optional<uint64_t> CalculateTotalSizeMerge(const IPartition* partIn, std::string_view dirIn);
   };
 
 protected:
-  SystemString m_outPath;
+  std::string m_outPath;
   std::unique_ptr<IFileIO> m_fileIO;
   std::vector<std::unique_ptr<PartitionBuilderBase>> m_partitions;
   int64_t m_discCapacity;
@@ -457,7 +456,7 @@ public:
   }
 
   virtual ~DiscBuilderBase() = default;
-  DiscBuilderBase(SystemStringView outPath, int64_t discCapacity, FProgress progressCB)
+  DiscBuilderBase(std::string_view outPath, int64_t discCapacity, FProgress progressCB)
   : m_outPath(outPath)
   , m_fileIO(NewFileIO(outPath, discCapacity))
   , m_discCapacity(discCapacity)

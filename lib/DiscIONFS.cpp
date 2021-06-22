@@ -34,8 +34,8 @@ class DiscIONFS : public IDiscIO {
     uint32_t totalBlockCount = 0;
     for (uint32_t i = 0; i < nfsHead.lbaRangeCount; ++i)
       totalBlockCount += nfsHead.lbaRanges[i].numBlocks;
-    return (uint64_t(totalBlockCount) * uint64_t(0x8000) +
-            (uint64_t(0x200) + uint64_t(0xF9FFFFF))) / uint64_t(0xFA00000);
+    return (uint64_t(totalBlockCount) * uint64_t(0x8000) + (uint64_t(0x200) + uint64_t(0xF9FFFFF))) /
+           uint64_t(0xFA00000);
   }
 
   struct FBO {
@@ -57,57 +57,57 @@ class DiscIONFS : public IDiscIO {
     if (block == UINT32_MAX)
       return {UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX};
     auto fileAndRemBlocks = nod::div(block, uint32_t(8000)); /* 8000 blocks per file */
-    return {uint32_t(fileAndRemBlocks.quot), uint32_t(fileAndRemBlocks.rem),
-            uint32_t(blockAndRemBytes.quot), uint32_t(blockAndRemBytes.rem)};
+    return {uint32_t(fileAndRemBlocks.quot), uint32_t(fileAndRemBlocks.rem), uint32_t(blockAndRemBytes.quot),
+            uint32_t(blockAndRemBytes.rem)};
   }
 
 public:
-  DiscIONFS(SystemStringView fpin, bool& err) {
+  DiscIONFS(std::string_view fpin, bool& err) {
     /* Validate file path format */
-    using SignedSize = std::make_signed<SystemString::size_type>::type;
-    const auto dotPos = SignedSize(fpin.rfind(_SYS_STR('.')));
-    const auto slashPos = SignedSize(fpin.find_last_of(_SYS_STR("/\\")));
-    if (fpin.size() <= 4 || dotPos == -1 || dotPos <= slashPos ||
-        fpin.compare(slashPos + 1, 4, _SYS_STR("hif_")) ||
-        fpin.compare(dotPos, fpin.size() - dotPos, _SYS_STR(".nfs"))) {
+    using SignedSize = std::make_signed<std::string::size_type>::type;
+    const auto dotPos = SignedSize(fpin.rfind('.'));
+    const auto slashPos = SignedSize(fpin.find_last_of("/\\"));
+    if (fpin.size() <= 4 || dotPos == -1 || dotPos <= slashPos || fpin.compare(slashPos + 1, 4, "hif_") ||
+        fpin.compare(dotPos, fpin.size() - dotPos, ".nfs")) {
       LogModule.report(logvisor::Error,
-        FMT_STRING(_SYS_STR("'{}' must begin with 'hif_' and end with '.nfs' to be accepted as an NFS image")), fpin);
+                       FMT_STRING("'{}' must begin with 'hif_' and end with '.nfs' to be accepted as an NFS image"),
+                       fpin);
       err = true;
       return;
     }
 
     /* Load key file */
-    const SystemString dir(fpin.begin(), fpin.begin() + slashPos + 1);
-    auto keyFile = NewFileIO(dir + _SYS_STR("../code/htk.bin"))->beginReadStream();
+    const std::string dir(fpin.begin(), fpin.begin() + slashPos + 1);
+    auto keyFile = NewFileIO(dir + "../code/htk.bin")->beginReadStream();
     if (!keyFile)
-      keyFile = NewFileIO(dir + _SYS_STR("htk.bin"))->beginReadStream();
+      keyFile = NewFileIO(dir + "htk.bin")->beginReadStream();
     if (!keyFile) {
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Unable to open '{}../code/htk.bin' or '{}htk.bin'")), dir, dir);
+      LogModule.report(logvisor::Error, FMT_STRING("Unable to open '{}../code/htk.bin' or '{}htk.bin'"), dir, dir);
       err = true;
       return;
     }
     if (keyFile->read(key, 16) != 16) {
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Unable to read from '{}../code/htk.bin' or '{}htk.bin'")), dir, dir);
+      LogModule.report(logvisor::Error, FMT_STRING("Unable to read from '{}../code/htk.bin' or '{}htk.bin'"), dir, dir);
       err = true;
       return;
     }
 
     /* Load header from first file */
-    const SystemString firstPath = fmt::format(FMT_STRING(_SYS_STR("{}hif_{:06}.nfs")), dir, 0);
+    const std::string firstPath = fmt::format(FMT_STRING("{}hif_{:06}.nfs"), dir, 0);
     files.push_back(NewFileIO(firstPath));
     auto rs = files.back()->beginReadStream();
     if (!rs) {
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("'{}' does not exist")), firstPath);
+      LogModule.report(logvisor::Error, FMT_STRING("'{}' does not exist"), firstPath);
       err = true;
       return;
     }
     if (rs->read(&nfsHead, 0x200) != 0x200) {
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Unable to read header from '{}'")), firstPath);
+      LogModule.report(logvisor::Error, FMT_STRING("Unable to read header from '{}'"), firstPath);
       err = true;
       return;
     }
     if (std::memcmp(&nfsHead.magic, "EGGS", 4)) {
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Invalid magic in '{}'")), firstPath);
+      LogModule.report(logvisor::Error, FMT_STRING("Invalid magic in '{}'"), firstPath);
       err = true;
       return;
     }
@@ -122,10 +122,10 @@ public:
     const uint32_t numFiles = calculateNumFiles();
     files.reserve(numFiles);
     for (uint32_t i = 1; i < numFiles; ++i) {
-      SystemString path = fmt::format(FMT_STRING(_SYS_STR("{}hif_{:06}.nfs")), dir, i);
+      std::string path = fmt::format(FMT_STRING("{}hif_{:06}.nfs"), dir, i);
       files.push_back(NewFileIO(path));
       if (!files.back()->exists()) {
-        LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("'{}' does not exist")), path);
+        LogModule.report(logvisor::Error, FMT_STRING("'{}' does not exist"), path);
         err = true;
         return;
       }
@@ -150,8 +150,10 @@ public:
     uint32_t m_curBlock = UINT32_MAX;
 
     ReadStream(const DiscIONFS& parent, uint64_t offset, bool& err)
-    : m_parent(parent), m_aes(NewAES()),
-      m_physAddr({UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX}), m_offset(offset) {
+    : m_parent(parent)
+    , m_aes(NewAES())
+    , m_physAddr({UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX})
+    , m_offset(offset) {
       m_aes->setKey(m_parent.key);
       setLogicalAddr(offset);
     }
@@ -260,7 +262,7 @@ public:
   bool hasWiiCrypto() const override { return false; }
 };
 
-std::unique_ptr<IDiscIO> NewDiscIONFS(SystemStringView path) {
+std::unique_ptr<IDiscIO> NewDiscIONFS(std::string_view path) {
   bool err = false;
   auto ret = std::make_unique<DiscIONFS>(path, err);
   if (err)
@@ -268,4 +270,4 @@ std::unique_ptr<IDiscIO> NewDiscIONFS(SystemStringView path) {
   return ret;
 }
 
-}
+} // namespace nod

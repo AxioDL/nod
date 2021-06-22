@@ -8,7 +8,7 @@ class DiscIOISO : public IDiscIO {
   std::unique_ptr<IFileIO> m_fio;
 
 public:
-  DiscIOISO(SystemStringView fpin) : m_fio(NewFileIO(fpin)) {}
+  DiscIOISO(std::string_view fpin) : m_fio(NewFileIO(fpin)) {}
 
   class ReadStream : public IReadStream {
     friend class DiscIOISO;
@@ -57,6 +57,6 @@ public:
   }
 };
 
-std::unique_ptr<IDiscIO> NewDiscIOISO(SystemStringView path) { return std::make_unique<DiscIOISO>(path); }
+std::unique_ptr<IDiscIO> NewDiscIOISO(std::string_view path) { return std::make_unique<DiscIOISO>(path); }
 
 } // namespace nod

@@ -9,7 +9,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         _SCL_SECURE_NO_DEPRECATE=1 _CRT_NONSTDC_NO_WARNINGS=1
         _ENABLE_EXTENDED_ALIGNED_STORAGE=1 NOMINMAX=1)
     add_compile_options(/IGNORE:4221 /wd4018 /wd4800 /wd4005 /wd4311 /wd4068
-        /wd4267 /wd4244 /wd4200 /wd4305 /wd4067 /wd4146 /wd4309 /wd4805 ${VS_OPTIONS})
+        /wd4267 /wd4244 /wd4200 /wd4305 /wd4067 /wd4146 /wd4309 /wd4805 /utf-8 ${VS_OPTIONS})
 
     add_compile_options(
       # Disable exceptions

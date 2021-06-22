@@ -15,16 +15,8 @@
 #include <nod/DiscWii.hpp>
 #include <nod/nod.hpp>
 
-
-constexpr std::array<nod::Codepage_t, 3> codepages = {
-  CP_US_ASCII,
-  CP_UTF8,
-  CP_SHIFT_JIS,
-};
-
-
 static void printHelp() {
-  fmt::print(stderr, FMT_STRING(_SYS_STR(
+  fmt::print(stderr, FMT_STRING(
     "Usage:\n"
     "  nodtool extract [options] <image-in> [<dir-out>]\n"
     "  nodtool makegcn [options] <fsroot-in> [<image-out>]\n"
@@ -33,64 +25,39 @@ static void printHelp() {
     "  nodtool mergewii [options] <fsroot-in> <image-in> [<image-out>]\n"
     "Options:\n"
     "  -f         Force (extract only)\n"
-    "  -v         Verbose details (extract only).\n"
-    "  -c <val>   Set multi-byte character set of image(s).\n"
-    "Available codepage values:\n"
-    "  0          7-bit ASCII (default)\n"
-    "  1          UTF-8\n"
-    "  2          Shift-JIS\n")));
+    "  -v         Verbose details (extract only).\n"));
 }
 
-#if NOD_UCS2
-#ifdef strcasecmp
-#undef strcasecmp
-#endif
-#define strcasecmp _wcsicmp
+#if _MSC_VER
+#include <nowide/args.hpp>
+
 #define PRISize "Iu"
-int wmain(int argc, wchar_t* argv[])
+int main(int argc, char* argv[]) {
+  nowide::args _(argc, argv);
 #else
 #define PRISize "zu"
-int main(int argc, char* argv[])
+int main(int argc, char* argv[]) {
 #endif
-{
   /* Enable logging to console */
   logvisor::RegisterStandardExceptions();
   logvisor::RegisterConsoleLogger();
-#if _WIN32
-  _setmode(_fileno(stdin), _O_U16TEXT);
-  _setmode(_fileno(stdout), _O_U16TEXT);
-  _setmode(_fileno(stderr), _O_U16TEXT);
-#endif
 
   int argidx = 1;
-  nod::SystemString errand;
+  std::string errand;
   bool verbose = false;
-  nod::Codepage_t discLocale = CP_US_ASCII;
-  nod::ExtractionContext ctx = {true, [&](nod::SystemStringView str, float c) {
+  nod::ExtractionContext ctx = {true, [&](std::string_view str, float c) {
                                   if (verbose)
-                                    fmt::print(stderr, FMT_STRING(_SYS_STR("Current node: {}, Extraction {:g}% Complete\n")),
+                                    fmt::print(stderr, FMT_STRING("Current node: {}, Extraction {:g}% Complete\n"),
                                                str, c * 100.f);
                                 }};
   while (argidx < argc) {
-    if (!strcasecmp(argv[argidx], _SYS_STR("-f"))) {
+    if (!nod::StrCaseCmp(argv[argidx], "-f")) {
       ctx.force = true;
       ++argidx;
       continue;
-    } else if (!strcasecmp(argv[argidx], _SYS_STR("-v"))) {
+    } else if (!nod::StrCaseCmp(argv[argidx], "-v")) {
       verbose = true;
       ++argidx;
-      continue;
-    } else if (!strcasecmp(argv[argidx], _SYS_STR("-c"))) {
-      if (argidx+1 < argc) {
-        unsigned long cpidx = nod::StrToUL(argv[argidx + 1], NULL, 0);
-        if (cpidx > codepages.size() - 1)
-          nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Unavailable codepage: {}")), cpidx);
-        discLocale = codepages[cpidx];
-      } else {
-        printHelp();
-        return 1;
-      }
-      argidx += 2;
       continue;
     } else if (errand.empty()) {
       errand = argv[argidx];
@@ -106,18 +73,18 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  auto progFunc = [&](float prog, nod::SystemStringView name, size_t bytes) {
-    fmt::print(FMT_STRING(_SYS_STR("\r                                                                      ")));
+  auto progFunc = [&](float prog, std::string_view name, size_t bytes) {
+    fmt::print(FMT_STRING("\r                                                                      "));
     if (bytes != SIZE_MAX)
-      fmt::print(FMT_STRING(_SYS_STR("\r{:g}% {} {} B")), prog * 100.f, name, bytes);
+      fmt::print(FMT_STRING("\r{:g}% {} {} B"), prog * 100.f, name, bytes);
     else
-      fmt::print(FMT_STRING(_SYS_STR("\r{:g}% {}")), prog * 100.f, name);
+      fmt::print(FMT_STRING("\r{:g}% {}"), prog * 100.f, name);
     fflush(stdout);
   };
 
-  if (errand == _SYS_STR("extract")) {
-    nod::SystemString imageIn;
-    nod::SystemString dirOut;
+  if (errand == "extract") {
+    std::string imageIn;
+    std::string dirOut;
     while (argidx < argc) {
       if (imageIn.empty()) {
         imageIn = argv[argidx];
@@ -133,10 +100,10 @@ int main(int argc, char* argv[])
       }
     }
     if (dirOut.empty())
-      dirOut = _SYS_STR(".");
+      dirOut = ".";
 
     bool isWii;
-    std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(imageIn, isWii, discLocale);
+    std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(imageIn, isWii);
     if (!disc)
       return 1;
 
@@ -148,9 +115,9 @@ int main(int argc, char* argv[])
 
     if (!dataPart->extractToDirectory(dirOut, ctx))
       return 1;
-  } else if (errand == _SYS_STR("makegcn")) {
-    nod::SystemString fsrootIn;
-    nod::SystemString imageOut;
+  } else if (errand == "makegcn") {
+    std::string fsrootIn;
+    std::string imageOut;
     while (argidx < argc) {
       if (fsrootIn.empty()) {
         fsrootIn = argv[argidx];
@@ -166,29 +133,29 @@ int main(int argc, char* argv[])
       }
     }
     if (imageOut.empty())
-      imageOut = fsrootIn + _SYS_STR(".gcm");
+      imageOut = fsrootIn + ".gcm";
 
     /* Pre-validate path */
     nod::Sstat theStat;
     if (nod::Stat(fsrootIn.c_str(), &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as directory")), fsrootIn);
+      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as directory"), fsrootIn);
       return 1;
     }
 
-    if (!nod::DiscBuilderGCN::CalculateTotalSizeRequired(fsrootIn, discLocale))
+    if (!nod::DiscBuilderGCN::CalculateTotalSizeRequired(fsrootIn))
       return 1;
 
     nod::EBuildResult ret;
 
-    nod::DiscBuilderGCN b(imageOut, progFunc, discLocale);
+    nod::DiscBuilderGCN b(imageOut, progFunc);
     ret = b.buildFromDirectory(fsrootIn);
 
-    fmt::print(FMT_STRING(_SYS_STR("\n")));
+    fmt::print(FMT_STRING("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
-  } else if (errand == _SYS_STR("makewii")) {
-    nod::SystemString fsrootIn;
-    nod::SystemString imageOut;
+  } else if (errand == "makewii") {
+    std::string fsrootIn;
+    std::string imageOut;
     while (argidx < argc) {
       if (fsrootIn.empty()) {
         fsrootIn = argv[argidx];
@@ -204,31 +171,31 @@ int main(int argc, char* argv[])
       }
     }
     if (imageOut.empty())
-      imageOut = fsrootIn + _SYS_STR(".iso");
+      imageOut = fsrootIn + ".iso";
 
     /* Pre-validate path */
     nod::Sstat theStat;
     if (nod::Stat(fsrootIn.c_str(), &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as directory")), fsrootIn);
+      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as directory"), fsrootIn);
       return 1;
     }
 
     bool dual = false;
-    if (!nod::DiscBuilderWii::CalculateTotalSizeRequired(fsrootIn, dual, discLocale))
+    if (!nod::DiscBuilderWii::CalculateTotalSizeRequired(fsrootIn, dual))
       return 1;
 
     nod::EBuildResult ret;
 
-    nod::DiscBuilderWii b(imageOut, dual, progFunc, discLocale);
+    nod::DiscBuilderWii b(imageOut, dual, progFunc);
     ret = b.buildFromDirectory(fsrootIn);
 
-    fmt::print(FMT_STRING(_SYS_STR("\n")));
+    fmt::print(FMT_STRING("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
-  } else if (errand == _SYS_STR("mergegcn")) {
-    nod::SystemString fsrootIn;
-    nod::SystemString imageIn;
-    nod::SystemString imageOut;
+  } else if (errand == "mergegcn") {
+    std::string fsrootIn;
+    std::string imageIn;
+    std::string imageOut;
     while (argidx < argc) {
       if (fsrootIn.empty()) {
         fsrootIn = argv[argidx];
@@ -248,45 +215,45 @@ int main(int argc, char* argv[])
       }
     }
     if (imageOut.empty())
-      imageOut = fsrootIn + _SYS_STR(".gcm");
+      imageOut = fsrootIn + ".gcm";
 
     /* Pre-validate paths */
     nod::Sstat theStat;
     if (nod::Stat(fsrootIn.c_str(), &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as directory")), fsrootIn);
+      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as directory"), fsrootIn);
       return 1;
     }
     if (nod::Stat(imageIn.c_str(), &theStat) || !S_ISREG(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as file")), imageIn);
+      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as file"), imageIn);
       return 1;
     }
 
     bool isWii;
-    std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(imageIn, isWii, discLocale);
+    std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(imageIn, isWii);
     if (!disc) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to open image {}")), imageIn);
+      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to open image {}"), imageIn);
       return 1;
     }
     if (isWii) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("Wii images should be merged with 'mergewii'")));
+      nod::LogModule.report(logvisor::Error, FMT_STRING("Wii images should be merged with 'mergewii'"));
       return 1;
     }
 
-    if (!nod::DiscMergerGCN::CalculateTotalSizeRequired(static_cast<nod::DiscGCN&>(*disc), fsrootIn, discLocale))
+    if (!nod::DiscMergerGCN::CalculateTotalSizeRequired(static_cast<nod::DiscGCN&>(*disc), fsrootIn))
       return 1;
 
     nod::EBuildResult ret;
 
-    nod::DiscMergerGCN b(imageOut, static_cast<nod::DiscGCN&>(*disc), progFunc, discLocale);
+    nod::DiscMergerGCN b(imageOut, static_cast<nod::DiscGCN&>(*disc), progFunc);
     ret = b.mergeFromDirectory(fsrootIn);
 
-    fmt::print(FMT_STRING(_SYS_STR("\n")));
+    fmt::print(FMT_STRING("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
-  } else if (errand == _SYS_STR("mergewii")) {
-    nod::SystemString fsrootIn;
-    nod::SystemString imageIn;
-    nod::SystemString imageOut;
+  } else if (errand == "mergewii") {
+    std::string fsrootIn;
+    std::string imageIn;
+    std::string imageOut;
     while (argidx < argc) {
       if (fsrootIn.empty()) {
         fsrootIn = argv[argidx];
@@ -306,47 +273,47 @@ int main(int argc, char* argv[])
       }
     }
     if (imageOut.empty())
-      imageOut = fsrootIn + _SYS_STR(".iso");
+      imageOut = fsrootIn + ".iso";
 
     /* Pre-validate paths */
     nod::Sstat theStat;
     if (nod::Stat(fsrootIn.c_str(), &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as directory")), fsrootIn);
+      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as directory"), fsrootIn);
       return 1;
     }
     if (nod::Stat(imageIn.c_str(), &theStat) || !S_ISREG(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to stat {} as file")), imageIn);
+      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as file"), imageIn);
       return 1;
     }
 
     bool isWii;
-    std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(imageIn, isWii, discLocale);
+    std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(imageIn, isWii);
     if (!disc) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to open image {}")), argv[3]);
+      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to open image {}"), argv[3]);
       return 1;
     }
     if (!isWii) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("GameCube images should be merged with 'mergegcn'")));
+      nod::LogModule.report(logvisor::Error, FMT_STRING("GameCube images should be merged with 'mergegcn'"));
       return 1;
     }
 
     bool dual = false;
-    if (!nod::DiscMergerWii::CalculateTotalSizeRequired(static_cast<nod::DiscWii&>(*disc), fsrootIn, dual, discLocale))
+    if (!nod::DiscMergerWii::CalculateTotalSizeRequired(static_cast<nod::DiscWii&>(*disc), fsrootIn, dual))
       return 1;
 
     nod::EBuildResult ret;
 
-    nod::DiscMergerWii b(imageOut, static_cast<nod::DiscWii&>(*disc), dual, progFunc, discLocale);
+    nod::DiscMergerWii b(imageOut, static_cast<nod::DiscWii&>(*disc), dual, progFunc);
     ret = b.mergeFromDirectory(fsrootIn);
 
-    fmt::print(FMT_STRING(_SYS_STR("\n")));
+    fmt::print(FMT_STRING("\n"));
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else {
     printHelp();
     return 1;
   }
-  
-  nod::LogModule.report(logvisor::Info, FMT_STRING(_SYS_STR("Success!")));
+
+  nod::LogModule.report(logvisor::Info, FMT_STRING("Success!"));
   return 0;
 }

@@ -83,7 +83,7 @@ class DiscIOWBFS : public IDiscIO {
   }
 
 public:
-  DiscIOWBFS(SystemStringView fpin) : m_fio(NewFileIO(fpin)) {
+  DiscIOWBFS(std::string_view fpin) : m_fio(NewFileIO(fpin)) {
     /* Temporary file handle to read LBA table */
     std::unique_ptr<IFileIO::IReadStream> rs = m_fio->beginReadStream();
     if (!rs)
@@ -275,6 +275,6 @@ public:
   std::unique_ptr<IWriteStream> beginWriteStream(uint64_t offset) const override { return {}; }
 };
 
-std::unique_ptr<IDiscIO> NewDiscIOWBFS(SystemStringView path) { return std::make_unique<DiscIOWBFS>(path); }
+std::unique_ptr<IDiscIO> NewDiscIOWBFS(std::string_view path) { return std::make_unique<DiscIOWBFS>(path); }
 
 } // namespace nod

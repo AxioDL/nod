@@ -69,6 +69,6 @@ public:
   virtual std::unique_ptr<IReadStream> beginReadStream(uint64_t offset) const = 0;
 };
 
-std::unique_ptr<IFileIO> NewFileIO(SystemStringView path, int64_t maxWriteSize = -1);
+std::unique_ptr<IFileIO> NewFileIO(std::string_view path, int64_t maxWriteSize = -1);
 
 } // namespace nod

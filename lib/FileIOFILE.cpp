@@ -11,14 +11,14 @@
 namespace nod {
 
 class FileIOFILE : public IFileIO {
-  SystemString m_path;
+  std::string m_path;
   int64_t m_maxWriteSize;
 
 public:
-  FileIOFILE(SystemStringView path, int64_t maxWriteSize) : m_path(path), m_maxWriteSize(maxWriteSize) {}
+  FileIOFILE(std::string_view path, int64_t maxWriteSize) : m_path(path), m_maxWriteSize(maxWriteSize) {}
 
   bool exists() override {
-    FILE* fp = Fopen(m_path.c_str(), _SYS_STR("rb"));
+    FILE* fp = Fopen(m_path.c_str(), "rb");
     if (!fp)
       return false;
     fclose(fp);
@@ -26,7 +26,7 @@ public:
   }
 
   uint64_t size() override {
-    FILE* fp = Fopen(m_path.c_str(), _SYS_STR("rb"));
+    FILE* fp = Fopen(m_path.c_str(), "rb");
     if (!fp)
       return 0;
     FSeek(fp, 0, SEEK_END);
@@ -38,33 +38,33 @@ public:
   struct WriteStream : public IFileIO::IWriteStream {
     FILE* fp;
     int64_t m_maxWriteSize;
-    WriteStream(SystemStringView path, int64_t maxWriteSize, bool& err) : m_maxWriteSize(maxWriteSize) {
-      fp = Fopen(path.data(), _SYS_STR("wb"));
+    WriteStream(std::string_view path, int64_t maxWriteSize, bool& err) : m_maxWriteSize(maxWriteSize) {
+      fp = Fopen(path.data(), "wb");
       if (!fp) {
-        LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to open '{}' for writing")), path);
+        LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for writing"), path);
         err = true;
       }
     }
-    WriteStream(SystemStringView path, uint64_t offset, int64_t maxWriteSize, bool& err)
+    WriteStream(std::string_view path, uint64_t offset, int64_t maxWriteSize, bool& err)
     : m_maxWriteSize(maxWriteSize) {
-      fp = Fopen(path.data(), _SYS_STR("ab"));
+      fp = Fopen(path.data(), "ab");
       if (!fp)
         goto FailLoc;
       fclose(fp);
-      fp = Fopen(path.data(), _SYS_STR("r+b"));
+      fp = Fopen(path.data(), "r+b");
       if (!fp)
         goto FailLoc;
       FSeek(fp, offset, SEEK_SET);
       return;
     FailLoc:
-      LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to open '{}' for writing")), path);
+      LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for writing"), path);
       err = true;
     }
     ~WriteStream() override { fclose(fp); }
     uint64_t write(const void* buf, uint64_t length) override {
       if (m_maxWriteSize >= 0) {
         if (FTell(fp) + length > m_maxWriteSize) {
-          LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("write operation exceeds file's {}-byte limit")),
+          LogModule.report(logvisor::Error, FMT_STRING("write operation exceeds file's {}-byte limit"),
                            m_maxWriteSize);
           return 0;
         }
@@ -95,14 +95,14 @@ public:
 
   struct ReadStream : public IFileIO::IReadStream {
     FILE* fp;
-    ReadStream(SystemStringView path, bool& err) {
-      fp = Fopen(path.data(), _SYS_STR("rb"));
+    ReadStream(std::string_view path, bool& err) {
+      fp = Fopen(path.data(), "rb");
       if (!fp) {
         err = true;
-        LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to open '{}' for reading")), path);
+        LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for reading"), path);
       }
     }
-    ReadStream(SystemStringView path, uint64_t offset, bool& err) : ReadStream(path, err) {
+    ReadStream(std::string_view path, uint64_t offset, bool& err) : ReadStream(path, err) {
       if (err)
         return;
       FSeek(fp, offset, SEEK_SET);
@@ -152,7 +152,7 @@ public:
   }
 };
 
-std::unique_ptr<IFileIO> NewFileIO(SystemStringView path, int64_t maxWriteSize) {
+std::unique_ptr<IFileIO> NewFileIO(std::string_view path, int64_t maxWriteSize) {
   return std::make_unique<FileIOFILE>(path, maxWriteSize);
 }
 

@@ -7,20 +7,20 @@ class DiscBuilderGCN;
 
 class DiscGCN : public DiscBase {
   friend class DiscMergerGCN;
-  DiscBuilderGCN makeMergeBuilder(SystemStringView outPath, FProgress progressCB, Codepage_t codepage);
+  DiscBuilderGCN makeMergeBuilder(std::string_view outPath, FProgress progressCB);
 
 public:
-  DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err, Codepage_t codepage = CP_US_ASCII);
-  bool extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const override;
+  DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err);
+  bool extractDiscHeaderFiles(std::string_view path, const ExtractionContext& ctx) const override;
 };
 
 class DiscBuilderGCN : public DiscBuilderBase {
   friend class DiscMergerGCN;
 
 public:
-  DiscBuilderGCN(SystemStringView outPath, FProgress progressCB, Codepage_t codepage = CP_US_ASCII);
-  EBuildResult buildFromDirectory(SystemStringView dirIn);
-  static std::optional<uint64_t> CalculateTotalSizeRequired(SystemStringView dirIn, Codepage_t codepage = CP_US_ASCII);
+  DiscBuilderGCN(std::string_view outPath, FProgress progressCB);
+  EBuildResult buildFromDirectory(std::string_view dirIn);
+  static std::optional<uint64_t> CalculateTotalSizeRequired(std::string_view dirIn);
 };
 
 class DiscMergerGCN {
@@ -28,9 +28,9 @@ class DiscMergerGCN {
   DiscBuilderGCN m_builder;
 
 public:
-  DiscMergerGCN(SystemStringView outPath, DiscGCN& sourceDisc, FProgress progressCB, Codepage_t codepage = CP_US_ASCII);
-  EBuildResult mergeFromDirectory(SystemStringView dirIn);
-  static std::optional<uint64_t> CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn, Codepage_t codepage = CP_US_ASCII);
+  DiscMergerGCN(std::string_view outPath, DiscGCN& sourceDisc, FProgress progressCB);
+  EBuildResult mergeFromDirectory(std::string_view dirIn);
+  static std::optional<uint64_t> CalculateTotalSizeRequired(DiscGCN& sourceDisc, std::string_view dirIn);
 };
 
 } // namespace nod
