@@ -236,7 +236,7 @@ public:
     return end();
   }
 
-  bool extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx, Codepage_t codepage) const;
+  bool extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx, Codepage_t codepage = CP_US_ASCII) const;
 };
 
 class IPartition {
