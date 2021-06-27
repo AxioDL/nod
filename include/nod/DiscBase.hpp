@@ -236,7 +236,7 @@ public:
     return end();
   }
 
-  bool extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx) const;
+  bool extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx, Codepage_t codepage) const;
 };
 
 class IPartition {
@@ -275,6 +275,7 @@ protected:
   PartitionKind m_kind;
   uint64_t m_offset;
   bool m_isWii;
+  Codepage_t m_codepage;
 
 public:
   mutable size_t m_curNodeIdx = 0;
@@ -289,8 +290,8 @@ public:
       return m_curNodeIdx / float(getNodeCount());
   }
 
-  IPartition(const DiscBase& parent, PartitionKind kind, bool isWii, uint64_t offset)
-  : m_parent(parent), m_kind(kind), m_offset(offset), m_isWii(isWii) {}
+  IPartition(const DiscBase& parent, PartitionKind kind, bool isWii, uint64_t offset, Codepage_t codepage)
+  : m_parent(parent), m_kind(kind), m_offset(offset), m_isWii(isWii), m_codepage(codepage) {}
   virtual uint64_t normalizeOffset(uint64_t anOffset) const { return anOffset; }
   PartitionKind getKind() const { return m_kind; }
   bool isWii() const { return m_isWii; }
@@ -405,14 +406,14 @@ public:
     bool recursiveMergeNodes(IPartWriteStream& ws, bool system, const Node* nodeIn, SystemStringView dirIn,
                              SystemStringView keyPath);
     bool recursiveMergeFST(const Node* nodeIn, SystemStringView dirIn, std::function<void(void)> incParents,
-                           SystemStringView keyPath);
+                           size_t parentDirIdx, SystemStringView keyPath);
 
-    static bool RecursiveCalculateTotalSize(uint64_t& totalSz, const Node* nodeIn, SystemStringView dirIn);
+    static bool RecursiveCalculateTotalSize(uint64_t& totalSz, const Node* nodeIn, SystemStringView dirIn, Codepage_t codepage);
 
     void addBuildName(SystemStringView str) {
-      SystemUTF8Conv utf8View(str);
-      m_buildNames.emplace_back(utf8View.utf8_str());
-      m_buildNameOff += str.size() + 1;
+      SystemToDiscLocConv nameView(str, m_codepage);
+      m_buildNames.emplace_back(nameView.disc_str());
+      m_buildNameOff += nameView.disc_str().size() + 1;
     }
 
     DiscBuilderBase& m_parent;
@@ -420,15 +421,16 @@ public:
     uint64_t m_dolOffset = 0;
     uint64_t m_dolSize = 0;
     bool m_isWii;
+    Codepage_t m_codepage;
 
   public:
-    PartitionBuilderBase(DiscBuilderBase& parent, PartitionKind kind, bool isWii)
-    : m_parent(parent), m_kind(kind), m_isWii(isWii) {}
+    PartitionBuilderBase(DiscBuilderBase& parent, PartitionKind kind, bool isWii, Codepage_t codepage)
+    : m_parent(parent), m_kind(kind), m_isWii(isWii), m_codepage(codepage) {}
     virtual std::unique_ptr<IPartWriteStream> beginWriteStream(uint64_t offset) = 0;
     bool buildFromDirectory(IPartWriteStream& ws, SystemStringView dirIn);
-    static std::optional<uint64_t> CalculateTotalSizeBuild(SystemStringView dirIn, PartitionKind kind, bool isWii);
+    static std::optional<uint64_t> CalculateTotalSizeBuild(SystemStringView dirIn, PartitionKind kind, bool isWii, Codepage_t codepage);
     bool mergeFromDirectory(IPartWriteStream& ws, const IPartition* partIn, SystemStringView dirIn);
-    static std::optional<uint64_t> CalculateTotalSizeMerge(const IPartition* partIn, SystemStringView dirIn);
+    static std::optional<uint64_t> CalculateTotalSizeMerge(const IPartition* partIn, SystemStringView dirIn, Codepage_t codepage);
   };
 
 protected:

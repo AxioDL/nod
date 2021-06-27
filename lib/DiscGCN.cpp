@@ -17,8 +17,8 @@ namespace nod {
 
 class PartitionGCN : public IPartition {
 public:
-  PartitionGCN(const DiscGCN& parent, uint64_t offset, bool& err)
-  : IPartition(parent, PartitionKind::Data, false, offset) {
+  PartitionGCN(const DiscGCN& parent, uint64_t offset, bool& err, Codepage_t codepage)
+  : IPartition(parent, PartitionKind::Data, false, offset, codepage) {
     /* GCN-specific header reads */
     std::unique_ptr<IPartReadStream> s = beginReadStream(0x0);
     if (!s) {
@@ -118,16 +118,16 @@ public:
   }
 };
 
-DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err) : DiscBase(std::move(dio), err) {
+DiscGCN::DiscGCN(std::unique_ptr<IDiscIO>&& dio, bool& err, Codepage_t codepage) : DiscBase(std::move(dio), err) {
   if (err)
     return;
 
   /* One lone partition for GCN */
-  m_partitions.emplace_back(std::make_unique<PartitionGCN>(*this, 0, err));
+  m_partitions.emplace_back(std::make_unique<PartitionGCN>(*this, 0, err, codepage));
 }
 
-DiscBuilderGCN DiscGCN::makeMergeBuilder(SystemStringView outPath, FProgress progressCB) {
-  return DiscBuilderGCN(outPath, progressCB);
+DiscBuilderGCN DiscGCN::makeMergeBuilder(SystemStringView outPath, FProgress progressCB, Codepage_t codepage) {
+  return DiscBuilderGCN(outPath, progressCB, codepage);
 }
 
 bool DiscGCN::extractDiscHeaderFiles(SystemStringView path, const ExtractionContext& ctx) const { return true; }
@@ -161,8 +161,8 @@ public:
     }
   };
 
-  PartitionBuilderGCN(DiscBuilderBase& parent)
-  : DiscBuilderBase::PartitionBuilderBase(parent, PartitionKind::Data, false) {}
+  PartitionBuilderGCN(DiscBuilderBase& parent, Codepage_t codepage)
+  : DiscBuilderBase::PartitionBuilderBase(parent, PartitionKind::Data, false, codepage) {}
 
   uint64_t userAllocate(uint64_t reqSz, IPartWriteStream& ws) override {
     m_curUser -= reqSz;
@@ -372,8 +372,8 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(SystemStringView dirIn) {
   return pb.buildFromDirectory(dirIn) ? EBuildResult::Success : EBuildResult::Failed;
 }
 
-std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn) {
-  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
+std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringView dirIn, Codepage_t codepage) {
+  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false, codepage);
   if (!sz)
     return sz;
   *sz += 0x30000;
@@ -384,13 +384,13 @@ std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(SystemStringV
   return sz;
 }
 
-DiscBuilderGCN::DiscBuilderGCN(SystemStringView outPath, FProgress progressCB)
+DiscBuilderGCN::DiscBuilderGCN(SystemStringView outPath, FProgress progressCB, Codepage_t codepage)
 : DiscBuilderBase(outPath, 0x57058000, progressCB) {
-  m_partitions.emplace_back(std::make_unique<PartitionBuilderGCN>(*this));
+  m_partitions.emplace_back(std::make_unique<PartitionBuilderGCN>(*this, codepage));
 }
 
-DiscMergerGCN::DiscMergerGCN(SystemStringView outPath, DiscGCN& sourceDisc, FProgress progressCB)
-: m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, progressCB)) {}
+DiscMergerGCN::DiscMergerGCN(SystemStringView outPath, DiscGCN& sourceDisc, FProgress progressCB, Codepage_t codepage)
+: m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, progressCB, codepage)) {}
 
 EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn) {
   if (!m_builder.getFileIO().beginWriteStream())
@@ -416,8 +416,8 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(SystemStringView dirIn) {
              : EBuildResult::Failed;
 }
 
-std::optional<uint64_t> DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn) {
-  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
+std::optional<uint64_t> DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, SystemStringView dirIn, Codepage_t codepage) {
+  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn, codepage);
   if (!sz)
     return std::nullopt;
   *sz += 0x30000;

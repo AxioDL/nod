@@ -241,8 +241,8 @@ class PartitionWii : public IPartition {
   uint8_t m_decKey[16];
 
 public:
-  PartitionWii(const DiscWii& parent, PartitionKind kind, uint64_t offset, bool& err)
-  : IPartition(parent, kind, true, offset) {
+  PartitionWii(const DiscWii& parent, PartitionKind kind, uint64_t offset, bool& err, Codepage_t codepage)
+  : IPartition(parent, kind, true, offset, codepage) {
     std::unique_ptr<IReadStream> s = parent.getDiscIO().beginReadStream(offset);
     if (!s) {
       err = true;
@@ -447,7 +447,7 @@ public:
     SystemString ticketPath = basePathStr + _SYS_STR("/ticket.bin");
     if (ctx.force || Stat(ticketPath.c_str(), &theStat)) {
       if (ctx.progressCB)
-        ctx.progressCB("ticket.bin", 0.f);
+        ctx.progressCB(_SYS_STR("ticket.bin"), 0.f);
       auto ws = NewFileIO(ticketPath)->beginWriteStream();
       if (!ws)
         return false;
@@ -458,7 +458,7 @@ public:
     SystemString tmdPath = basePathStr + _SYS_STR("/tmd.bin");
     if (ctx.force || Stat(tmdPath.c_str(), &theStat)) {
       if (ctx.progressCB)
-        ctx.progressCB("tmd.bin", 0.f);
+        ctx.progressCB(_SYS_STR("tmd.bin"), 0.f);
       auto ws = NewFileIO(tmdPath)->beginWriteStream();
       if (!ws)
         return false;
@@ -469,7 +469,7 @@ public:
     SystemString certPath = basePathStr + _SYS_STR("/cert.bin");
     if (ctx.force || Stat(certPath.c_str(), &theStat)) {
       if (ctx.progressCB)
-        ctx.progressCB("cert.bin", 0.f);
+        ctx.progressCB(_SYS_STR("cert.bin"), 0.f);
       auto ws = NewFileIO(certPath)->beginWriteStream();
       if (!ws)
         return false;
@@ -482,7 +482,7 @@ public:
     SystemString h3Path = basePathStr + _SYS_STR("/h3.bin");
     if (ctx.force || Stat(h3Path.c_str(), &theStat)) {
       if (ctx.progressCB)
-        ctx.progressCB("h3.bin", 0.f);
+        ctx.progressCB(_SYS_STR("h3.bin"), 0.f);
       auto ws = NewFileIO(h3Path)->beginWriteStream();
       if (!ws)
         return false;
@@ -493,7 +493,7 @@ public:
   }
 };
 
-DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err) : DiscBase(std::move(dio), err) {
+DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err, Codepage_t codepage) : DiscBase(std::move(dio), err) {
   if (err)
     return;
 
@@ -543,14 +543,14 @@ DiscWii::DiscWii(std::unique_ptr<IDiscIO>&& dio, bool& err) : DiscBase(std::move
       err = true;
       return;
     }
-    m_partitions.emplace_back(std::make_unique<PartitionWii>(*this, kind, part.partDataOff << 2, err));
+    m_partitions.emplace_back(std::make_unique<PartitionWii>(*this, kind, part.partDataOff << 2, err, codepage));
     if (err)
       return;
   }
 }
 
-DiscBuilderWii DiscWii::makeMergeBuilder(SystemStringView outPath, bool dualLayer, FProgress progressCB) {
-  return DiscBuilderWii(outPath, dualLayer, progressCB);
+DiscBuilderWii DiscWii::makeMergeBuilder(SystemStringView outPath, bool dualLayer, FProgress progressCB, Codepage_t codepage) {
+  return DiscBuilderWii(outPath, dualLayer, progressCB, codepage);
 }
 
 bool DiscWii::extractDiscHeaderFiles(SystemStringView basePath, const ExtractionContext& ctx) const {
@@ -567,7 +567,7 @@ bool DiscWii::extractDiscHeaderFiles(SystemStringView basePath, const Extraction
   SystemString headerPath = basePathStr + _SYS_STR("/disc/header.bin");
   if (ctx.force || Stat(headerPath.c_str(), &theStat)) {
     if (ctx.progressCB)
-      ctx.progressCB("header.bin", 0.f);
+      ctx.progressCB(_SYS_STR("header.bin"), 0.f);
     std::unique_ptr<IReadStream> rs = getDiscIO().beginReadStream(0x0);
     if (!rs)
       return false;
@@ -583,7 +583,7 @@ bool DiscWii::extractDiscHeaderFiles(SystemStringView basePath, const Extraction
   SystemString regionPath = basePathStr + _SYS_STR("/disc/region.bin");
   if (ctx.force || Stat(regionPath.c_str(), &theStat)) {
     if (ctx.progressCB)
-      ctx.progressCB("header.bin", 0.f);
+      ctx.progressCB(_SYS_STR("header.bin"), 0.f);
     std::unique_ptr<IReadStream> rs = getDiscIO().beginReadStream(0x4E000);
     if (!rs)
       return false;
@@ -746,8 +746,8 @@ public:
     }
   };
 
-  PartitionBuilderWii(DiscBuilderBase& parent, PartitionKind kind, uint64_t baseOffset)
-  : DiscBuilderBase::PartitionBuilderBase(parent, kind, true), m_baseOffset(baseOffset), m_aes(NewAES()) {}
+  PartitionBuilderWii(DiscBuilderBase& parent, PartitionKind kind, uint64_t baseOffset, Codepage_t codepage)
+  : DiscBuilderBase::PartitionBuilderBase(parent, kind, true, codepage), m_baseOffset(baseOffset), m_aes(NewAES()) {}
 
   uint64_t getCurUserEnd() const { return m_curUser; }
 
@@ -1235,8 +1235,8 @@ EBuildResult DiscBuilderWii::buildFromDirectory(SystemStringView dirIn) {
   return EBuildResult::Success;
 }
 
-std::optional<uint64_t> DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer) {
-  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true);
+std::optional<uint64_t> DiscBuilderWii::CalculateTotalSizeRequired(SystemStringView dirIn, bool& dualLayer, Codepage_t codepage) {
+  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, true, codepage);
   if (!sz)
     return sz;  
   auto szDiv = nod::div(*sz, uint64_t(0x1F0000));
@@ -1252,13 +1252,13 @@ std::optional<uint64_t> DiscBuilderWii::CalculateTotalSizeRequired(SystemStringV
   return sz;
 }
 
-DiscBuilderWii::DiscBuilderWii(SystemStringView outPath, bool dualLayer, FProgress progressCB)
+DiscBuilderWii::DiscBuilderWii(SystemStringView outPath, bool dualLayer, FProgress progressCB, Codepage_t codepage)
 : DiscBuilderBase(outPath, dualLayer ? 0x1FB4E0000 : 0x118240000, progressCB) {
-  m_partitions.emplace_back(std::make_unique<PartitionBuilderWii>(*this, PartitionKind::Data, 0x200000));
+  m_partitions.emplace_back(std::make_unique<PartitionBuilderWii>(*this, PartitionKind::Data, 0x200000, codepage));
 }
 
-DiscMergerWii::DiscMergerWii(SystemStringView outPath, DiscWii& sourceDisc, bool dualLayer, FProgress progressCB)
-: m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, dualLayer, progressCB)) {}
+DiscMergerWii::DiscMergerWii(SystemStringView outPath, DiscWii& sourceDisc, bool dualLayer, FProgress progressCB, Codepage_t codepage)
+: m_sourceDisc(sourceDisc), m_builder(sourceDisc.makeMergeBuilder(outPath, dualLayer, progressCB, codepage)) {}
 
 EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn) {
   PartitionBuilderWii& pb = static_cast<PartitionBuilderWii&>(*m_builder.m_partitions[0]);
@@ -1342,8 +1342,8 @@ EBuildResult DiscMergerWii::mergeFromDirectory(SystemStringView dirIn) {
   return EBuildResult::Success;
 }
 
-std::optional<uint64_t> DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc, SystemStringView dirIn, bool& dualLayer) {
-  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
+std::optional<uint64_t> DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourceDisc, SystemStringView dirIn, bool& dualLayer, Codepage_t codepage) {
+  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn, codepage);
   if (!sz)
     return std::nullopt;
   auto szDiv = nod::div(*sz, uint64_t(0x1F0000));
