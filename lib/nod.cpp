@@ -14,7 +14,7 @@ std::unique_ptr<IDiscIO> NewDiscIOISO(SystemStringView path);
 std::unique_ptr<IDiscIO> NewDiscIOWBFS(SystemStringView path);
 std::unique_ptr<IDiscIO> NewDiscIONFS(SystemStringView path);
 
-std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii) {
+std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii, Codepage_t codepage) {
   /* Temporary file handle to determine image type */
   std::unique_ptr<IFileIO> fio = NewFileIO(path);
   if (!fio->exists()) {
@@ -67,13 +67,13 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii) 
   bool err = false;
   std::unique_ptr<DiscBase> ret;
   if (isWii) {
-    ret = std::make_unique<DiscWii>(std::move(discIO), err);
+    ret = std::make_unique<DiscWii>(std::move(discIO), err, codepage);
     if (err)
       return {};
     return ret;
   }
 
-  ret = std::make_unique<DiscGCN>(std::move(discIO), err);
+  ret = std::make_unique<DiscGCN>(std::move(discIO), err, codepage);
   if (err)
     return {};
   return ret;
@@ -81,7 +81,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path, bool& isWii) 
 
 std::unique_ptr<DiscBase> OpenDiscFromImage(SystemStringView path) {
   bool isWii;
-  return OpenDiscFromImage(path, isWii);
+  return OpenDiscFromImage(path, isWii, CP_US_ASCII);
 }
 
 } // namespace nod

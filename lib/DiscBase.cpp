@@ -126,25 +126,25 @@ std::unique_ptr<uint8_t[]> Node::getBuf() const {
   return buf;
 }
 
-bool Node::extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx) const {
-  SystemStringConv nameView(getName());
+bool Node::extractToDirectory(SystemStringView basePath, const ExtractionContext& ctx, Codepage_t codepage) const {
+  DiscLocToSystemConv nameView(getName(), codepage);
   SystemString path = SystemString(basePath) + _SYS_STR('/') + nameView.sys_str().data();
 
   if (m_kind == Kind::Directory) {
     ++m_parent.m_curNodeIdx;
     if (ctx.progressCB && !getName().empty())
-      ctx.progressCB(getName(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
+      ctx.progressCB(nameView.sys_str(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
     if (Mkdir(path.c_str(), 0755) && errno != EEXIST) {
       LogModule.report(logvisor::Error, FMT_STRING(_SYS_STR("unable to mkdir '{}'")), path);
       return false;
     }
     for (Node& subnode : *this)
-      if (!subnode.extractToDirectory(path, ctx))
+      if (!subnode.extractToDirectory(path, ctx, codepage))
         return false;
   } else if (m_kind == Kind::File) {
     Sstat theStat;
     if (ctx.progressCB)
-      ctx.progressCB(getName(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
+      ctx.progressCB(nameView.sys_str(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
 
     if (ctx.force || Stat(path.c_str(), &theStat)) {
       std::unique_ptr<IPartReadStream> rs = beginReadStream();
@@ -153,7 +153,7 @@ bool Node::extractToDirectory(SystemStringView basePath, const ExtractionContext
         return false;
       ws->copyFromDisc(*rs, m_discLength, [&](float prog) {
         if (ctx.progressCB)
-          ctx.progressCB(getName(), (m_parent.m_curNodeIdx + prog) / float(m_parent.getNodeCount()));
+          ctx.progressCB(nameView.sys_str(), (m_parent.m_curNodeIdx + prog) / float(m_parent.getNodeCount()));
       });
     }
     ++m_parent.m_curNodeIdx;
@@ -194,7 +194,7 @@ bool IPartition::extractToDirectory(SystemStringView path, const ExtractionConte
     return false;
   }
 
-  return m_nodes[0].extractToDirectory(fsPath, ctx);
+  return m_nodes[0].extractToDirectory(fsPath, ctx, m_codepage);
 }
 
 bool IPartition::extractSysFiles(SystemStringView basePath, const ExtractionContext& ctx) const {
@@ -209,7 +209,7 @@ bool IPartition::extractSysFiles(SystemStringView basePath, const ExtractionCont
   SystemString apploaderPath = basePathStr + _SYS_STR("/sys/apploader.img");
   if (ctx.force || Stat(apploaderPath.c_str(), &theStat)) {
     if (ctx.progressCB)
-      ctx.progressCB("apploader.bin", 0.f);
+      ctx.progressCB(_SYS_STR("apploader.bin"), 0.f);
     std::unique_ptr<uint8_t[]> buf = getApploaderBuf();
     auto ws = NewFileIO(apploaderPath)->beginWriteStream();
     if (!ws)
@@ -221,7 +221,7 @@ bool IPartition::extractSysFiles(SystemStringView basePath, const ExtractionCont
   SystemString dolPath = basePathStr + _SYS_STR("/sys/main.dol");
   if (ctx.force || Stat(dolPath.c_str(), &theStat)) {
     if (ctx.progressCB)
-      ctx.progressCB("main.dol", 0.f);
+      ctx.progressCB(_SYS_STR("main.dol"), 0.f);
     std::unique_ptr<uint8_t[]> buf = getDOLBuf();
     auto ws = NewFileIO(dolPath)->beginWriteStream();
     if (!ws)
@@ -233,7 +233,7 @@ bool IPartition::extractSysFiles(SystemStringView basePath, const ExtractionCont
   SystemString bootPath = basePathStr + _SYS_STR("/sys/boot.bin");
   if (ctx.force || Stat(bootPath.c_str(), &theStat)) {
     if (ctx.progressCB)
-      ctx.progressCB("boot.bin", 0.f);
+      ctx.progressCB(_SYS_STR("boot.bin"), 0.f);
     auto ws = NewFileIO(bootPath)->beginWriteStream();
     if (!ws)
       return false;
@@ -244,7 +244,7 @@ bool IPartition::extractSysFiles(SystemStringView basePath, const ExtractionCont
   SystemString bi2Path = basePathStr + _SYS_STR("/sys/bi2.bin");
   if (ctx.force || Stat(bi2Path.c_str(), &theStat)) {
     if (ctx.progressCB)
-      ctx.progressCB("bi2.bin", 0.f);
+      ctx.progressCB(_SYS_STR("bi2.bin"), 0.f);
 
     auto ws = NewFileIO(bi2Path)->beginWriteStream();
     if (!ws)
@@ -406,10 +406,10 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodesPre(const Node* n
   if (!dirIn.empty()) {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum) {
-      SystemUTF8Conv nameView(e.m_name);
+      SystemToDiscLocConv nameView(e.m_name, m_codepage);
 
       if (e.m_isDir) {
-        auto search = dirNodes.find(nameView.utf8_str().data());
+        auto search = dirNodes.find(nameView.disc_str().data());
         if (search != dirNodes.cend()) {
           recursiveMergeNodesPre(search->second, e.m_path.c_str());
           dirNodes.erase(search);
@@ -417,7 +417,7 @@ void DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodesPre(const Node* n
           recursiveMergeNodesPre(nullptr, e.m_path.c_str());
         }
       } else {
-        fileNodes.erase(nameView.utf8_str().data());
+        fileNodes.erase(nameView.disc_str().data());
         ++m_parent.m_progressTotal;
       }
     }
@@ -452,11 +452,11 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
   if (!dirIn.empty()) {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum) {
-      SystemUTF8Conv nameView(e.m_name);
+      SystemToDiscLocConv nameView(e.m_name, m_codepage);
       SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + e.m_name;
 
       if (e.m_isDir) {
-        auto search = dirNodes.find(nameView.utf8_str().data());
+        auto search = dirNodes.find(nameView.disc_str().data());
         if (search != dirNodes.cend()) {
           if (!recursiveMergeNodes(ws, system, search->second, e.m_path.c_str(), chKeyPath))
             return false;
@@ -471,7 +471,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
         if (system ^ isSys)
           continue;
 
-        fileNodes.erase(nameView.utf8_str().data());
+        fileNodes.erase(nameView.disc_str().data());
 
         size_t fileSz = ROUND_UP_32(e.m_fileSz);
         uint64_t fileOff = userAllocate(fileSz, ws);
@@ -508,7 +508,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
 
   /* Write-through remaining dir nodes */
   for (const auto& p : dirNodes) {
-    SystemStringConv sysName(p.second->getName());
+    DiscLocToSystemConv sysName(p.second->getName(), m_codepage);
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.c_str();
     if (!recursiveMergeNodes(ws, system, p.second, {}, chKeyPath))
       return false;
@@ -517,7 +517,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
   /* Write-through remaining file nodes */
   for (const auto& p : fileNodes) {
     const Node& ch = *p.second;
-    SystemStringConv sysName(ch.getName());
+    DiscLocToSystemConv sysName(ch.getName(), m_codepage);
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.c_str();
 
     bool isDol;
@@ -565,7 +565,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeNodes(IPartWriteStream
 
 bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn, SystemStringView dirIn,
                                                               std::function<void(void)> incParents,
-                                                              SystemStringView keyPath) {
+                                                              size_t parentDirIdx, SystemStringView keyPath) {
   /* Build map of existing nodes to write-through later */
   std::unordered_map<std::string, const Node*> fileNodes;
   std::unordered_map<std::string, const Node*> dirNodes;
@@ -584,23 +584,23 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
   if (!dirIn.empty()) {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum) {
-      SystemUTF8Conv nameView(e.m_name);
+      SystemToDiscLocConv nameView(e.m_name, m_codepage);
       SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + e.m_name;
 
       if (e.m_isDir) {
         size_t dirNodeIdx = m_buildNodes.size();
-        m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx + 1);
+        m_buildNodes.emplace_back(true, m_buildNameOff, parentDirIdx, dirNodeIdx + 1);
         addBuildName(e.m_name);
         incParents();
 
-        auto search = dirNodes.find(nameView.utf8_str().data());
+        auto search = dirNodes.find(nameView.disc_str().data());
         if (search != dirNodes.cend()) {
           if (!recursiveMergeFST(search->second, e.m_path.c_str(),
                                  [&]() {
                                    m_buildNodes[dirNodeIdx].incrementLength();
                                    incParents();
                                  },
-                                 chKeyPath))
+                                 dirNodeIdx, chKeyPath))
             return false;
           dirNodes.erase(search);
         } else {
@@ -609,11 +609,11 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
                                    m_buildNodes[dirNodeIdx].incrementLength();
                                    incParents();
                                  },
-                                 chKeyPath))
+                                 dirNodeIdx, chKeyPath))
             return false;
         }
       } else {
-        fileNodes.erase(nameView.utf8_str().data());
+        fileNodes.erase(nameView.disc_str().data());
         std::pair<uint64_t, uint64_t> fileOffSz = m_fileOffsetsSizes.at(chKeyPath);
         m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
         addBuildName(e.m_name);
@@ -624,11 +624,11 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
 
   /* Write-through remaining dir nodes */
   for (const auto& p : dirNodes) {
-    SystemStringConv sysName(p.second->getName());
+    DiscLocToSystemConv sysName(p.second->getName(), m_codepage);
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.sys_str().data();
 
     size_t dirNodeIdx = m_buildNodes.size();
-    m_buildNodes.emplace_back(true, m_buildNameOff, 0, dirNodeIdx + 1);
+    m_buildNodes.emplace_back(true, m_buildNameOff, parentDirIdx, dirNodeIdx + 1);
     addBuildName(sysName.sys_str());
     incParents();
 
@@ -637,14 +637,14 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
                              m_buildNodes[dirNodeIdx].incrementLength();
                              incParents();
                            },
-                           chKeyPath))
+                           dirNodeIdx, chKeyPath))
       return false;
   }
 
   /* Write-through remaining file nodes */
   for (const auto& p : fileNodes) {
     const Node& ch = *p.second;
-    SystemStringConv sysName(ch.getName());
+    DiscLocToSystemConv sysName(ch.getName(), m_codepage);
     SystemString chKeyPath = SystemString(keyPath) + _SYS_STR('/') + sysName.sys_str().data();
 
     std::pair<uint64_t, uint64_t> fileOffSz = m_fileOffsetsSizes.at(chKeyPath);
@@ -657,7 +657,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
 }
 
 bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(uint64_t& totalSz, const Node* nodeIn,
-                                                                        SystemStringView dirIn) {
+                                                                        SystemStringView dirIn, Codepage_t codepage) {
   /* Build map of existing nodes to write-through later */
   std::unordered_map<std::string, const Node*> fileNodes;
   std::unordered_map<std::string, const Node*> dirNodes;
@@ -676,20 +676,20 @@ bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(uint64_t
   if (!dirIn.empty()) {
     DirectoryEnumerator dEnum(dirIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
     for (const DirectoryEnumerator::Entry& e : dEnum) {
-      SystemUTF8Conv nameView(e.m_name);
+      SystemToDiscLocConv nameView(e.m_name, codepage);
 
       if (e.m_isDir) {
-        auto search = dirNodes.find(nameView.utf8_str().data());
+        auto search = dirNodes.find(nameView.disc_str().data());
         if (search != dirNodes.cend()) {
-          if (!RecursiveCalculateTotalSize(totalSz, search->second, e.m_path.c_str()))
+          if (!RecursiveCalculateTotalSize(totalSz, search->second, e.m_path.c_str(), codepage))
             return false;
           dirNodes.erase(search);
         } else {
-          if (!RecursiveCalculateTotalSize(totalSz, nullptr, e.m_path.c_str()))
+          if (!RecursiveCalculateTotalSize(totalSz, nullptr, e.m_path.c_str(), codepage))
             return false;
         }
       } else {
-        fileNodes.erase(nameView.utf8_str().data());
+        fileNodes.erase(nameView.disc_str().data());
         totalSz += ROUND_UP_32(e.m_fileSz);
       }
     }
@@ -697,7 +697,7 @@ bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(uint64_t
 
   /* Write-through remaining dir nodes */
   for (const auto& p : dirNodes) {
-    if (!RecursiveCalculateTotalSize(totalSz, p.second, {}))
+    if (!RecursiveCalculateTotalSize(totalSz, p.second, {}, codepage))
       return false;
   }
 
@@ -770,7 +770,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
 }
 
 std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(SystemStringView dirIn,
-                                                                                       PartitionKind kind, bool isWii) {
+                                                                                       PartitionKind kind, bool isWii, Codepage_t codepage) {
   SystemString dirStr(dirIn);
   SystemString basePath = isWii ? dirStr + _SYS_STR("/") + getKindString(kind) : dirStr;
   SystemString dolIn = basePath + _SYS_STR("/sys/main.dol");
@@ -782,7 +782,7 @@ std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSiz
     return std::nullopt;
   }
   uint64_t totalSz = ROUND_UP_32(dolStat.st_size);
-  if (!RecursiveCalculateTotalSize(totalSz, nullptr, filesIn.c_str()))
+  if (!RecursiveCalculateTotalSize(totalSz, nullptr, filesIn.c_str(), codepage))
     return std::nullopt;
   return totalSz;
 }
@@ -837,20 +837,20 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
     return false;
   if (!recursiveMergeNodes(ws, false, &partIn->getFSTRoot(), filesIn.c_str(), keyPath))
     return false;
-  if (!recursiveMergeFST(&partIn->getFSTRoot(), filesIn.c_str(), [&]() { m_buildNodes[0].incrementLength(); }, keyPath))
+  if (!recursiveMergeFST(&partIn->getFSTRoot(), filesIn.c_str(), [&]() { m_buildNodes[0].incrementLength(); }, 0, keyPath))
     return false;
 
   return true;
 }
 
 std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(const IPartition* partIn,
-                                                                                       SystemStringView dirIn) {
+                                                                                       SystemStringView dirIn, Codepage_t codepage) {
   SystemString dirStr(dirIn);
   SystemString basePath = partIn->isWii() ? dirStr + _SYS_STR("/") + getKindString(partIn->getKind()) : dirStr;
   SystemString filesIn = basePath + _SYS_STR("/files");
 
   uint64_t totalSz = ROUND_UP_32(partIn->getDOLSize());
-  if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), filesIn.c_str()))
+  if (!RecursiveCalculateTotalSize(totalSz, &partIn->getFSTRoot(), filesIn.c_str(), codepage))
     return std::nullopt;
   return totalSz;
 }
