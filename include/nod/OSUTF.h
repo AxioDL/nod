@@ -1,5 +1,10 @@
 #ifdef __cplusplus
 #include <array>
+#include <cstdint>
+
+#if !__cpp_char8_t
+using char8_t = uint8_t;
+#endif
 
 #define OS_CONSTEXPR constexpr
 
