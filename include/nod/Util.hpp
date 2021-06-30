@@ -1,6 +1,7 @@
 #pragma once
 
-#if _WIN32 && UNICODE
+#if _WIN32
+#include <array>
 #include <cwctype>
 #include <direct.h>
 #ifndef WIN32_LEAN_AND_MEAN
@@ -88,7 +89,7 @@ static inline int Stat(const char* path, Sstat* statout) {
   return _wstat64(wpath.get(), statout);
 }
 #else
-static inline int Mkdir(const char* path, mode_t mode) { return CreateDirectoryA(path, mode); }
+static inline int Mkdir(const char* path, mode_t mode) { return mkdir(path, mode); }
 
 typedef struct stat Sstat;
 static inline int Stat(const char* path, Sstat* statout) { return stat(path, statout); }
@@ -235,14 +236,14 @@ static inline bool CheckFreeSpace(const char* path, size_t reqSz) {
   wchar_t* end = nullptr;
   DWORD ret = GetFullPathNameW(wpath.get(), 1024, buf.data(), &end);
   if (ret == 0 || ret > 1024) {
-    LogModule.report(logvisor::Error, FMT_STRING("GetFullPathNameA {}"), path);
+    LogModule.report(logvisor::Error, FMT_STRING("GetFullPathNameW {}"), path);
     return false;
   }
   if (end != nullptr) {
     end[0] = L'\0';
   }
   if (!GetDiskFreeSpaceExW(buf.data(), &freeBytes, nullptr, nullptr)) {
-    LogModule.report(logvisor::Error, FMT_STRING("GetDiskFreeSpaceExA {}: {}"), path, GetLastError());
+    LogModule.report(logvisor::Error, FMT_STRING("GetDiskFreeSpaceExW {}: {}"), path, GetLastError());
     return false;
   }
   return reqSz < freeBytes.QuadPart;

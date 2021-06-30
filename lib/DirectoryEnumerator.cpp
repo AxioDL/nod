@@ -1,15 +1,20 @@
 #include "nod/DirectoryEnumerator.hpp"
 
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #else
-#include <sys/stat.h>
 #include <dirent.h>
+#include <sys/stat.h>
 #endif
 
 #include <cstring>
 #include <map>
+#ifdef __cpp_lib_ranges
 #include <ranges>
+#endif
 
 namespace nod {
 
