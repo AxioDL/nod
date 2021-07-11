@@ -3106,6 +3106,7 @@ const char8_t* OSUTF8To32(const char8_t* utf8, char32_t* utf32) {
     len = 0;
   } else if ((chr & 0xe0) == 0xc0) {
     outChar = chr & 0x1F;
+    len = 1;
   } else if ((chr & 0xf0) == 0xe0) {
     outChar = chr & 0xf;
     len = 2;
