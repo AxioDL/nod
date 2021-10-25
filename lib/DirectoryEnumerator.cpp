@@ -5,6 +5,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <ranges>
 #else
 #include <dirent.h>
 #include <sys/stat.h>
@@ -12,9 +13,6 @@
 
 #include <cstring>
 #include <map>
-#ifdef __cpp_lib_ranges
-#include <ranges>
-#endif
 
 namespace nod {
 
