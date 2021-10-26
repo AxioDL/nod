@@ -5,7 +5,6 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
-#include <ranges>
 #else
 #include <dirent.h>
 #include <sys/stat.h>
@@ -83,8 +82,8 @@ DirectoryEnumerator::DirectoryEnumerator(std::string_view path, Mode mode, bool 
 
     m_entries.reserve(sort.size());
     if (reverse) {
-      for (auto& it : std::ranges::reverse_view(sort)) {
-        m_entries.emplace_back(std::move(it.second));
+      for (auto it = sort.crbegin(); it != sort.crend(); ++it) {
+        m_entries.emplace_back(std::move(it->second));
       }
     } else {
       for (auto& e : sort) {
@@ -125,8 +124,8 @@ DirectoryEnumerator::DirectoryEnumerator(std::string_view path, Mode mode, bool 
 
       m_entries.reserve(m_entries.size() + sort.size());
       if (reverse) {
-        for (auto& it : std::ranges::reverse_view(sort)) {
-          m_entries.emplace_back(std::move(it.second));
+        for (auto it = sort.crbegin(); it != sort.crend(); ++it) {
+          m_entries.emplace_back(std::move(it->second));
         }
       } else {
         for (auto& e : sort) {
@@ -155,8 +154,8 @@ DirectoryEnumerator::DirectoryEnumerator(std::string_view path, Mode mode, bool 
 
       m_entries.reserve(m_entries.size() + sort.size());
       if (reverse) {
-        for (auto& e : std::ranges::reverse_view(sort)) {
-          m_entries.emplace_back(std::move(e.second));
+        for (auto it = sort.crbegin(); it != sort.crend(); ++it) {
+          m_entries.emplace_back(std::move(it->second));
         }
       } else {
         for (auto& e : sort) {
