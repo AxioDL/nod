@@ -1,7 +1,13 @@
-#include <cinttypes>
 #include <cstdint>
-#include <cstdio>
-#include <cstdlib>
+#if _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 1
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#endif
 
 #include "nod/IFileIO.hpp"
 #include "nod/Util.hpp"

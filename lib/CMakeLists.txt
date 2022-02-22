@@ -11,6 +11,7 @@ add_library(nod
   DiscWii.cpp
   nod.cpp
   OSUTF.c
+  Util.cpp
 
   ../include/nod/aes.hpp
   ../include/nod/DirectoryEnumerator.hpp
@@ -20,9 +21,9 @@ add_library(nod
   ../include/nod/IDiscIO.hpp
   ../include/nod/IFileIO.hpp
   ../include/nod/nod.hpp
+  ../include/nod/OSUTF.h
   ../include/nod/sha1.h
   ../include/nod/Util.hpp
-  ../include/nod/OSUTF.h
 )
 
 target_include_directories(nod PUBLIC
