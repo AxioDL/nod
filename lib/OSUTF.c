@@ -3033,7 +3033,7 @@ char16_t* OSUTF32To16(char32_t utf32, char16_t* utf16) {
 }
 
 char8_t* OSUTF32To8(char32_t utf32, char8_t* utf8) {
-  char32_t len = 4;
+  char32_t len = 0;
   if (utf32 < 0xd800 || utf32 > 0xdfff) {
     if (utf32 < 0x80) {
       utf8[0] = utf32;
@@ -3059,7 +3059,7 @@ char8_t* OSUTF32To8(char32_t utf32, char8_t* utf8) {
 
     while (len > 0) {
       --len;
-      *utf8 = ((utf32 >> (len * 6)) & 0x3f) | 0x80;
+      *utf8 = ((utf32 >> (len * 6 & 0x3fU)) & 0x3f) | 0x80;
       ++utf8;
     }
   } else {
@@ -3070,26 +3070,26 @@ char8_t* OSUTF32To8(char32_t utf32, char8_t* utf8) {
 }
 
 const char16_t* OSUTF16To32(const char16_t* utf16, char32_t* utf32) {
-  char16_t chr1 = *utf16;
-  char16_t chr2 = 0;
-  char32_t outChr = 0;
+  uint32_t outChr = 0;
+  uint16_t chr1 = *utf16;
   if (chr1 != 0) {
     ++utf16;
   }
 
   if (chr1 < 0xd800 || chr1 > 0xdfff) {
     outChr = chr1;
-  } else if (chr1 > 0xdbff) {
-    return NULL;
   } else {
-    chr2 = *utf16;
+    if (chr1 > 0xdbff) {
+      return NULL;
+    }
+    uint16_t chr2 = *utf16;
     ++utf16;
     if (chr2 < 0xdc00 || chr2 > 0xdfff) {
       return NULL;
     }
-
-    outChr = ((chr1 & 0x3ff) << 10 | (chr2 & 0x3ff)) + 0x10000;
+    outChr = (((chr1 & 0x3ff) << 10) | (chr2 & 0x3ff)) + 0x10000;
   }
+
   *utf32 = outChr;
   return utf16;
 }
