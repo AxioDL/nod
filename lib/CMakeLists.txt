@@ -36,6 +36,7 @@ target_link_libraries(nod PUBLIC $<BUILD_INTERFACE:spdlog::spdlog>)
 
 if(WIN32)
   target_sources(nod PRIVATE FileIOWin32.cpp)
+  target_link_libraries(nod PRIVATE nowide::nowide)
 else()
   target_compile_options(nod PRIVATE -Wno-multichar)
   target_sources(nod PRIVATE FileIOFILE.cpp)
