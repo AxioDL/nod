@@ -7,9 +7,9 @@
 #include <string>
 
 #include "nod/nod.hpp"
-#include "nod/Util.hpp"
+#include "Util.hpp"
 
-#include <logvisor/logvisor.hpp>
+#include <spdlog/spdlog.h>
 
 #define BUFFER_SZ 0x8000
 
@@ -168,7 +168,7 @@ public:
     m_curUser -= reqSz;
     m_curUser &= 0xfffffffffffffff0;
     if (m_curUser < 0x30000) {
-      LogModule.report(logvisor::Error, FMT_STRING("user area low mark reached"));
+      spdlog::error("user area low mark reached");
       return -1;
     }
     static_cast<PartWriteStream&>(ws).seek(m_curUser);
@@ -211,7 +211,7 @@ public:
     fstSz = ROUND_UP_32(fstSz);
 
     if (fstOff + fstSz >= m_curUser) {
-      LogModule.report(logvisor::Error, FMT_STRING("FST flows into user area (one or the other is too big)"));
+      spdlog::error("FST flows into user area (one or the other is too big)");
       return false;
     }
 
@@ -240,7 +240,7 @@ public:
     std::string apploaderIn = dirStr + "/sys/apploader.img";
     Sstat apploaderStat;
     if (Stat(apploaderIn.c_str(), &apploaderStat)) {
-      LogModule.report(logvisor::Error, FMT_STRING("unable to stat {}"), apploaderIn);
+      spdlog::error("unable to stat {}", apploaderIn);
       return false;
     }
 
@@ -248,7 +248,7 @@ public:
     std::string bootIn = dirStr + "/sys/boot.bin";
     Sstat bootStat;
     if (Stat(bootIn.c_str(), &bootStat)) {
-      LogModule.report(logvisor::Error, FMT_STRING("unable to stat {}"), bootIn);
+      spdlog::error("unable to stat {}", bootIn);
       return false;
     }
 
@@ -256,7 +256,7 @@ public:
     std::string bi2In = dirStr + "/sys/bi2.bin";
     Sstat bi2Stat;
     if (Stat(bi2In.c_str(), &bi2Stat)) {
-      LogModule.report(logvisor::Error, FMT_STRING("unable to stat {}"), bi2In);
+      spdlog::error("unable to stat {}", bi2In);
       return false;
     }
 
@@ -298,7 +298,7 @@ public:
             ws.write(buf, rdSz);
             xferSz += rdSz;
             if (0x2440 + xferSz >= m_curUser) {
-              LogModule.report(logvisor::Error, FMT_STRING("apploader flows into user area (one or the other is too big)"));
+              spdlog::error("apploader flows into user area (one or the other is too big)");
               return false;
             }
             m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderIn, xferSz);
@@ -340,7 +340,7 @@ public:
           ws.write(apploaderBuf.get(), apploaderSz);
           xferSz += apploaderSz;
           if (0x2440 + xferSz >= m_curUser) {
-            LogModule.report(logvisor::Error, FMT_STRING("apploader flows into user area (one or the other is too big)"));
+            spdlog::error("apploader flows into user area (one or the other is too big)");
             return false;
           }
           m_parent.m_progressCB(m_parent.getProgressFactor(), apploaderName, xferSz);
@@ -354,7 +354,7 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(std::string_view dirIn) {
   if (!m_fileIO->beginWriteStream())
     return EBuildResult::Failed;
   if (!CheckFreeSpace(m_outPath.c_str(), 0x57058000)) {
-    LogModule.report(logvisor::Error, FMT_STRING("not enough free disk space for {}"), m_outPath);
+    spdlog::error("not enough free disk space for {}", m_outPath);
     return EBuildResult::DiskFull;
   }
   m_progressCB(getProgressFactor(), "Preallocating image", -1);
@@ -373,12 +373,13 @@ EBuildResult DiscBuilderGCN::buildFromDirectory(std::string_view dirIn) {
 }
 
 std::optional<uint64_t> DiscBuilderGCN::CalculateTotalSizeRequired(std::string_view dirIn) {
-  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
+  std::optional<uint64_t> sz =
+      DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeBuild(dirIn, PartitionKind::Data, false);
   if (!sz)
     return sz;
   *sz += 0x30000;
   if (sz > 0x57058000) {
-    LogModule.report(logvisor::Error, FMT_STRING("disc capacity exceeded [{} / {}]"), *sz, 0x57058000);
+    spdlog::error("disc capacity exceeded [{} / {}]", *sz, 0x57058000);
     return std::nullopt;
   }
   return sz;
@@ -396,7 +397,7 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(std::string_view dirIn) {
   if (!m_builder.getFileIO().beginWriteStream())
     return EBuildResult::Failed;
   if (!CheckFreeSpace(m_builder.m_outPath.c_str(), 0x57058000)) {
-    LogModule.report(logvisor::Error, FMT_STRING("not enough free disk space for {}"), m_builder.m_outPath);
+    spdlog::error("not enough free disk space for {}", m_builder.m_outPath);
     return EBuildResult::DiskFull;
   }
   m_builder.m_progressCB(m_builder.getProgressFactor(), "Preallocating image", -1);
@@ -417,12 +418,13 @@ EBuildResult DiscMergerGCN::mergeFromDirectory(std::string_view dirIn) {
 }
 
 std::optional<uint64_t> DiscMergerGCN::CalculateTotalSizeRequired(DiscGCN& sourceDisc, std::string_view dirIn) {
-  std::optional<uint64_t> sz = DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
+  std::optional<uint64_t> sz =
+      DiscBuilderBase::PartitionBuilderBase::CalculateTotalSizeMerge(sourceDisc.getDataPartition(), dirIn);
   if (!sz)
     return std::nullopt;
   *sz += 0x30000;
   if (sz > 0x57058000) {
-    LogModule.report(logvisor::Error, FMT_STRING("disc capacity exceeded [{} / {}]"), *sz, 0x57058000);
+    spdlog::error("disc capacity exceeded [{} / {}]", *sz, 0x57058000);
     return std::nullopt;
   }
   return sz;

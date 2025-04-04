@@ -9,28 +9,30 @@ add_library(nod
   DiscIONFS.cpp
   DiscIOWBFS.cpp
   DiscWii.cpp
+  IFileIO.cpp
   nod.cpp
   OSUTF.c
   Util.cpp
+  Util.hpp
 
   ../include/nod/aes.hpp
   ../include/nod/DirectoryEnumerator.hpp
   ../include/nod/DiscBase.hpp
   ../include/nod/DiscGCN.hpp
   ../include/nod/DiscWii.hpp
+  ../include/nod/Endian.hpp
   ../include/nod/IDiscIO.hpp
   ../include/nod/IFileIO.hpp
   ../include/nod/nod.hpp
   ../include/nod/OSUTF.h
   ../include/nod/sha1.h
-  ../include/nod/Util.hpp
 )
 
 target_include_directories(nod PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
 )
 
-target_link_libraries(nod PUBLIC $<BUILD_INTERFACE:logvisor>)
+target_link_libraries(nod PUBLIC $<BUILD_INTERFACE:spdlog::spdlog>)
 
 if(WIN32)
   target_sources(nod PRIVATE FileIOWin32.cpp)

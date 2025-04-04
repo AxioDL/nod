@@ -10,9 +10,9 @@
 #endif
 
 #include "nod/IFileIO.hpp"
-#include "nod/Util.hpp"
+#include "Util.hpp"
 
-#include <logvisor/logvisor.hpp>
+#include <spdlog/spdlog.h>
 
 #include <nowide/convert.hpp>
 #include <nowide/stackstring.hpp>
@@ -25,8 +25,7 @@ class FileIOWin32 : public IFileIO {
 
 public:
   FileIOWin32(std::string_view path, int64_t maxWriteSize)
-  : m_wpath(nowide::widen(path))
-  , m_maxWriteSize(maxWriteSize) {}
+  : m_wpath(nowide::widen(path)), m_maxWriteSize(maxWriteSize) {}
 
   bool exists() override {
 #if !WINDOWS_STORE
@@ -71,7 +70,7 @@ public:
 #endif
       if (fp == INVALID_HANDLE_VALUE) {
         const nowide::stackstring path(wpath.data(), wpath.data() + wpath.size());
-        LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for writing"), path.get());
+        spdlog::error("unable to open '{}' for writing", path.get());
         err = true;
       }
     }
@@ -85,7 +84,7 @@ public:
 #endif
       if (fp == INVALID_HANDLE_VALUE) {
         const nowide::stackstring path(wpath.data(), wpath.data() + wpath.size());
-        LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for writing"), path.get());
+        spdlog::error("unable to open '{}' for writing", path.get());
         err = true;
         return;
       }
@@ -100,8 +99,7 @@ public:
         LARGE_INTEGER res;
         SetFilePointerEx(fp, li, &res, FILE_CURRENT);
         if (res.QuadPart + int64_t(length) > m_maxWriteSize) {
-          LogModule.report(logvisor::Error, FMT_STRING("write operation exceeds file's {}-byte limit"),
-                           m_maxWriteSize);
+          spdlog::error("write operation exceeds file's {}-byte limit", m_maxWriteSize);
           return 0;
         }
       }
@@ -144,7 +142,7 @@ public:
       if (fp == INVALID_HANDLE_VALUE) {
         err = true;
         const nowide::stackstring path(wpath.data(), wpath.data() + wpath.size());
-        LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for reading"), path.get());
+        spdlog::error("unable to open '{}' for reading", path.get());
       }
     }
     ReadStream(std::wstring_view wpath, uint64_t offset, bool& err) : ReadStream(wpath, err) {
@@ -177,11 +175,11 @@ public:
       while (length) {
         uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
         if (read(buf, thisSz) != thisSz) {
-          LogModule.report(logvisor::Error, FMT_STRING("unable to read enough from file"));
+          spdlog::error("unable to read enough from file");
           return written;
         }
         if (discio.write(buf, thisSz) != thisSz) {
-          LogModule.report(logvisor::Error, FMT_STRING("unable to write enough to disc"));
+          spdlog::error("unable to write enough to disc");
           return written;
         }
         length -= thisSz;

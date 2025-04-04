@@ -4,9 +4,9 @@
 #include <cstdlib>
 
 #include "nod/IFileIO.hpp"
-#include "nod/Util.hpp"
+#include "Util.hpp"
 
-#include <logvisor/logvisor.hpp>
+#include <spdlog/spdlog.h>
 
 namespace nod {
 
@@ -41,7 +41,7 @@ public:
     WriteStream(std::string_view path, int64_t maxWriteSize, bool& err) : m_maxWriteSize(maxWriteSize) {
       fp = Fopen(path.data(), "wb");
       if (!fp) {
-        LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for writing"), path);
+        spdlog::error("unable to open '{}' for writing", path);
         err = true;
       }
     }
@@ -57,15 +57,14 @@ public:
       FSeek(fp, offset, SEEK_SET);
       return;
     FailLoc:
-      LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for writing"), path);
+      spdlog::error("unable to open '{}' for writing", path);
       err = true;
     }
     ~WriteStream() override { fclose(fp); }
     uint64_t write(const void* buf, uint64_t length) override {
       if (m_maxWriteSize >= 0) {
         if (FTell(fp) + length > m_maxWriteSize) {
-          LogModule.report(logvisor::Error, FMT_STRING("write operation exceeds file's {}-byte limit"),
-                           m_maxWriteSize);
+          spdlog::error("write operation exceeds file's {}-byte limit", m_maxWriteSize);
           return 0;
         }
       }
@@ -99,7 +98,7 @@ public:
       fp = Fopen(path.data(), "rb");
       if (!fp) {
         err = true;
-        LogModule.report(logvisor::Error, FMT_STRING("unable to open '{}' for reading"), path);
+        spdlog::error("unable to open '{}' for reading", path);
       }
     }
     ReadStream(std::string_view path, uint64_t offset, bool& err) : ReadStream(path, err) {
@@ -117,11 +116,11 @@ public:
       while (length) {
         uint64_t thisSz = nod::min(uint64_t(0x7c00), length);
         if (read(buf, thisSz) != thisSz) {
-          LogModule.report(logvisor::Error, FMT_STRING("unable to read enough from file"));
+          spdlog::error("unable to read enough from file");
           return written;
         }
         if (discio.write(buf, thisSz) != thisSz) {
-          LogModule.report(logvisor::Error, FMT_STRING("unable to write enough to disc"));
+          spdlog::error("unable to write enough to disc");
           return written;
         }
         length -= thisSz;

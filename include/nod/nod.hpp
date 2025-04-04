@@ -2,9 +2,7 @@
 
 #include <functional>
 #include <memory>
-#include <string>
-
-#include "nod/Util.hpp"
+#include <string_view>
 
 namespace nod {
 

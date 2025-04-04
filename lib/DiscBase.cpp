@@ -9,13 +9,13 @@
 #include "nod/DirectoryEnumerator.hpp"
 #include "nod/IFileIO.hpp"
 #include "nod/nod.hpp"
-#include "nod/Util.hpp"
+#include "Util.hpp"
 
 #ifndef _WIN32
 #include <unistd.h>
 #else
 
-#include <logvisor/logvisor.hpp>
+#include <spdlog/spdlog.h>
 
 static void* memmem(const void* haystack, size_t hlen, const void* needle, size_t nlen) {
   int needle_first;
@@ -40,6 +40,7 @@ static void* memmem(const void* haystack, size_t hlen, const void* needle, size_
 #endif
 
 #include <algorithm>
+#include <spdlog/spdlog.h>
 
 namespace nod {
 
@@ -109,7 +110,7 @@ Node::Node(const IPartition& parent, const FSTNode& node, std::string_view name)
 
 std::unique_ptr<IPartReadStream> Node::beginReadStream(uint64_t offset) const {
   if (m_kind != Kind::File) {
-    LogModule.report(logvisor::Error, FMT_STRING("unable to stream a non-file {}"), m_name);
+    spdlog::error("unable to stream a non-file {}", m_name);
     return std::unique_ptr<IPartReadStream>();
   }
   return m_parent.beginReadStream(m_discOffset + offset);
@@ -117,7 +118,7 @@ std::unique_ptr<IPartReadStream> Node::beginReadStream(uint64_t offset) const {
 
 std::unique_ptr<uint8_t[]> Node::getBuf() const {
   if (m_kind != Kind::File) {
-    LogModule.report(logvisor::Error, FMT_STRING("unable to buffer a non-file {}"), m_name);
+    spdlog::error("unable to buffer a non-file {}", m_name);
     return nullptr;
   }
 
@@ -135,7 +136,7 @@ bool Node::extractToDirectory(std::string_view basePath, const ExtractionContext
     if (ctx.progressCB && !getName().empty())
       ctx.progressCB(nameView.str(), m_parent.m_curNodeIdx / float(m_parent.getNodeCount()));
     if (Mkdir(path.c_str(), 0755) && errno != EEXIST) {
-      LogModule.report(logvisor::Error, FMT_STRING("unable to mkdir '{}'"), path);
+      spdlog::error("unable to mkdir '{}'", path);
       return false;
     }
     for (Node& subnode : *this)
@@ -164,14 +165,14 @@ bool Node::extractToDirectory(std::string_view basePath, const ExtractionContext
 bool IPartition::extractToDirectory(std::string_view path, const ExtractionContext& ctx) {
   m_curNodeIdx = 0;
   if (Mkdir(path.data(), 0755) && errno != EEXIST) {
-    LogModule.report(logvisor::Error, FMT_STRING("unable to mkdir '{}'"), path);
+    spdlog::error("unable to mkdir '{}'", path);
     return false;
   }
 
   std::string basePath = m_isWii ? std::string(path) + "/" + getKindString(m_kind) : std::string(path);
   if (m_isWii) {
     if (Mkdir(basePath.c_str(), 0755) && errno != EEXIST) {
-      LogModule.report(logvisor::Error, FMT_STRING("unable to mkdir '{}'"), basePath);
+      spdlog::error("unable to mkdir '{}'", basePath);
       return false;
     }
   }
@@ -190,7 +191,7 @@ bool IPartition::extractToDirectory(std::string_view path, const ExtractionConte
   /* Extract Filesystem */
   std::string fsPath = basePath + "/files";
   if (Mkdir(fsPath.c_str(), 0755) && errno != EEXIST) {
-    LogModule.report(logvisor::Error, FMT_STRING("unable to mkdir '{}'"), fsPath);
+    spdlog::error("unable to mkdir '{}'", fsPath);
     return false;
   }
 
@@ -200,7 +201,7 @@ bool IPartition::extractToDirectory(std::string_view path, const ExtractionConte
 bool IPartition::extractSysFiles(std::string_view basePath, const ExtractionContext& ctx) const {
   std::string basePathStr(basePath);
   if (Mkdir((basePathStr + "/sys").c_str(), 0755) && errno != EEXIST) {
-    LogModule.report(logvisor::Error, FMT_STRING("unable to mkdir '{}/sys'"), basePath);
+    spdlog::error("unable to mkdir '{}/sys'", basePath);
     return false;
   }
 
@@ -711,7 +712,7 @@ bool DiscBuilderBase::PartitionBuilderBase::RecursiveCalculateTotalSize(uint64_t
 
 bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream& ws, std::string_view dirIn) {
   if (dirIn.empty()) {
-    LogModule.report(logvisor::Error, FMT_STRING("all arguments must be supplied to buildFromDirectory()"));
+    spdlog::error("all arguments must be supplied to buildFromDirectory()");
     return false;
   }
 
@@ -736,7 +737,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
   {
     Sstat dolStat;
     if (Stat(dolIn.c_str(), &dolStat)) {
-      LogModule.report(logvisor::Error, FMT_STRING("unable to stat {}"), dolIn);
+      spdlog::error("unable to stat {}", dolIn);
       return false;
     }
     size_t fileSz = ROUND_UP_32(dolStat.st_size);
@@ -777,7 +778,7 @@ std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSiz
 
   Sstat dolStat;
   if (Stat(dolIn.c_str(), &dolStat)) {
-    LogModule.report(logvisor::Error, FMT_STRING("unable to stat {}"), dolIn);
+    spdlog::error("unable to stat {}", dolIn);
     return std::nullopt;
   }
   uint64_t totalSz = ROUND_UP_32(dolStat.st_size);
@@ -789,7 +790,7 @@ std::optional<uint64_t> DiscBuilderBase::PartitionBuilderBase::CalculateTotalSiz
 bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream& ws, const IPartition* partIn,
                                                                std::string_view dirIn) {
   if (dirIn.empty()) {
-    LogModule.report(logvisor::Error, FMT_STRING("all arguments must be supplied to mergeFromDirectory()"));
+    spdlog::error("all arguments must be supplied to mergeFromDirectory()");
     return false;
   }
 

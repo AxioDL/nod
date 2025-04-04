@@ -8,15 +8,16 @@
 #include <io.h>
 #endif
 
-#include <logvisor/logvisor.hpp>
+#include <spdlog/spdlog.h>
 
 #include <nod/DiscBase.hpp>
 #include <nod/DiscGCN.hpp>
 #include <nod/DiscWii.hpp>
 #include <nod/nod.hpp>
+#include "../lib/Util.hpp"
 
 static void printHelp() {
-  fmt::print(stderr, FMT_STRING(
+  fmt::print(stderr,
     "Usage:\n"
     "  nodtool extract [options] <image-in> [<dir-out>]\n"
     "  nodtool makegcn [options] <fsroot-in> [<image-out>]\n"
@@ -25,7 +26,7 @@ static void printHelp() {
     "  nodtool mergewii [options] <fsroot-in> <image-in> [<image-out>]\n"
     "Options:\n"
     "  -f         Force (extract only)\n"
-    "  -v         Verbose details (extract only).\n"));
+    "  -v         Verbose details (extract only).\n");
 }
 
 #if _MSC_VER
@@ -38,17 +39,13 @@ int main(int argc, char* argv[]) {
 #define PRISize "zu"
 int main(int argc, char* argv[]) {
 #endif
-  /* Enable logging to console */
-  logvisor::RegisterStandardExceptions();
-  logvisor::RegisterConsoleLogger();
-
   int argidx = 1;
   std::string errand;
   bool verbose = false;
   nod::ExtractionContext ctx = {true, [&](std::string_view str, float c) {
                                   if (verbose)
-                                    fmt::print(stderr, FMT_STRING("Current node: {}, Extraction {:g}% Complete\n"),
-                                               str, c * 100.f);
+                                    fmt::print(stderr, "Current node: {}, Extraction {:g}% Complete\n", str,
+                                               c * 100.f);
                                 }};
   while (argidx < argc) {
     if (!nod::StrCaseCmp(argv[argidx], "-f")) {
@@ -74,11 +71,11 @@ int main(int argc, char* argv[]) {
   }
 
   auto progFunc = [&](float prog, std::string_view name, size_t bytes) {
-    fmt::print(FMT_STRING("\r                                                                      "));
+    fmt::print("\r                                                                      ");
     if (bytes != SIZE_MAX)
-      fmt::print(FMT_STRING("\r{:g}% {} {} B"), prog * 100.f, name, bytes);
+      fmt::print("\r{:g}% {} {} B", prog * 100.f, name, bytes);
     else
-      fmt::print(FMT_STRING("\r{:g}% {}"), prog * 100.f, name);
+      fmt::print("\r{:g}% {}", prog * 100.f, name);
     fflush(stdout);
   };
 
@@ -138,7 +135,7 @@ int main(int argc, char* argv[]) {
     /* Pre-validate path */
     nod::Sstat theStat;
     if (nod::Stat(fsrootIn.c_str(), &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as directory"), fsrootIn);
+      spdlog::error("unable to stat {} as directory");
       return 1;
     }
 
@@ -150,7 +147,7 @@ int main(int argc, char* argv[]) {
     nod::DiscBuilderGCN b(imageOut, progFunc);
     ret = b.buildFromDirectory(fsrootIn);
 
-    fmt::print(FMT_STRING("\n"));
+    fmt::print("\n");
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (errand == "makewii") {
@@ -176,7 +173,7 @@ int main(int argc, char* argv[]) {
     /* Pre-validate path */
     nod::Sstat theStat;
     if (nod::Stat(fsrootIn.c_str(), &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as directory"), fsrootIn);
+      spdlog::error("unable to stat {} as directory");
       return 1;
     }
 
@@ -189,7 +186,7 @@ int main(int argc, char* argv[]) {
     nod::DiscBuilderWii b(imageOut, dual, progFunc);
     ret = b.buildFromDirectory(fsrootIn);
 
-    fmt::print(FMT_STRING("\n"));
+    fmt::print("\n");
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (errand == "mergegcn") {
@@ -220,22 +217,22 @@ int main(int argc, char* argv[]) {
     /* Pre-validate paths */
     nod::Sstat theStat;
     if (nod::Stat(fsrootIn.c_str(), &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as directory"), fsrootIn);
+      spdlog::error("unable to stat {} as directory");
       return 1;
     }
     if (nod::Stat(imageIn.c_str(), &theStat) || !S_ISREG(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as file"), imageIn);
+      spdlog::error("unable to stat {} as file");
       return 1;
     }
 
     bool isWii;
     std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(imageIn, isWii);
     if (!disc) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to open image {}"), imageIn);
+      spdlog::error("unable to open image {}");
       return 1;
     }
     if (isWii) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("Wii images should be merged with 'mergewii'"));
+      spdlog::error("Wii images should be merged with 'mergewii'");
       return 1;
     }
 
@@ -247,7 +244,7 @@ int main(int argc, char* argv[]) {
     nod::DiscMergerGCN b(imageOut, static_cast<nod::DiscGCN&>(*disc), progFunc);
     ret = b.mergeFromDirectory(fsrootIn);
 
-    fmt::print(FMT_STRING("\n"));
+    fmt::print("\n");
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else if (errand == "mergewii") {
@@ -278,22 +275,22 @@ int main(int argc, char* argv[]) {
     /* Pre-validate paths */
     nod::Sstat theStat;
     if (nod::Stat(fsrootIn.c_str(), &theStat) || !S_ISDIR(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as directory"), fsrootIn);
+      spdlog::error("unable to stat {} as directory");
       return 1;
     }
     if (nod::Stat(imageIn.c_str(), &theStat) || !S_ISREG(theStat.st_mode)) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to stat {} as file"), imageIn);
+      spdlog::error("unable to stat {} as file");
       return 1;
     }
 
     bool isWii;
     std::unique_ptr<nod::DiscBase> disc = nod::OpenDiscFromImage(imageIn, isWii);
     if (!disc) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("unable to open image {}"), argv[3]);
+      spdlog::error("unable to open image {}");
       return 1;
     }
     if (!isWii) {
-      nod::LogModule.report(logvisor::Error, FMT_STRING("GameCube images should be merged with 'mergegcn'"));
+      spdlog::error("GameCube images should be merged with 'mergegcn'");
       return 1;
     }
 
@@ -306,7 +303,7 @@ int main(int argc, char* argv[]) {
     nod::DiscMergerWii b(imageOut, static_cast<nod::DiscWii&>(*disc), dual, progFunc);
     ret = b.mergeFromDirectory(fsrootIn);
 
-    fmt::print(FMT_STRING("\n"));
+    fmt::print("\n");
     if (ret != nod::EBuildResult::Success)
       return 1;
   } else {
@@ -314,6 +311,6 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  nod::LogModule.report(logvisor::Info, FMT_STRING("Success!"));
+  spdlog::info("Success!");
   return 0;
 }

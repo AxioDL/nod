@@ -4,16 +4,14 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
-#include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
-#include <vector>
+#include <string_view>
 
 #include "nod/IDiscIO.hpp"
 #include "nod/IFileIO.hpp"
 #include "nod/OSUTF.h"
-#include "nod/Util.hpp"
+#include "nod/Endian.hpp"
 
 namespace nod {
 

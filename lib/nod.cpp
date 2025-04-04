@@ -6,10 +6,9 @@
 #include "nod/DiscGCN.hpp"
 #include "nod/DiscWii.hpp"
 
+#include <spdlog/spdlog.h>
+
 namespace nod {
-
-logvisor::Module LogModule("nod");
-
 std::unique_ptr<IDiscIO> NewDiscIOISO(std::string_view path);
 std::unique_ptr<IDiscIO> NewDiscIOWBFS(std::string_view path);
 std::unique_ptr<IDiscIO> NewDiscIONFS(std::string_view path);
@@ -18,7 +17,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(std::string_view path, bool& isWii) 
   /* Temporary file handle to determine image type */
   std::unique_ptr<IFileIO> fio = NewFileIO(path);
   if (!fio->exists()) {
-    LogModule.report(logvisor::Error, FMT_STRING("Unable to open '{}'"), path);
+    spdlog::error("Unable to open '{}'", path);
     return {};
   }
   std::unique_ptr<IFileIO::IReadStream> rs = fio->beginReadStream();
@@ -29,7 +28,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(std::string_view path, bool& isWii) 
   std::unique_ptr<IDiscIO> discIO;
   uint32_t magic = 0;
   if (rs->read(&magic, 4) != 4) {
-    LogModule.report(logvisor::Error, FMT_STRING("Unable to read magic from '{}'"), path);
+    spdlog::error("Unable to read magic from '{}'", path);
     return {};
   }
 
@@ -60,7 +59,7 @@ std::unique_ptr<DiscBase> OpenDiscFromImage(std::string_view path, bool& isWii) 
   }
 
   if (!discIO) {
-    LogModule.report(logvisor::Error, FMT_STRING("'{}' is not a valid image"), path);
+    spdlog::error("'{}' is not a valid image", path);
     return {};
   }
 

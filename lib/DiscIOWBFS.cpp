@@ -5,9 +5,10 @@
 
 #include "nod/IDiscIO.hpp"
 #include "nod/IFileIO.hpp"
-#include "nod/Util.hpp"
+#include "nod/Endian.hpp"
+#include "Util.hpp"
 
-#include <logvisor/logvisor.hpp>
+#include <spdlog/spdlog.h>
 
 namespace nod {
 
@@ -76,7 +77,7 @@ class DiscIOWBFS : public IDiscIO {
     off *= 512ULL;
     rs.seek(off, SEEK_SET);
     if (rs.read(buf, count * 512ULL) != count * 512ULL) {
-      LogModule.report(logvisor::Error, FMT_STRING("error reading disc"));
+      spdlog::error("error reading disc");
       return 1;
     }
     return 0;
@@ -92,7 +93,7 @@ public:
     WBFS* p = &wbfs;
     WBFSHead tmpHead;
     if (rs->read(&tmpHead, sizeof(tmpHead)) != sizeof(tmpHead)) {
-      LogModule.report(logvisor::Error, FMT_STRING("unable to read WBFS head"));
+      spdlog::error("unable to read WBFS head");
       return;
     }
     unsigned hd_sector_size = 1 << tmpHead.hd_sec_sz_s;
@@ -102,7 +103,7 @@ public:
     WBFSHead* head = (WBFSHead*)wbfsHead.get();
     rs->seek(0, SEEK_SET);
     if (rs->read(head, hd_sector_size) != hd_sector_size) {
-      LogModule.report(logvisor::Error, FMT_STRING("unable to read WBFS head"));
+      spdlog::error("unable to read WBFS head");
       return;
     }
 
@@ -115,11 +116,11 @@ public:
     if (_wbfsReadSector(*rs, p->part_lba, 1, head))
       return;
     if (hd_sector_size && head->hd_sec_sz_s != size_to_shift(hd_sector_size)) {
-      LogModule.report(logvisor::Error, FMT_STRING("hd sector size doesn't match"));
+      spdlog::error("hd sector size doesn't match");
       return;
     }
     if (num_hd_sector && head->n_hd_sec != SBig(num_hd_sector)) {
-      LogModule.report(logvisor::Error, FMT_STRING("hd num sector doesn't match"));
+      spdlog::error("hd num sector doesn't match");
       return;
     }
     p->hd_sec_sz = 1 << head->hd_sec_sz_s;
@@ -147,7 +148,7 @@ public:
     if (head->disc_table[0]) {
       wbfsDiscInfo.reset(new uint8_t[p->disc_info_sz]);
       if (!wbfsDiscInfo) {
-        LogModule.report(logvisor::Error, FMT_STRING("allocating memory"));
+        spdlog::error("allocating memory");
         return;
       }
       if (_wbfsReadSector(*rs, p->part_lba + 1, disc_info_sz_lba, wbfsDiscInfo.get()))

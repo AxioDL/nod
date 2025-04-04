@@ -1,9 +1,10 @@
 #include "nod/IDiscIO.hpp"
 #include "nod/IFileIO.hpp"
-#include "nod/Util.hpp"
 #include "nod/aes.hpp"
+#include "nod/Endian.hpp"
+#include "Util.hpp"
 
-#include <logvisor/logvisor.hpp>
+#include <spdlog/spdlog.h>
 
 namespace nod {
 
@@ -69,9 +70,7 @@ public:
     const auto slashPos = SignedSize(fpin.find_last_of("/\\"));
     if (fpin.size() <= 4 || dotPos == -1 || dotPos <= slashPos || fpin.compare(slashPos + 1, 4, "hif_") ||
         fpin.compare(dotPos, fpin.size() - dotPos, ".nfs")) {
-      LogModule.report(logvisor::Error,
-                       FMT_STRING("'{}' must begin with 'hif_' and end with '.nfs' to be accepted as an NFS image"),
-                       fpin);
+      spdlog::error("'{}' must begin with 'hif_' and end with '.nfs' to be accepted as an NFS image", fpin);
       err = true;
       return;
     }
@@ -82,32 +81,32 @@ public:
     if (!keyFile)
       keyFile = NewFileIO(dir + "htk.bin")->beginReadStream();
     if (!keyFile) {
-      LogModule.report(logvisor::Error, FMT_STRING("Unable to open '{}../code/htk.bin' or '{}htk.bin'"), dir, dir);
+      spdlog::error("Unable to open '{}../code/htk.bin' or '{}htk.bin'", dir, dir);
       err = true;
       return;
     }
     if (keyFile->read(key, 16) != 16) {
-      LogModule.report(logvisor::Error, FMT_STRING("Unable to read from '{}../code/htk.bin' or '{}htk.bin'"), dir, dir);
+      spdlog::error("Unable to read from '{}../code/htk.bin' or '{}htk.bin'", dir, dir);
       err = true;
       return;
     }
 
     /* Load header from first file */
-    const std::string firstPath = fmt::format(FMT_STRING("{}hif_{:06}.nfs"), dir, 0);
+    const std::string firstPath = fmt::format("{}hif_{:06}.nfs", dir, 0);
     files.push_back(NewFileIO(firstPath));
     auto rs = files.back()->beginReadStream();
     if (!rs) {
-      LogModule.report(logvisor::Error, FMT_STRING("'{}' does not exist"), firstPath);
+      spdlog::error("'{}' does not exist", firstPath);
       err = true;
       return;
     }
     if (rs->read(&nfsHead, 0x200) != 0x200) {
-      LogModule.report(logvisor::Error, FMT_STRING("Unable to read header from '{}'"), firstPath);
+      spdlog::error("Unable to read header from '{}'", firstPath);
       err = true;
       return;
     }
     if (std::memcmp(&nfsHead.magic, "EGGS", 4)) {
-      LogModule.report(logvisor::Error, FMT_STRING("Invalid magic in '{}'"), firstPath);
+      spdlog::error("Invalid magic in '{}'", firstPath);
       err = true;
       return;
     }
@@ -122,10 +121,10 @@ public:
     const uint32_t numFiles = calculateNumFiles();
     files.reserve(numFiles);
     for (uint32_t i = 1; i < numFiles; ++i) {
-      std::string path = fmt::format(FMT_STRING("{}hif_{:06}.nfs"), dir, i);
+      std::string path = fmt::format("{}hif_{:06}.nfs", dir, i);
       files.push_back(NewFileIO(path));
       if (!files.back()->exists()) {
-        LogModule.report(logvisor::Error, FMT_STRING("'{}' does not exist"), path);
+        spdlog::error("'{}' does not exist", path);
         err = true;
         return;
       }
@@ -163,7 +162,7 @@ public:
 
     void setCurFile(uint32_t curFile) {
       if (curFile >= m_parent.files.size()) {
-        LogModule.report(logvisor::Error, FMT_STRING("Out of bounds NFS file access"));
+        spdlog::error("Out of bounds NFS file access");
         return;
       }
       m_curFile = curFile;

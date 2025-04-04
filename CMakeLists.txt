@@ -59,8 +59,8 @@ endif()
 
 include (CMakePackageConfigHelpers)
 
-if (NOT TARGET logvisor)
-  add_subdirectory(logvisor)
+if(NOT TARGET spdlog)
+  find_package(spdlog REQUIRED)
 endif()
 
 add_subdirectory(lib)
