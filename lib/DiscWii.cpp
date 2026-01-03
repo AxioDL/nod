@@ -1246,8 +1246,8 @@ std::optional<uint64_t> DiscBuilderWii::CalculateTotalSizeRequired(std::string_v
     ++szDiv.quot;
   sz = szDiv.quot * 0x200000;
   *sz += 0x200000;
-  dualLayer = (sz > 0x118240000);
-  if (sz > 0x1FB4E0000) {
+  dualLayer = (sz > UINT64_C(0x118240000));
+  if (sz > UINT64_C(0x1FB4E0000)) {
     spdlog::error("disc capacity exceeded [{} / {}]", *sz, 0x1FB4E0000);
     return std::nullopt;
   }
@@ -1353,8 +1353,8 @@ std::optional<uint64_t> DiscMergerWii::CalculateTotalSizeRequired(DiscWii& sourc
     ++szDiv.quot;
   sz = szDiv.quot * 0x200000;
   *sz += 0x200000;
-  dualLayer = (sz > 0x118240000);
-  if (sz > 0x1FB4E0000) {
+  dualLayer = (sz > UINT64_C(0x118240000));
+  if (sz > UINT64_C(0x1FB4E0000)) {
     spdlog::error("disc capacity exceeded [{} / {}]", *sz, 0x1FB4E0000);
     return std::nullopt;
   }

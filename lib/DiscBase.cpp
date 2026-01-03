@@ -366,11 +366,11 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(std::string_view f
   DirectoryEnumerator dEnum(filesIn, DirectoryEnumerator::Mode::DirsThenFilesSorted, false, false, true);
   for (const DirectoryEnumerator::Entry& e : dEnum) {
     if (e.m_isDir) {
-      size_t dirNodeIdx = m_buildNodes.size();
-      m_buildNodes.emplace_back(true, m_buildNameOff, parentDirIdx, dirNodeIdx + 1);
+      const size_t dirNodeIdx = m_buildNodes.size();
+      m_buildNodes.emplace_back(true, uint32_t(m_buildNameOff), uint32_t(parentDirIdx), uint32_t(dirNodeIdx + 1));
       addBuildName(e.m_name);
       incParents();
-      if (!recursiveBuildFST(e.m_path.c_str(),
+      if (!recursiveBuildFST(e.m_path,
                              [&]() {
                                m_buildNodes[dirNodeIdx].incrementLength();
                                incParents();
@@ -378,8 +378,8 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveBuildFST(std::string_view f
                              dirNodeIdx))
         return false;
     } else {
-      std::pair<uint64_t, uint64_t> fileOffSz = m_fileOffsetsSizes.at(e.m_path);
-      m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
+      const auto [fileOff, fileOffLen] = m_fileOffsetsSizes.at(e.m_path);
+      m_buildNodes.emplace_back(false, uint32_t(m_buildNameOff), packOffset(fileOff), uint32_t(fileOffLen));
       addBuildName(e.m_name);
       incParents();
     }
@@ -589,13 +589,13 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
 
       if (e.m_isDir) {
         size_t dirNodeIdx = m_buildNodes.size();
-        m_buildNodes.emplace_back(true, m_buildNameOff, parentDirIdx, dirNodeIdx + 1);
+        m_buildNodes.emplace_back(true, uint32_t(m_buildNameOff), uint32_t(parentDirIdx), uint32_t(dirNodeIdx + 1));
         addBuildName(e.m_name);
         incParents();
 
         auto search = dirNodes.find(nameView.str());
         if (search != dirNodes.cend()) {
-          if (!recursiveMergeFST(search->second, e.m_path.c_str(),
+          if (!recursiveMergeFST(search->second, e.m_path,
                                  [&]() {
                                    m_buildNodes[dirNodeIdx].incrementLength();
                                    incParents();
@@ -604,7 +604,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
             return false;
           dirNodes.erase(search);
         } else {
-          if (!recursiveMergeFST(nullptr, e.m_path.c_str(),
+          if (!recursiveMergeFST(nullptr, e.m_path,
                                  [&]() {
                                    m_buildNodes[dirNodeIdx].incrementLength();
                                    incParents();
@@ -614,8 +614,8 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
         }
       } else {
         fileNodes.erase(nameView.str());
-        std::pair<uint64_t, uint64_t> fileOffSz = m_fileOffsetsSizes.at(chKeyPath);
-        m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
+        const auto [fileOff, fileOffLen] = m_fileOffsetsSizes.at(chKeyPath);
+        m_buildNodes.emplace_back(false, uint32_t(m_buildNameOff), packOffset(fileOff), uint32_t(fileOffLen));
         addBuildName(e.m_name);
         incParents();
       }
@@ -628,7 +628,7 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
     std::string chKeyPath = std::string(keyPath) + '/' + sysName.str();
 
     size_t dirNodeIdx = m_buildNodes.size();
-    m_buildNodes.emplace_back(true, m_buildNameOff, parentDirIdx, dirNodeIdx + 1);
+    m_buildNodes.emplace_back(true, uint32_t(m_buildNameOff), uint32_t(parentDirIdx), uint32_t(dirNodeIdx + 1));
     addBuildName(sysName.str());
     incParents();
 
@@ -647,8 +647,8 @@ bool DiscBuilderBase::PartitionBuilderBase::recursiveMergeFST(const Node* nodeIn
     SJISToUTF8 sysName(ch.getName());
     std::string chKeyPath = std::string(keyPath) + '/' + sysName.str();
 
-    std::pair<uint64_t, uint64_t> fileOffSz = m_fileOffsetsSizes.at(chKeyPath);
-    m_buildNodes.emplace_back(false, m_buildNameOff, packOffset(fileOffSz.first), fileOffSz.second);
+    const auto [fileOff, fileOffLen] = m_fileOffsetsSizes.at(chKeyPath);
+    m_buildNodes.emplace_back(false, uint32_t(m_buildNameOff), packOffset(fileOff), uint32_t(fileOffLen));
     addBuildName(ch.getName());
     incParents();
   }
@@ -723,14 +723,14 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
 
   /* 1st pass - Tally up total progress steps */
   m_parent.m_progressTotal += 2; /* Prep and DOL */
-  recursiveBuildNodesPre(filesIn.c_str());
+  recursiveBuildNodesPre(filesIn);
 
   /* Clear file */
   m_parent.m_progressCB(m_parent.getProgressFactor(), "Preparing output image", -1);
   ++m_parent.m_progressIdx;
 
   /* Add root node */
-  m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
+  m_buildNodes.emplace_back(true, uint32_t(m_buildNameOff), 0, 1);
   addBuildName("<root>");
 
   /* Write Boot DOL first (first thing seeked to after Apploader) */
@@ -746,7 +746,7 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
       return false;
     m_dolOffset = fileOff;
     m_dolSize = fileSz;
-    std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn.c_str())->beginReadStream();
+    std::unique_ptr<IFileIO::IReadStream> rs = NewFileIO(dolIn)->beginReadStream();
     if (!rs)
       return false;
     bool patched;
@@ -759,11 +759,11 @@ bool DiscBuilderBase::PartitionBuilderBase::buildFromDirectory(IPartWriteStream&
   }
 
   /* Gather files in root directory */
-  if (!recursiveBuildNodes(ws, true, filesIn.c_str()))
+  if (!recursiveBuildNodes(ws, true, filesIn))
     return false;
-  if (!recursiveBuildNodes(ws, false, filesIn.c_str()))
+  if (!recursiveBuildNodes(ws, false, filesIn))
     return false;
-  if (!recursiveBuildFST(filesIn.c_str(), [&]() { m_buildNodes[0].incrementLength(); }, 0))
+  if (!recursiveBuildFST(filesIn, [&]() { m_buildNodes[0].incrementLength(); }, 0))
     return false;
 
   return true;
@@ -800,14 +800,14 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
 
   /* 1st pass - Tally up total progress steps */
   m_parent.m_progressTotal += 2; /* Prep and DOL */
-  recursiveMergeNodesPre(&partIn->getFSTRoot(), filesIn.c_str());
+  recursiveMergeNodesPre(&partIn->getFSTRoot(), filesIn);
 
   /* Clear file */
   m_parent.m_progressCB(m_parent.getProgressFactor(), "Preparing output image", -1);
   ++m_parent.m_progressIdx;
 
   /* Add root node */
-  m_buildNodes.emplace_back(true, m_buildNameOff, 0, 1);
+  m_buildNodes.emplace_back(true, uint32_t(m_buildNameOff), 0, 1);
   addBuildName("<root>");
 
   /* Write Boot DOL first (first thing seeked to after Apploader) */
@@ -833,11 +833,11 @@ bool DiscBuilderBase::PartitionBuilderBase::mergeFromDirectory(IPartWriteStream&
 
   /* Gather files in root directory */
   std::string keyPath;
-  if (!recursiveMergeNodes(ws, true, &partIn->getFSTRoot(), filesIn.c_str(), keyPath))
+  if (!recursiveMergeNodes(ws, true, &partIn->getFSTRoot(), filesIn, keyPath))
     return false;
-  if (!recursiveMergeNodes(ws, false, &partIn->getFSTRoot(), filesIn.c_str(), keyPath))
+  if (!recursiveMergeNodes(ws, false, &partIn->getFSTRoot(), filesIn, keyPath))
     return false;
-  if (!recursiveMergeFST(&partIn->getFSTRoot(), filesIn.c_str(), [&]() { m_buildNodes[0].incrementLength(); }, 0, keyPath))
+  if (!recursiveMergeFST(&partIn->getFSTRoot(), filesIn, [&]() { m_buildNodes[0].incrementLength(); }, 0, keyPath))
     return false;
 
   return true;
